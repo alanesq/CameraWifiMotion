@@ -9,10 +9,11 @@
  *             
  *             Note: The flash can not be used if using an SD Card as they both use pin 4
  *             
+ *             GPIO16 is used as an input pin for external sensors etc.
+ *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times.....chances are there is a problem with the power to the board.
- *                          It needs a good 500ma supply and probably a good smoothing capacitor.
- *                          This catches me out time and time again ;-)
+ *                          It needs a good 500ma supply and ideally a good size smoothing capacitor.
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
  *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -35,18 +36,21 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "29Jan20";                     // version of this sketch
+  const String sversion = "30Jan20";                     // version of this sketch
   
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
   const int datarefresh = 4000;                          // Refresh rate of the updating data on web page (1000 = 1 second)
-
+  String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript)
+  
   const int LogNumber = 40;                              // number of entries to store in the system log
 
   const int ServerPort = 80;                             // ip port to serve web pages on
 
-  const int led = 4;                                     // illumination LED pin
+  const int Illumination_led = 4;                        // illumination LED pin
 
+  const byte gioPin = 16;                                // I/O pin (for external sensor input)
+  
   const int SystemCheckRate = 5000;                      // how often to do routine system checks (milliseconds)
   
   const boolean ledON = HIGH;                            // Status LED control 
@@ -90,9 +94,9 @@
 #include "motion.h"                     // motion detection / camera
 
 // misc
-  unsigned long CAMERAtimer = millis();      // used for timing camera motion refresh timing
-  unsigned long TRIGGERtimer = millis();     // used for limiting camera motion trigger rate
-  unsigned long EMAILtimer = millis();       // used for limiting rate emails can be sent
+  unsigned long CAMERAtimer = 0;             // used for timing camera motion refresh timing
+  unsigned long TRIGGERtimer = 0;            // used for limiting camera motion trigger rate
+  unsigned long EMAILtimer = 0;              // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
   String TriggerTime = "Not yet triggered";  // Time of last motion trigger
   unsigned long MaintTiming = millis();      // used for timing maintenance tasks
@@ -119,10 +123,15 @@ void setup(void) {
   
   // Serial.setDebugOutput(true);                                // enable extra diagnostic info  
    
-  // configure the onboard illumination LED
-    pinMode(led, OUTPUT); 
-    digitalWrite(led, ledOFF);                                    // led on until wifi has connected
+  // configure the LED
+    pinMode(Illumination_led, OUTPUT); 
+    digitalWrite(Illumination_led, ledOFF); 
 
+  BlinkLed(1);           // flash the led once
+
+  // configure the I/O pin (with pullup resistor)
+    pinMode(gioPin,  INPUT_PULLUP);                                
+    
   startWifiManager();                                            // Connect to wifi (procedure is in wifi.h)
   
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
@@ -182,15 +191,21 @@ void setup(void) {
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
   // Finished connecting to network
-    for (int i = 0; i < 3; i++) {             // flash led
-      digitalWrite(led, ledON);
-      delay(100);
-      digitalWrite(led, ledOFF);
-      delay(200);
-    }
+    BlinkLed(2);      // flash the led twice
     log_system_message(stitle + " Started");   
     TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
     
+}
+
+
+// blink the led 
+void BlinkLed(byte Bcount) {
+  for (int i = 0; i < Bcount; i++) {             // flash led
+    digitalWrite(Illumination_led, ledON);
+    delay(50);
+    digitalWrite(Illumination_led, ledOFF);
+    delay(300);
+  }
 }
 
 
@@ -202,7 +217,7 @@ void loop(void){
 
   unsigned long currentMillis = millis();        // get current time
   
-  server.handleClient();                         // service any web page requests (may not be needed for esp32?)
+  server.handleClient();                         // service any web page requests 
 
   // camera motion detection 
   //        explanation of timing here: https://www.baldengineer.com/arduino-millis-plus-addition-does-not-add-up.html
@@ -234,10 +249,9 @@ void loop(void){
       WIFIcheck();                                 // check if wifi connection is ok
       MaintTiming = millis();                      // reset timer
       time_t t=now();                              // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
-      Serial.flush();                              // Make sure any serial data backlog is cleared
     }
 
-  delay(20);
+  delay(40);
 
 } 
 
@@ -472,11 +486,11 @@ void handleRoot() {
       if (server.hasArg("illuminator")) {
         // button was pressed 
           TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
-          if (digitalRead(led) == ledOFF) {
-            digitalWrite(led, ledON);  
+          if (digitalRead(Illumination_led) == ledOFF) {
+            digitalWrite(Illumination_led, ledON);  
             log_system_message("Illuminator LED turned on");    
           } else {
-            digitalWrite(led, ledOFF);  
+            digitalWrite(Illumination_led, ledOFF);  
             log_system_message("Illuminator LED turned off"); 
           }
           SaveSettingsSpiffs();     // save settings in Spiffs
@@ -518,8 +532,9 @@ void handleRoot() {
     
 
     // insert an iframe containing the changing data (updates every few seconds using java script)
-       message += "<BR><iframe id='dataframe' height=150; width=600; frameborder='0'; src='/data'></iframe>\n"
+       message += "<BR><iframe id='dataframe' height=150; width=600; frameborder='0';></iframe>\n"
       "<script type='text/javascript'>\n"
+         "setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + JavaRefreshTime +");\n"
          "window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n"
       "</script>\n"; 
 
@@ -534,7 +549,7 @@ void handleRoot() {
     // detection parameters
       message += "<BR>Detection thresholds: ";
       message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as changed'min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
-      message += "Image<input type='number' style='width: 35px' name='imaget' title='Percentage changed blocks in image to count as motion detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
+      message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks in image to count as motion detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
 
     // input submit button  
       message += "<BR><input type='submit'><BR><BR>\n";
@@ -591,7 +606,7 @@ void handleData(){
     
   // Illumination
     message += "<BR>Illumination LED is ";    
-    if (digitalRead(led) == ledON) message += red + "On" + endcolour;
+    if (digitalRead(Illumination_led) == ledON) message += red + "On" + endcolour;
     else message += "Off";
     if (!SD_Present) {    // if no sd card in use
       // show status of use flash 
@@ -603,13 +618,19 @@ void handleData(){
     message += "<BR>Time: " + currentTime() + "\n";      // show current time
 
   // show if a sd card is present
-    if (SD_Present) message += "<BR>SD-Card present (Flash disabled)";
+    if (SD_Present) message += "<BR>SD-Card present (Flash disabled)\n";
+
+  // show io pin status
+    message += "<BR>External sensor pin is: ";
+    if (digitalRead(gioPin)) message += "High\n";
+    else message += "Low\n";
   
   
   message += "</body></htlm>\n";
   
   server.send(200, "text/html", message);   // send reply as plain text
   message = "";      // clear variable
+
   
 }
 
@@ -630,7 +651,12 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);     // capture an image from camera
 
   // insert image in to html
-    message += "<img src='/img' alt='Live Image' width='70%'>\n";
+    message += "<img  id='img' alt='Live Image' width='70%'>\n";       // content is set in javascript
+
+  // javascript to refresh the image after short delay (bug fix as it often rejects the first request)
+    message +=  "<script type='text/javascript'>\n"
+                "  setTimeout(function(){ document.getElementById('img').src='/img'; }, " + JavaRefreshTime + ");\n"
+                "</script>\n";
     
   message += webfooter();                                             // add the standard footer
   
@@ -684,8 +710,12 @@ void handleImages(){
     file.close();
     
   // insert image in to html
-    message += "<BR><img src='/img?pic=" + String(ImageToShow) + "' alt='Camera Image' width='70%'>\n";
-  
+    message += "<BR><img id='img' alt='Camera Image' width='70%'>\n";      // content is set in javascript
+
+  // javascript to refresh the image after short delay (bug fix as it often rejects the first request)
+    message +=  "<script type='text/javascript'>\n"
+                "  setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "' ; }, " + JavaRefreshTime + ");\n"
+                "</script>\n";
 
   message += webfooter();                                             // add the standard footer
 
@@ -764,8 +794,8 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
 
   // use flash if required
-  bool tFlash = digitalRead(led);                           // store current Illuminator LED status
-  if (!SD_Present && UseFlash)  digitalWrite(led, ledON);   // turn Illuminator LED on if no sd card and it is required
+  bool tFlash = digitalRead(Illumination_led);                           // store current Illuminator LED status
+  if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
   
 
   // ------------------- capture an image -------------------
@@ -875,7 +905,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     
   } while ( !ok && TryCount < 3);           // if there was a problem try again 
 
-  if (!SD_Present) digitalWrite(led, tFlash);         // restore flash status
+  if (!SD_Present) digitalWrite(Illumination_led, tFlash);         // restore flash status
 
   if (TryCount == 3) log_system_message("Unable to capture/store image");
   
@@ -934,21 +964,21 @@ void MotionDetected(float changes) {
   
     log_system_message("Camera detected motion: " + String(changes)); 
     TriggerTime = currentTime();                                 // store time of trigger
-    
     capturePhotoSaveSpiffs(UseFlash);                            // capture an image
 
+    // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {
-      // check when last email was sent
         unsigned long currentMillis = millis();        // get current time  
-        if ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000) ) {
+        if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
+
+          EMAILtimer = currentMillis;    // reset timer 
       
           // send an email
               String emessage = "Camera triggered at " + currentTime();
               byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
               if (q==0) log_system_message("email sent ok" );
               else log_system_message("Error sending email, error code=" + String(q) );
-
-          EMAILtimer = currentMillis;    // reset timer   
+  
          }
          else log_system_message("Too soon to send another email");
     }
