@@ -23,18 +23,11 @@
 byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
   
 // Wifi libraries (for both ESP8266 and ESP32)
+    #include <WiFiManager.h>            // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
     #if defined(ESP8266)                  // esp8266 section
-      #include <ESP8266WiFi.h>     
-      // #include <DNSServer.h>
-      #include <ESP8266WebServer.h>
-      #include <WiFiManager.h>            // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
       ESP8266WebServer server(ServerPort);
       const String ESPType = "ESP8266";
     #elif defined(ESP32)                  // esp32 section
-      #include <WiFi.h>        
-      // #include <DNSServer.h>
-      #include <WebServer.h>
-      #include <WiFiManager.h>  
       WebServer server(ServerPort); 
       const String ESPType = "ESP32";
     #else
@@ -42,7 +35,7 @@ byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
     #endif
 
 
-// time from NTP server
+// Time from NTP server
 //      from https://raw.githubusercontent.com/RalphBacon/No-Real-Time-Clock-RTC-required---use-an-NTP/master
   #include <TimeLib.h>
   #include <WiFiUdp.h>                         // UDP library which is how we communicate with Time Server
@@ -233,7 +226,7 @@ time_t getNTPTime() {
 
   // Wait to see if a reply is available - timeout after X seconds. At least
   // this way we exit the 'delay' as soon as we have a UDP packet to process
-  #define UDPtimeoutSecs 5
+  #define UDPtimeoutSecs 3
   int timeOutCnt = 0;
   while (NTPUdp.parsePacket() == 0 && ++timeOutCnt < (UDPtimeoutSecs * 10)){
     delay(100);

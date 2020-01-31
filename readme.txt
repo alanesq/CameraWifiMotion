@@ -1,9 +1,15 @@
-This is a sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
-The idea is that the camera looks for movement and when detected it captures an image and emails it.
+                        CameraWifiMotion - alanesq@disroot.org - Jan2020
+                        ================================================
+
+This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
+The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
+internal memory or on to an sd card and also emails it if required.
 
 It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
-the image was captured.
+the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
+if you set the highest.
+
 It also has the following URLs you can use:
     http://<esp ip address>     /ping - responds with OK, just so you know it is still working
                                 /log - log page of the device activities
@@ -13,6 +19,7 @@ It also has the following URLs you can use:
                                 /live - capture and display a live image from the camera
                                 /images - display the 10 images stored in Spiffs
                                 /img - just display a plain jpg of the latest captured image
+                                /data - this is the updating text on the main page but handy for a quick check of status
 
 Note: I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org
       This sketch includes a lot of other peoples code from many sources which I have included links to   
@@ -32,7 +39,8 @@ It uses WifiManager so first time the ESP starts it will create an access point 
  
 Note: As I discovered myself, it is vital that the ESP has a good 5volt supply (at least 0.5amp capable - although it draws around 
       100mA most of the time) otherwise you get all sorts of weird things happening including very slow network response times.
- 
+      The esp camera board also seems very sensitive to what is around the antenna and this can cause wifi to slow or stop.
+      e.g. I mounted the camera on a strip board and this was enough to stop wifi responding.
  
 -----------------
 

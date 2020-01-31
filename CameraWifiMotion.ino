@@ -36,7 +36,9 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "30Jan20";                     // version of this sketch
+  const String sversion = "31Jan20";                     // version of this sketch
+
+  int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
@@ -75,7 +77,6 @@
   #include <SPIFFS.h>
   #include <FS.h>                       // gives file access on spiffs
   int SpiffsFileCounter = 0;            // counter of last image stored
-  int MaxSpiffsImages = 10;              // number of images to store
 
 // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
   #include "SD_MMC.h"
@@ -485,7 +486,8 @@ void handleRoot() {
     // if button "toggle illuminator LED" was pressed  
       if (server.hasArg("illuminator")) {
         // button was pressed 
-          TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
+          if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting (to stop light triggering it)
+          delay(100);
           if (digitalRead(Illumination_led) == ledOFF) {
             digitalWrite(Illumination_led, ledON);  
             log_system_message("Illuminator LED turned on");    
@@ -494,8 +496,12 @@ void handleRoot() {
             log_system_message("Illuminator LED turned off"); 
           }
           SaveSettingsSpiffs();     // save settings in Spiffs
+          // restart detection
+            TRIGGERtimer = millis(); 
+            delay(100);
+            if (DetectionEnabled == 2) DetectionEnabled = 1;  
       }
-
+      
     // if button "flash" was pressed  - toggle flash enabled
       if (server.hasArg("flash")) {
         // button was pressed 
@@ -548,8 +554,8 @@ void handleRoot() {
 
     // detection parameters
       message += "<BR>Detection thresholds: ";
-      message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as changed'min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
-      message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks in image to count as motion detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
+      message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as block has changed' min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
+      message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks to count as motion is detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
 
     // input submit button  
       message += "<BR><input type='submit'><BR><BR>\n";
@@ -620,10 +626,10 @@ void handleData(){
   // show if a sd card is present
     if (SD_Present) message += "<BR>SD-Card present (Flash disabled)\n";
 
-  // show io pin status
-    message += "<BR>External sensor pin is: ";
-    if (digitalRead(gioPin)) message += "High\n";
-    else message += "Low\n";
+//  // show io pin status
+//    message += "<BR>External sensor pin is: ";
+//    if (digitalRead(gioPin)) message += "High\n";
+//    else message += "Low\n";
   
   
   message += "</body></htlm>\n";
@@ -701,18 +707,17 @@ void handleImages(){
   // Insert time info. from text file
     String TFileName = "/" + String(ImageToShow) + ".txt";
     File file = SPIFFS.open(TFileName, "r");
-    if (!file) {
-      Serial.println("Error opening file - " + TFileName);
+    if (!file) message += red + "<BR>File not found" + endcolour + "\n";
     } else {
-      String line = file.readStringUntil('\n');
+      String line = file.readStringUntil('\n');      // read first line of text file
       message += "<BR>" + line +"\n";
     }
     file.close();
     
   // insert image in to html
-    message += "<BR><img id='img' alt='Camera Image' width='70%'>\n";      // content is set in javascript
+    message += "<BR><img id='img' alt='Camera Image' width='90%'>\n";      // content is set in javascript
 
-  // javascript to refresh the image after short delay (bug fix as it often rejects the first request)
+  // javascript to refresh the image after short delay (bug fix as it often rejects the request otherwise)
     message +=  "<script type='text/javascript'>\n"
                 "  setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "' ; }, " + JavaRefreshTime + ");\n"
                 "</script>\n";

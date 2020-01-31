@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                 'Standard' procedures  - 24Jan20
+ *                                 'Standard' procedures  - 30Jan20
  *                                 
  *                                 Note: modified from my standard
  *             
@@ -58,7 +58,7 @@ void log_system_message(String smes) {
 //                         -header (html) 
 // ----------------------------------------------------------------
 
-// HTML at the end of each web page
+// HTML at the top of each web page
 //
 //    refresh = how often to auto refresh the page in seconds  (not usually used as jscript a better option)
 //    more info on html here - https://randomnerdtutorials.com/esp8266-web-server/
