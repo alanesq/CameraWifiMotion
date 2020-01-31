@@ -708,7 +708,7 @@ void handleImages(){
     String TFileName = "/" + String(ImageToShow) + ".txt";
     File file = SPIFFS.open(TFileName, "r");
     if (!file) message += red + "<BR>File not found" + endcolour + "\n";
-    } else {
+    else {
       String line = file.readStringUntil('\n');      // read first line of text file
       message += "<BR>" + line +"\n";
     }
