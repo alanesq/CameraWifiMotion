@@ -5,6 +5,9 @@ This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards 
 The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
 internal memory or on to an sd card and also emails it if required.
 
+This is still very much a work in progress but it is now in a functioning state but I need to do a lot more testing and tweaking so keep checking back for the latest version...
+
+
 It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
