@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "31Jan20";                     // version of this sketch
+  const String sversion = "01Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -102,7 +102,7 @@
   String TriggerTime = "Not yet triggered";  // Time of last motion trigger
   unsigned long MaintTiming = millis();      // used for timing maintenance tasks
   bool emailWhenTriggered = 0;               // flag if to send emails when motion detection triggers
-  
+  bool ReqLEDStatus = 0;                     // desired status of the illuminator led (i.e. should it be on or off when not being used as a flash)
   
   
 // ---------------------------------------------------------------
@@ -216,46 +216,54 @@ void BlinkLed(byte Bcount) {
 
 void loop(void){
 
-  unsigned long currentMillis = millis();        // get current time
-  
   server.handleClient();                         // service any web page requests 
 
   // camera motion detection 
   //        explanation of timing here: https://www.baldengineer.com/arduino-millis-plus-addition-does-not-add-up.html
   if (DetectionEnabled == 1) {    
-    if ((unsigned long)(currentMillis - CAMERAtimer) >= FrameRefreshTime ) {                // limit camera motion detection rate
-        CAMERAtimer = currentMillis;                                                        // reset timer
-        if (!capture_still()) {                                                             // capture an image from camera
-          log_system_message("Camera failed to capture image - resetting camera"); 
-          // turn camera off then back on      
-            digitalWrite(PWDN_GPIO_NUM, HIGH);
-            delay(500);
-            digitalWrite(PWDN_GPIO_NUM, LOW); 
-            delay(100);
-            RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    
-         }
-         float changes = motion_detect();                                                // find amount of change in current video frame
-         if (changes >= (float)(image_threshold / 100.0)) {                              // if motion detected 
-             if ((unsigned long)(currentMillis - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {   // limit time between detection triggers
-                  TRIGGERtimer = currentMillis;                                           // reset last motion trigger time
-                  MotionDetected(changes);                                                // run motion detected procedure (passing change level)
+    if ((unsigned long)(millis() - CAMERAtimer) >= FrameRefreshTime ) {                // limit camera motion detection rate
+        CAMERAtimer = millis();                                                        // reset timer
+        if (!capture_still()) {                                                             // capture image, if problem reboot camera and try again
+          RebootCamera();   
+          capture_still(); 
+        }
+        float changes = motion_detect();                                                    // find amount of change in current video frame
+        update_frame();                                                                     // Copy current frame to previous
+        if (changes >= (float)(image_threshold / 100.0)) {                                  // if motion detected 
+             if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between detection triggers
+                  TRIGGERtimer = millis();                                                  // reset last motion trigger time
+                  MotionDetected(changes);                                                  // run motion detected procedure (passing change level)
              } 
          }
-         update_frame();                                                                 // Copy current frame to previous
     }
   }
 
   // periodically check Wifi is connected and refresh NTP time
-    if ((unsigned long)(currentMillis - MaintTiming) >= SystemCheckRate ) {   
+    if ((unsigned long)(millis() - MaintTiming) >= SystemCheckRate ) {   
       WIFIcheck();                                 // check if wifi connection is ok
       MaintTiming = millis();                      // reset timer
       time_t t=now();                              // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
+      // check status of illumination led
+        if (ReqLEDStatus && !SD_Present) digitalWrite(Illumination_led, ledON); 
+        else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
     }
 
   delay(40);
 
 } 
 
+
+// reboot camera (used if camera is failing to respond)
+void RebootCamera() {                                                             // capture an image from camera
+    log_system_message("Camera failed to capture image - rebooting camera"); 
+    // turn camera off then back on      
+        digitalWrite(PWDN_GPIO_NUM, HIGH);
+        delay(600);
+        digitalWrite(PWDN_GPIO_NUM, LOW); 
+        delay(600);
+    RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    
+}
+         
 
 // ----------------------------------------------------------------
 //              Load settings from text file in Spiffs
@@ -274,78 +282,77 @@ void LoadSettingsSpiffs() {
     } 
 
     // read contents of file
-    String line;
-    int tnum;
-
-    // line 1 - emailWhenTriggered
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum == 0) emailWhenTriggered = 0;
-      else if (tnum == 1) emailWhenTriggered = 1;
-      else {
-        log_system_message("Invalid emailWhenTriggered in settings: " + line);
-        return;
-      }
-      
-    // line 2 - block_threshold
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum < 1 || tnum > 100) {
-        log_system_message("invalid block_threshold in settings");
-        return;
-      }
-      block_threshold = tnum;
-      
-    // line 3 - image_threshold
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum < 1 || tnum > 100) {
-        log_system_message("invalid image_threshold in settings");
-        return;
-      }
-      image_threshold = tnum;
-
-    // line 4 - TriggerLimitTime
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum < 1 || tnum > 3600) {
-        log_system_message("invalid TriggerLimitTime in settings");
-        return;
-      }
-      TriggerLimitTime = tnum;
-
-    // line 5 - DetectionEnabled
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum == 0) DetectionEnabled = 0;
-      else if (tnum == 1) DetectionEnabled = 1;
-      else {
-        log_system_message("Invalid DetectionEnabled in settings: " + line);
-        return;
-      }
-
-    // line 6 - EmailLimitTime
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum < 60 || tnum > 10000) {
-        log_system_message("invalid EmailLimitTime in settings");
-        return;
-      }
-      EmailLimitTime = tnum;
-
-    // line 7 - UseFlash
-      line = file.readStringUntil('\n');
-      tnum = line.toInt();
-      if (tnum == 0) UseFlash = 0;
-      else if (tnum == 1) UseFlash = 1;
-      else {
-        log_system_message("Invalid UseFlash in settings: " + line);
-        return;
-      }
-      
+      String line;
+      int tnum;
+  
+      // line 1 - emailWhenTriggered
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum == 0) emailWhenTriggered = 0;
+        else if (tnum == 1) emailWhenTriggered = 1;
+        else {
+          log_system_message("Invalid emailWhenTriggered in settings: " + line);
+          return;
+        }
+        
+      // line 2 - block_threshold
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum < 1 || tnum > 100) {
+          log_system_message("invalid block_threshold in settings");
+          return;
+        }
+        block_threshold = tnum;
+        
+      // line 3 - image_threshold
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum < 1 || tnum > 100) {
+          log_system_message("invalid image_threshold in settings");
+          return;
+        }
+        image_threshold = tnum;
+  
+      // line 4 - TriggerLimitTime
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum < 1 || tnum > 3600) {
+          log_system_message("invalid TriggerLimitTime in settings");
+          return;
+        }
+        TriggerLimitTime = tnum;
+  
+      // line 5 - DetectionEnabled
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum == 0) DetectionEnabled = 0;
+        else if (tnum == 1) DetectionEnabled = 1;
+        else {
+          log_system_message("Invalid DetectionEnabled in settings: " + line);
+          return;
+        }
+  
+      // line 6 - EmailLimitTime
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum < 60 || tnum > 10000) {
+          log_system_message("invalid EmailLimitTime in settings");
+          return;
+        }
+        EmailLimitTime = tnum;
+  
+      // line 7 - UseFlash
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum == 0) UseFlash = 0;
+        else if (tnum == 1) UseFlash = 1;
+        else {
+          log_system_message("Invalid UseFlash in settings: " + line);
+          return;
+        }
+        
       file.close();
       log_system_message("Settings loaded from Spiffs");
-      
 }
 
 
@@ -426,10 +433,12 @@ void handleRoot() {
     // if wipeS was entered  - clear all stored images in Spiffs
       if (server.hasArg("wipeS")) {
         log_system_message("Clearing all stored images (Spiffs)"); 
+        if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting 
         SPIFFS.format();
         SpiffsFileCounter = 0;
         TriggerTime = "Not since images wiped";
         SaveSettingsSpiffs();     // save settings in Spiffs
+        if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
       }
 
 //    // if wipeSD was entered  - clear all stored images on SD Card
@@ -487,19 +496,17 @@ void handleRoot() {
       if (server.hasArg("illuminator")) {
         // button was pressed 
           if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting (to stop light triggering it)
-          delay(100);
-          if (digitalRead(Illumination_led) == ledOFF) {
+          if (!ReqLEDStatus) {
+            ReqLEDStatus = 1;
             digitalWrite(Illumination_led, ledON);  
             log_system_message("Illuminator LED turned on");    
           } else {
+            ReqLEDStatus = 0;
             digitalWrite(Illumination_led, ledOFF);  
             log_system_message("Illuminator LED turned off"); 
           }
-          SaveSettingsSpiffs();     // save settings in Spiffs
-          // restart detection
-            TRIGGERtimer = millis(); 
-            delay(100);
-            if (DetectionEnabled == 2) DetectionEnabled = 1;  
+          TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant trigger)
+          if (DetectionEnabled == 2) DetectionEnabled = 1;        // re enable detection if it was paused
       }
       
     // if button "flash" was pressed  - toggle flash enabled
@@ -518,8 +525,8 @@ void handleRoot() {
     // if button "toggle movement detection" was pressed  
       if (server.hasArg("detection")) {
         // button was pressed 
-          TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
           if (DetectionEnabled == 0) {
+            TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant 
             DetectionEnabled = 1;
             log_system_message("Movement detection enabled");    
           } else {
@@ -602,7 +609,8 @@ void handleData(){
           
   // Movement detection
     message += "<BR>Movement detection is ";
-    if (DetectionEnabled) message +=  "enabled, last triggered: " + TriggerTime + "\n";
+    if (DetectionEnabled == 1) message +=  "enabled, last triggered: " + TriggerTime + "\n";
+    else if (DetectionEnabled == 2) message += red + "disabled" + endcolour + "\n";
     else message += red + "disabled" + endcolour + "\n";
 
   // email when motion detected
@@ -797,11 +805,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
   // increment image count
     SpiffsFileCounter++;
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
-
-  // use flash if required
-  bool tFlash = digitalRead(Illumination_led);                           // store current Illuminator LED status
-  if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
-  
+ 
 
   // ------------------- capture an image -------------------
     
@@ -815,12 +819,19 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
 
     TryCount ++;
       
+    // use flash if required
+      if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
+   
     Serial.println("Taking a photo... attempt #" + String(TryCount));
     fb = esp_camera_fb_get();
     if (!fb) {
       Serial.println("Camera capture failed");
       return;
     }
+
+    // restore flash status after using it as a flash
+      if (ReqLEDStatus && !SD_Present) digitalWrite(Illumination_led, ledON);   
+      else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
        
 
     // ------------------- save image to Spiffs -------------------
@@ -835,12 +846,13 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       return;
     }
     else {
-      file.write(fb->buf, fb->len);     // payload (image), payload length
-      Serial.print("The picture has been saved in ");
-      Serial.print(IFileName);
-      Serial.print(" - Size: ");
-      Serial.print(file.size());
-      Serial.println(" bytes");
+      if (file.write(fb->buf, fb->len)) {              // payload (image), payload length
+        Serial.print("The picture has been saved in ");
+        Serial.print(IFileName);
+        Serial.print(" - Size: ");
+        Serial.print(file.size());
+        Serial.println(" bytes");
+      } else log_system_message("Error writing image to Spiffs");
     }
     file.close();
     
@@ -910,15 +922,12 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     
   } while ( !ok && TryCount < 3);           // if there was a problem try again 
 
-  if (!SD_Present) digitalWrite(Illumination_led, tFlash);         // restore flash status
-
   if (TryCount == 3) log_system_message("Unable to capture/store image");
   
   RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    // restart camera back to greyscale mode for movement detection
-  if (capture_still()) update_frame();                      // update stored frame
+
   TRIGGERtimer = millis();                                  // reset retrigger timer to stop instant movement trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;          // restart paused motion detecting
-    
 }
 
 
@@ -947,6 +956,7 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
     ok = esp_camera_init(&config);
     if (ok == ESP_OK) {
       Serial.println("Camera mode switched");
+      TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant trigger)
     }
     else {
       // failed so try again
