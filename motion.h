@@ -19,19 +19,18 @@
 #define DEBUG_MOTION 0        // serial debug enable for motion.h
 
 
-// camera settings
+// Settings
   #define CAMERA_MODEL_AI_THINKER              // type of camera
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
-  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       // SVGA=800x600, XGA=1024x768
-  #define BLOCK_SIZE 10                        // size of blocks used for motion sensing
+  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  #define BLOCK_SIZE 10                        // size of image blocks used for motion sensing
 
-  
 // camera type (CAMERA_MODEL_AI_THINKER)
-  #define PWDN_GPIO_NUM     32
+  #define PWDN_GPIO_NUM     32      // power down pin
   #define RESET_GPIO_NUM    -1      // -1 = not used
   #define XCLK_GPIO_NUM      0
-  #define SIOD_GPIO_NUM     26
-  #define SIOC_GPIO_NUM     27
+  #define SIOD_GPIO_NUM     26      // i2c sda
+  #define SIOC_GPIO_NUM     27      // i2c scl
   #define Y9_GPIO_NUM       35
   #define Y8_GPIO_NUM       34
   #define Y7_GPIO_NUM       39
@@ -40,9 +39,9 @@
   #define Y4_GPIO_NUM       19
   #define Y3_GPIO_NUM       18
   #define Y2_GPIO_NUM        5
-  #define VSYNC_GPIO_NUM    25
-  #define HREF_GPIO_NUM     23
-  #define PCLK_GPIO_NUM     22
+  #define VSYNC_GPIO_NUM    25      // vsync_pin
+  #define HREF_GPIO_NUM     23      // href_pin
+  #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
   
 //   ---------------------------------------------------------------------------------------------------------------------

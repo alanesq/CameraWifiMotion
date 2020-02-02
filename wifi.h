@@ -59,14 +59,26 @@ byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
 
 void startWifiManager() {
 
-  // WiFiManager - connect to wifi with stored settings
+//  // clear stored wifimanager settings
+//        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); //load the flash-saved configs
+//        esp_wifi_init(&cfg); //initiate and allocate wifi resources (does not matter if connection fails)
+//        delay(2000); //wait a bit
+//        if(esp_wifi_restore()!=ESP_OK)
+//        {
+//            Serial.println("WiFi is not initialized by esp_wifi_init ");
+//         }else{
+//             Serial.println("WiFi Configurations Cleared!");
+//         }
+//         while(1);   // stop
+
+  // WiFiManager - connect to wifi with stored settings - ref: https://github.com/tzapu/WiFiManager/wiki/API-reference
     WiFiManager wifiManager;                                     // Local intialisation 
-    wifiManager.setTimeout(120);                                 // sets timeout for configuration portal (in mins)
+    wifiManager.setTimeout(600);                                 // sets timeout for configuration portal (in seconds)
     Serial.println(F("Starting Wifi Manager"));
-    if(!wifiManager.autoConnect( "ESPconfig" , "12345678" )) {   // Activate wifi - access point name and password are set here (password must be 8 characters for some reason)
+    if(!wifiManager.autoConnect( "ESPcamera" , "12345678" )) {   // Activate wifi - access point name and password are set here (password must be 8 characters for some reason)
       // Failed to connect to wifi and access point timed out
         Serial.println(F("failed to connect to wifi and access point timed out so rebooting to try again..."));
-        Serial.flush();
+        delay(500);
         ESP.restart();                                             // reboot and try again
         delay(5000);                                               // restart will fail without this delay
     }

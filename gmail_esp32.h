@@ -37,11 +37,11 @@
 
 //               s e t t i n g s 
 
-  const String emailReceiver = "<enter the email address to send to>";         // address to send emails
-
-  const String _mailUser = "<enter the email address to send from>";
+  const String emailReceiver = "<email address to send to>";         // address to send emails
   
-  const String _mailPassword = "<enter the email password>";
+  const String _mailUser = "<email address to send from>";
+  
+  const String _mailPassword = "<email password>";
 
   const String _SMTP = "smtp.gmail.com";
 

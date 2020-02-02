@@ -17,7 +17,7 @@
   String requestpage();
   void handleReboot();
   void WIFIcheck();
-
+  void UpdateBootlogSpiffs(String Info);   // in main code
 
 
 // ----------------------------------------------------------------
@@ -111,20 +111,24 @@ String webfooter(void) {
      // NTP server link status
             String NTPtext = "NTP Link "; 
             if (NTPok == 1) NTPtext += "OK";
-            else NTPtext += "down";
+            else NTPtext += "Down";
 
       String message = 
       
              "<br>\n" 
              
-           /* Status display at bottom of screen */
+             /* Status display at bottom of screen */
              "<div style='text-align: center;background-color:rgb(128, 64, 0)'>\n" 
                 "<small>" + red + 
-                  stitle + " " + sversion + " | Memory:" + String(ESP.getFreeHeap()) + " | Wifi: " + String(WiFi.RSSI()) + "dBm" + " | " + NTPtext + 
+                    stitle + " " + sversion + 
+                    " | Memory:" + String(ESP.getFreeHeap()) + 
+                    " | Wifi: " + String(WiFi.RSSI()) + "dBm" 
+                    " | " + NTPtext + 
+                    " | Free Spiffs:" + (SPIFFS.totalBytes() - SPIFFS.usedBytes()) +  
                 endcolour + "</small>\n" 
              "</div>\n" 
                
-           /* end of HTML */  
+             /* end of HTML */  
              "</body>\n" 
              "</html>\n";
 
@@ -167,7 +171,6 @@ void handleLogpage() {
     server.send(200, "text/html", message);    // send the web page
 
 }
-
 
 
 // ----------------------------------------------------------------
@@ -265,6 +268,7 @@ void handleReboot(){
       server.send(404, "text/plain", message);   // send reply as plain text
 
       // rebooting
+        UpdateBootlogSpiffs("Rebooting - URL request");     // update bootlog
         delay(500);          // give time to send the above html
         ESP.restart();   
         delay(5000);         // restart fails without this line

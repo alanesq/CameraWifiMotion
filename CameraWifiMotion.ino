@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "01Feb20";                     // version of this sketch
+  const String sversion = "02Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -148,6 +148,7 @@ void setup(void) {
     server.on("/live", handleLive);          // capture and display live image
     server.on("/images", handleImages);      // display images
     server.on("/img", handleImg);            // latest captured image
+    server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
     server.onNotFound(handleNotFound);       // invalid page requested
     
   // start web server
@@ -201,12 +202,14 @@ void setup(void) {
 
 // blink the led 
 void BlinkLed(byte Bcount) {
-  for (int i = 0; i < Bcount; i++) {             // flash led
+  for (int i = 0; i < Bcount; i++) {                    // flash led
     digitalWrite(Illumination_led, ledON);
     delay(50);
     digitalWrite(Illumination_led, ledOFF);
     delay(300);
   }
+
+UpdateBootlogSpiffs("Booted");                          // store time of boot in bootlog
 }
 
 
@@ -221,12 +224,9 @@ void loop(void){
   // camera motion detection 
   //        explanation of timing here: https://www.baldengineer.com/arduino-millis-plus-addition-does-not-add-up.html
   if (DetectionEnabled == 1) {    
-    if ((unsigned long)(millis() - CAMERAtimer) >= FrameRefreshTime ) {                // limit camera motion detection rate
-        CAMERAtimer = millis();                                                        // reset timer
-        if (!capture_still()) {                                                             // capture image, if problem reboot camera and try again
-          RebootCamera();   
-          capture_still(); 
-        }
+    if ((unsigned long)(millis() - CAMERAtimer) >= FrameRefreshTime ) {                     // limit camera motion detection rate
+        CAMERAtimer = millis();                                                             // reset timer
+        if (!capture_still()) RebootCamera();                                               // capture image, if problem reboot camera and try again
         float changes = motion_detect();                                                    // find amount of change in current video frame
         update_frame();                                                                     // Copy current frame to previous
         if (changes >= (float)(image_threshold / 100.0)) {                                  // if motion detected 
@@ -254,14 +254,23 @@ void loop(void){
 
 
 // reboot camera (used if camera is failing to respond)
-void RebootCamera() {                                                             // capture an image from camera
+void RebootCamera() {  
     log_system_message("Camera failed to capture image - rebooting camera"); 
     // turn camera off then back on      
         digitalWrite(PWDN_GPIO_NUM, HIGH);
-        delay(600);
+        delay(500);
         digitalWrite(PWDN_GPIO_NUM, LOW); 
-        delay(600);
-    RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    
+        delay(500);
+    RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE); 
+    delay(1000);
+    // try camera again, if still problem reboot esp32
+        if (!capture_still()) {
+            Serial.println("unable to reboot camera so rebooting esp...");
+            UpdateBootlogSpiffs("Camera fault - rebooting");                     // store in bootlog
+            delay(500);
+            ESP.restart();   
+            delay(5000);      // restart will fail without this delay
+         }
 }
          
 
@@ -325,6 +334,7 @@ void LoadSettingsSpiffs() {
       // line 5 - DetectionEnabled
         line = file.readStringUntil('\n');
         tnum = line.toInt();
+        if (tnum == 2) tnum = 1;     // if it was paused restart it
         if (tnum == 0) DetectionEnabled = 0;
         else if (tnum == 1) DetectionEnabled = 1;
         else {
@@ -351,6 +361,16 @@ void LoadSettingsSpiffs() {
           return;
         }
         
+      // line 8 - SpiffsFileCounter
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum > MaxSpiffsImages) {
+          log_system_message("invalid SpiffsFileCounter in settings");
+          return;
+        }
+        SpiffsFileCounter = tnum;
+        
+        
       file.close();
       log_system_message("Settings loaded from Spiffs");
 }
@@ -370,14 +390,35 @@ void SaveSettingsSpiffs() {
     } 
 
     // save settings in to file
-    file.println(String(emailWhenTriggered));
-    file.println(String(block_threshold));
-    file.println(String(image_threshold));
-    file.println(String(TriggerLimitTime));
-    file.println(String(DetectionEnabled));
-    file.println(String(EmailLimitTime));
-    file.println(String(UseFlash));
-      
+        file.println(String(emailWhenTriggered));
+        file.println(String(block_threshold));
+        file.println(String(image_threshold));
+        file.println(String(TriggerLimitTime));
+        file.println(String(DetectionEnabled));
+        file.println(String(EmailLimitTime));
+        file.println(String(UseFlash));
+        file.println(String(SpiffsFileCounter));
+    
+    file.close();
+}
+
+
+// ----------------------------------------------------------------
+//                     Update boot log - Spiffs
+// ----------------------------------------------------------------
+
+void UpdateBootlogSpiffs(String Info) {
+    Serial.println("Updating bootlog: " + Info);
+    String TFileName = "/bootlog.txt";
+    File file = SPIFFS.open(TFileName, FILE_APPEND);
+    if (!file) {
+      log_system_message("Unable to boot log file in Spiffs");
+      return;
+    } 
+
+    // add current time to file
+      file.println(currentTime() + " - " + Info);
+    
     file.close();
 }
 
@@ -430,14 +471,15 @@ void handleRoot() {
         SaveSettingsSpiffs();     // save settings in Spiffs
       }
       
-    // if wipeS was entered  - clear all stored images in Spiffs
+    // if wipeS was entered  - clear Spiffs
       if (server.hasArg("wipeS")) {
         log_system_message("Clearing all stored images (Spiffs)"); 
         if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting 
         SPIFFS.format();
         SpiffsFileCounter = 0;
         TriggerTime = "Not since images wiped";
-        SaveSettingsSpiffs();     // save settings in Spiffs
+        UpdateBootlogSpiffs("Spiffs Wiped");                           // store event in bootlog file
+        SaveSettingsSpiffs();                                          // save settings in Spiffs
         if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
       }
 
@@ -528,7 +570,8 @@ void handleRoot() {
           if (DetectionEnabled == 0) {
             TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant 
             DetectionEnabled = 1;
-            log_system_message("Movement detection enabled");    
+            log_system_message("Movement detection enabled"); 
+            TriggerTime = "Not since detection enabled";
           } else {
             DetectionEnabled = 0;
             log_system_message("Movement detection disabled");    
@@ -665,7 +708,7 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);     // capture an image from camera
 
   // insert image in to html
-    message += "<img  id='img' alt='Live Image' width='70%'>\n";       // content is set in javascript
+    message += "<img  id='img' alt='Live Image' width='90%'>\n";       // content is set in javascript
 
   // javascript to refresh the image after short delay (bug fix as it often rejects the first request)
     message +=  "<script type='text/javascript'>\n"
@@ -755,6 +798,43 @@ void handlePing(){
 
 
 // ----------------------------------------------------------------
+//   -bootlog web page requested    i.e. http://x.x.x.x/bootlog
+// ----------------------------------------------------------------
+// display boot log from Spiffs
+
+void handleBootLog() {
+
+   log_system_message("bootlog webpage requested");     
+
+    // build the html for /bootlog page
+
+    String message = webheader(0);     // add the standard header
+
+      message += "<P>\n";                // start of section
+  
+      message += "<br>SYSTEM BOOT LOG<br><br>\n";
+  
+      // show contents of bootlog.txt in Spiffs
+        File file = SPIFFS.open("/bootlog.txt", "r");
+        if (!file) message += red + "No Boot Log Available" + endcolour + "<BR>\n";
+        else {
+          String line;
+          while(file.available()){
+            line = file.readStringUntil('\n');      // read first line of text file
+            message += line +"<BR>\n";
+          }
+        }
+        file.close();
+
+      message += "<BR><BR>" + webfooter();     // add standard footer html
+    
+
+    server.send(200, "text/html", message);    // send the web page
+
+}
+
+
+// ----------------------------------------------------------------
 // -last stored image page requested     i.e. http://x.x.x.x/img
 // ----------------------------------------------------------------
 // pic parameter on url selects which file to display
@@ -805,7 +885,8 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
   // increment image count
     SpiffsFileCounter++;
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
- 
+    SaveSettingsSpiffs();     // save settings in Spiffs
+    
 
   // ------------------- capture an image -------------------
     
