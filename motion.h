@@ -23,7 +23,7 @@
   #define CAMERA_MODEL_AI_THINKER              // type of camera
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
   #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-  #define BLOCK_SIZE 10                        // size of image blocks used for motion sensing
+  #define BLOCK_SIZE 30                        // size of image blocks used for motion sensing
 
 // camera type (CAMERA_MODEL_AI_THINKER)
   #define PWDN_GPIO_NUM     32      // power down pin
@@ -60,15 +60,21 @@
   #define H (HEIGHT / BLOCK_SIZE)
   
 // frame stores (blocks)
-    uint16_t prev_frame[H][W] = { 0 };
-    uint16_t current_frame[H][W] = { 0 };
-
+    uint16_t prev_frame[H][W] = { 0 };      // last captured frame
+    uint16_t current_frame[H][W] = { 0 };   // current frame
+    
+// Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
+    bool mask_frame[][3] = { {1,1,1},
+                             {1,1,1},
+                             {1,1,1} };
+    
 // pre declare procedures
     bool setup_camera(framesize_t);
     bool capture_still();
     float motion_detect();
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
+    bool Mask_active(int y, int x);
 
 // camera configuration settings
     camera_config_t config;
@@ -185,15 +191,14 @@ float motion_detect() {
             float prev = prev_frame[y][x];
             float delta = abs(current - prev) / prev;
 
-            if (delta >= threshold_dec) {
+            if (delta >= threshold_dec) {                // if change in block has changed enough to qualify
 #if DEBUG_MOTION
                 Serial.print("diff\t");
                 Serial.print(y);
                 Serial.print('\t');
                 Serial.println(x);
 #endif
-
-                changes += 1;
+              if (Mask_active(y,x)) changes += 1;        // if detection mask is enabled for this block increment changed block count
             }
         }
     }
@@ -211,10 +216,31 @@ float motion_detect() {
 
 //   ---------------------------------------------------------------------------------------------------------------------
 
+/**
+ * Decide if this image block is active in the detection mask  (mask area is a 3 x 3 grid)
+ *    returns 1 for active, 0 for disabled
+ */
+
+bool Mask_active(int y, int x) {
+
+    // Which mask area is this block in
+      int Maskx = floor(x / 3);       // x mask area (0 to 2)
+      int Masky = floor(y / 3);       // y mask area (0 to 2)
+      // Serial.println(String(x) + "," + String(y) + " = mask area " + String(Maskx) + "," + String(Masky));
+
+    // is this mask area enabled
+      if (mask_frame[Maskx][Masky]) return(1);     // active
+      else return(0);                              // disabled
+}
+
+
+//   ---------------------------------------------------------------------------------------------------------------------
+
 
 /**
  * Copy current frame to previous
  */
+ 
 void update_frame() {
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {

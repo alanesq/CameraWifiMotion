@@ -1,4 +1,4 @@
-/*******************************************************************************************************************
+ /*******************************************************************************************************************
  *
  *             ESP32Camera with motion detection and web server -  using Arduino IDE 
  *             
@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "02Feb20";                     // version of this sketch
+  const String sversion = "03Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -369,6 +369,19 @@ void LoadSettingsSpiffs() {
           return;
         }
         SpiffsFileCounter = tnum;
+
+      // Detection mask grid
+        bool gerr = 0;
+        for (int y = 0; y < 3; y++) {
+          for (int x = 0; x < 3; x++) {
+            line = file.readStringUntil('\n');
+            tnum = line.toInt();
+            if (tnum == 1) mask_frame[x][y] = 1;
+            else if (tnum == 0) mask_frame[x][y] = 0;
+            else gerr = 1;    // flag invalid entry
+          }
+        }
+        if (gerr) log_system_message("invalid mask entry in settings");
         
         
       file.close();
@@ -398,7 +411,14 @@ void SaveSettingsSpiffs() {
         file.println(String(EmailLimitTime));
         file.println(String(UseFlash));
         file.println(String(SpiffsFileCounter));
-    
+
+       // Detection mask grid
+          for (int y = 0; y < 3; y++) {
+            for (int x = 0; x < 3; x++) {
+              file.println(String(mask_frame[x][y]));
+            }
+          }
+
     file.close();
 }
 
@@ -412,11 +432,11 @@ void UpdateBootlogSpiffs(String Info) {
     String TFileName = "/bootlog.txt";
     File file = SPIFFS.open(TFileName, FILE_APPEND);
     if (!file) {
-      log_system_message("Unable to boot log file in Spiffs");
+      log_system_message("Unable to open boot log file in Spiffs");
       return;
     } 
 
-    // add current time to file
+    // add entry including time to file
       file.println(currentTime() + " - " + Info);
     
     file.close();
@@ -459,6 +479,19 @@ void handleRoot() {
 
   // action any buttons presses etc.
 
+    // Mask grid check array
+      if (server.hasArg("submit")) {                    // if submit button was pressed
+        for (int y = 0; y < 3; y++) {
+          for (int x = 0; x < 3; x++) {
+            if (server.hasArg(String(x) + String(y))) mask_frame[x][y] = 1;
+            else mask_frame[x][y] = 0;
+          }
+          Serial.println(" ");
+        }
+        log_system_message("Detection mask updated"); 
+        SaveSettingsSpiffs();     // save settings in Spiffs
+      }
+      
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
         if (!emailWhenTriggered) {
@@ -607,8 +640,20 @@ void handleRoot() {
       message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as block has changed' min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
       message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks to count as motion is detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
 
+    // detection mask check grid (right of screen)
+      message += "<div style='float: right;'>Detection<br>";
+      for (int y = 0; y < 3; y++) {
+        for (int x = 0; x < 3; x++) {
+          message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
+          if (mask_frame[x][y]) message += "checked ";
+          message += ">\n";
+        }
+        message += "<BR>";
+      }
+      message += "</div>\n";
+                
     // input submit button  
-      message += "<BR><input type='submit'><BR><BR>\n";
+      message += "<BR><input type='submit' name='submit'><BR><BR>\n";
 
     // Toggle illuminator LED button
       if (!SD_Present) message += "<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n";
@@ -673,6 +718,9 @@ void handleData(){
 
   // show current time
     message += "<BR>Time: " + currentTime() + "\n";      // show current time
+
+  // last log entry
+  //  message += "<BR>log: " + system_message[LogNumber];
 
   // show if a sd card is present
     if (SD_Present) message += "<BR>SD-Card present (Flash disabled)\n";
