@@ -22,8 +22,8 @@
 // Settings
   #define CAMERA_MODEL_AI_THINKER              // type of camera
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
-  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-  #define BLOCK_SIZE 30                        // size of image blocks used for motion sensing
+  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing
 
 // camera type (CAMERA_MODEL_AI_THINKER)
   #define PWDN_GPIO_NUM     32      // power down pin
@@ -58,6 +58,8 @@
   #define HEIGHT 240
   #define W (WIDTH / BLOCK_SIZE)
   #define H (HEIGHT / BLOCK_SIZE)
+  uint32_t AveragePix = 0;               // average pixel reading from captured image (used for nighttime compensation)
+                                         //   bright day = around 120
   
 // frame stores (blocks)
     uint16_t prev_frame[H][W] = { 0 };      // last captured frame
@@ -67,6 +69,7 @@
     bool mask_frame[][3] = { {1,1,1},
                              {1,1,1},
                              {1,1,1} };
+    int mask_active = 9;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
     
 // pre declare procedures
     bool setup_camera(framesize_t);
@@ -132,7 +135,9 @@ bool setup_camera() {
  */
 bool capture_still() {
 
-    Serial.flush();   // wait for serial data to be sent first as suspected this may cause interference (now think this not required?)
+    // Serial.flush();   // wait for serial data to be sent first as suspected this may cause interference (now think this not required?)
+
+    AveragePix = 0;     // average pixel reading
 
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
@@ -145,17 +150,21 @@ bool capture_still() {
 
 
     // down-sample image in blocks
-    for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
-        const uint16_t x = i % WIDTH;
-        const uint16_t y = floor(i / WIDTH);
-        const uint8_t block_x = floor(x / BLOCK_SIZE);
-        const uint8_t block_y = floor(y / BLOCK_SIZE);
-        const uint8_t pixel = frame_buffer->buf[i];
-        const uint16_t current = current_frame[block_y][block_x];
+      for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
+          const uint16_t x = i % WIDTH;
+          const uint16_t y = floor(i / WIDTH);
+          const uint8_t block_x = floor(x / BLOCK_SIZE);
+          const uint8_t block_y = floor(y / BLOCK_SIZE);
+          const uint8_t pixel = frame_buffer->buf[i];
+          const uint16_t current = current_frame[block_y][block_x];
 
-    // accumulate all the pixels in each block
-        current_frame[block_y][block_x] += pixel;
+      // accumulate all the pixels in each block
+          current_frame[block_y][block_x] += pixel;
+  
+      AveragePix += pixel;    // add pixel to average counter
     }
+
+    AveragePix = AveragePix / (WIDTH * HEIGHT);     // convert to average
 
     // average pixels in each block (rescale)
     for (int y = 0; y < H; y++)
@@ -203,34 +212,38 @@ float motion_detect() {
         }
     }
 
+
+    // calc relative blocks depending on how many mask area sections are active (max = 9)
+      uint16_t tblocks = (blocks / 9) * mask_active; 
+      
 #if DEBUG_MOTION
     Serial.print("Changed ");
     Serial.print(changes);
     Serial.print(" out of ");
-    Serial.println(blocks);
+    Serial.println(tblocks);
 #endif
 
-    return (1.0 * changes / blocks);
+    return (1.0 * changes / tblocks);
 }
 
 
 //   ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Decide if this image block is active in the detection mask  (mask area is a 3 x 3 grid)
+ * Is this image block active in the detection mask  (mask area is a 3 x 3 grid)
  *    returns 1 for active, 0 for disabled
  */
 
 bool Mask_active(int y, int x) {
 
-    // Which mask area is this block in
+    // Which mask area is this block in 
       int Maskx = floor(x / 3);       // x mask area (0 to 2)
       int Masky = floor(y / 3);       // y mask area (0 to 2)
-      // Serial.println(String(x) + "," + String(y) + " = mask area " + String(Maskx) + "," + String(Masky));
 
-    // is this mask area enabled
-      if (mask_frame[Maskx][Masky]) return(1);     // active
-      else return(0);                              // disabled
+    // Serial.println(String(x) + "," + String(y) + " = mask area " + String(Maskx) + "," + String(Masky));
+
+    return mask_frame[Maskx][Masky];
+      
 }
 
 

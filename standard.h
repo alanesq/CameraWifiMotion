@@ -87,11 +87,12 @@ String webheader(int refresh) {
          "</head>\n"
          "<body style='color: rgb(0, 0, 0); background-color: yellow; text-align: center;'>\n"
            "<ul>\n"                  
-             "<li><a href='" + HomeLink + "'>Home</a></li>\n"       /* home menu button */
-             "<li><a href='/log'>Log</a></li>\n"                    /* log menu button */
+             "<li><a href='/'>Home</a></li>\n"                       /* home menu button */
+             "<li><a href='/log'>Log</a></li>\n"                     /* log menu button */
+             "<li><a href='/bootlog'>BootLog</a></li>\n"             /* boot log menu button */
              "<li><a href='/live'>Live Image</a></li>\n"             /* live menu button */
-             "<li><a href='/images'>Stored Images</a></li>\n"           /* last menu button */
-             "<h1>" + red + stitle + endcolour + "</h1>\n"          /* display the project title in red */
+             "<li><a href='/images'>Stored Images</a></li>\n"        /* last menu button */
+             "<h1>" + red + stitle + endcolour + "</h1>\n"           /* display the project title in red */
            "</ul>\n";
 
     return message;
@@ -156,11 +157,10 @@ void handleLogpage() {
   
       // list all system messages
       for (int i=LogNumber; i != 0; i--){
+        if (i == LogNumber) message += red;           // most recent entry
         message += system_message[i];
-        if (i == LogNumber) {
-          message += red + "  <-- most recent" + endcolour;
-        }
-        message += "<BR>\n";    // new line
+        if (i == LogNumber) message += endcolour;
+        message += "<BR>\n"; 
       }
   
       // message += "<a href='/'>BACK TO MAIN PAGE</a>\n";       // link back to root page

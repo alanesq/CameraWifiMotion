@@ -36,12 +36,10 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "03Feb20";                     // version of this sketch
+  const String sversion = "04Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
-  const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
-
   const int datarefresh = 4000;                          // Refresh rate of the updating data on web page (1000 = 1 second)
   String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript)
   
@@ -83,7 +81,6 @@
   // #include <SPI.h>                   // (already loaded)
   // #include <FS.h>                    // gives file access on spiffs (already loaded)
   #define SD_CS 5                       // sd chip select pin
-  #define FLASH_PIN 4                   // shared pin (flash and sd card)
   bool SD_Present;                      // flag if sd card is found (0 = no)
 
 #include "wifi.h"                       // Load the Wifi / NTP stuff
@@ -120,7 +117,6 @@ void setup(void) {
   Serial.println(F("\n\n\n---------------------------------------"));
   Serial.println("Starting - " + stitle + " - " + sversion);
   Serial.println(F("---------------------------------------"));
-  Serial.println( "ESP type: " + ESPType );
   
   // Serial.setDebugOutput(true);                                // enable extra diagnostic info  
    
@@ -138,7 +134,7 @@ void setup(void) {
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
 
   // set up web page request handling
-    server.on(HomeLink, handleRoot);         // root page
+    server.on("/", handleRoot);              // root page
     server.on("/data", handleData);          // This displays information which updates every few seconds (used by root web page)
     server.on("/ping", handlePing);          // ping requested
     server.on("/log", handleLogpage);        // system log
@@ -173,19 +169,22 @@ void setup(void) {
     }
 
   // start sd card
-      if(!SD_MMC.begin()){            // if loading sd card fails     ("/sdcard", true = 1 wire?)
+      pinMode(Illumination_led, INPUT);            // disable led pin as sdcard uses it
+      if(!SD_MMC.begin()){                         // if loading sd card fails     ("/sdcard", true = 1 wire?)
           log_system_message("SD Card not found"); 
-          pinMode(FLASH_PIN, OUTPUT);        // sd card failed so enable onboard flash LED
-          SD_Present = 0;      // flag no working sd card found
+          pinMode(Illumination_led, OUTPUT);       // re-enable led pin
+          digitalWrite(Illumination_led, ledOFF); 
+          SD_Present = 0;                          // flag no sd card found
       } else {
       uint8_t cardType = SD_MMC.cardType();
-        if(cardType == CARD_NONE){           // if no sd card found
+        if(cardType == CARD_NONE){                 // if no sd card found
             log_system_message("SD Card type detect failed"); 
-            pinMode(FLASH_PIN, OUTPUT);        // sd card failed so enable onboard flash LED
-            SD_Present = 0;      // flag no working sd card found
+            pinMode(Illumination_led, OUTPUT);     // re-enable led pin
+            digitalWrite(Illumination_led, ledOFF); 
+            SD_Present = 0;                        // flag no sd card found
         } else {
             log_system_message("SD Card found"); 
-            SD_Present = 1;      // flag sd card found
+            SD_Present = 1;                        // flag working sd card found
         }
       }
 
@@ -227,7 +226,7 @@ void loop(void){
     if ((unsigned long)(millis() - CAMERAtimer) >= FrameRefreshTime ) {                     // limit camera motion detection rate
         CAMERAtimer = millis();                                                             // reset timer
         if (!capture_still()) RebootCamera();                                               // capture image, if problem reboot camera and try again
-        float changes = motion_detect();                                                    // find amount of change in current video frame
+        float changes = motion_detect();                                                    // find amount of change in current video frame      
         update_frame();                                                                     // Copy current frame to previous
         if (changes >= (float)(image_threshold / 100.0)) {                                  // if motion detected 
              if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between detection triggers
@@ -236,7 +235,7 @@ void loop(void){
              } 
          }
     }
-  }
+  } else AveragePix = 0;        // clear brightness reading as frames are not being captured
 
   // periodically check Wifi is connected and refresh NTP time
     if ((unsigned long)(millis() - MaintTiming) >= SystemCheckRate ) {   
@@ -372,11 +371,15 @@ void LoadSettingsSpiffs() {
 
       // Detection mask grid
         bool gerr = 0;
+        mask_active = 0;
         for (int y = 0; y < 3; y++) {
           for (int x = 0; x < 3; x++) {
             line = file.readStringUntil('\n');
             tnum = line.toInt();
-            if (tnum == 1) mask_frame[x][y] = 1;
+            if (tnum == 1) {
+              mask_frame[x][y] = 1;
+              mask_active ++;  
+            }
             else if (tnum == 0) mask_frame[x][y] = 0;
             else gerr = 1;    // flag invalid entry
           }
@@ -454,9 +457,16 @@ void handleDefault() {
       block_threshold = 15;
       image_threshold= 20;
       TriggerLimitTime = 3;
+      TRIGGERtimer = millis();            // reset last image captured timer (to prevent instant trigger)
       DetectionEnabled = 1;
-      EmailLimitTime = 60;
+      EmailLimitTime = 600;
       UseFlash = 1;
+
+      // Detection mask grid
+        for (int y = 0; y < 3; y++) 
+          for (int x = 0; x < 3; x++) 
+            mask_frame[x][y] = 1;
+        mask_active = 9;
 
     SaveSettingsSpiffs();     // save settings in Spiffs
 
@@ -481,10 +491,13 @@ void handleRoot() {
 
     // Mask grid check array
       if (server.hasArg("submit")) {                    // if submit button was pressed
+        mask_active = 0;  
         for (int y = 0; y < 3; y++) {
           for (int x = 0; x < 3; x++) {
-            if (server.hasArg(String(x) + String(y))) mask_frame[x][y] = 1;
-            else mask_frame[x][y] = 0;
+            if (server.hasArg(String(x) + String(y))) {
+              mask_frame[x][y] = 1;
+              mask_active ++;
+            } else mask_frame[x][y] = 0;
           }
           Serial.println(" ");
         }
@@ -621,12 +634,25 @@ void handleRoot() {
     
 
     // insert an iframe containing the changing data (updates every few seconds using java script)
-       message += "<BR><iframe id='dataframe' height=150; width=600; frameborder='0';></iframe>\n"
+       message += "<BR><iframe id='dataframe' height=160; width=600; frameborder='0';></iframe>\n"
       "<script type='text/javascript'>\n"
          "setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + JavaRefreshTime +");\n"
          "window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n"
       "</script>\n"; 
 
+    // detection mask check grid (right of screen)
+      message += "<div style='float: right;'>Detection Mask<br>";
+      for (int y = 0; y < 3; y++) {
+        for (int x = 0; x < 3; x++) {
+          message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
+          if (mask_frame[x][y]) message += "checked ";
+          message += ">\n";
+        }
+        message += "<BR>";
+      }
+      message += String(mask_active) + " active";
+      message += "</div>\n";
+      
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
       message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
@@ -639,19 +665,7 @@ void handleRoot() {
       message += "<BR>Detection thresholds: ";
       message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as block has changed' min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
       message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks to count as motion is detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
-
-    // detection mask check grid (right of screen)
-      message += "<div style='float: right;'>Detection<br>";
-      for (int y = 0; y < 3; y++) {
-        for (int x = 0; x < 3; x++) {
-          message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
-          if (mask_frame[x][y]) message += "checked ";
-          message += ">\n";
-        }
-        message += "<BR>";
-      }
-      message += "</div>\n";
-                
+               
     // input submit button  
       message += "<BR><input type='submit' name='submit'><BR><BR>\n";
 
@@ -729,7 +743,8 @@ void handleData(){
 //    message += "<BR>External sensor pin is: ";
 //    if (digitalRead(gioPin)) message += "High\n";
 //    else message += "Low\n";
-  
+
+  if (AveragePix) message += "<BR>Average brightness: " + String(AveragePix);
   
   message += "</body></htlm>\n";
   
