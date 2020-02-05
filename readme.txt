@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - Jan2020
+                        CameraWifiMotion - alanesq@disroot.org - Feb2020
                         ================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
@@ -11,7 +11,17 @@ generates. If you install a sd card it will store all captured images on it alon
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
 if you set the highest.
 
-There is a 3 x 3 grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
+The motion detection works by capturing a greyscale image 3 times a second (320x240 pixels).  This image is split up in to 20x20 
+pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
+number for each block between 0 and 255 (i.e. average brightness of the block).
+These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by more 
+then the "block" setting then this block is declared changed.
+If enough blocks have changed (percentage of active image detection area, the "image" setting) then motion is detected.
+So the two settings you can vary equate to:
+        Block = how much brighness variation in the image is required to trigger
+        Image = how much of the image area needs to change to count as movement detected
+
+There is a 4 x 3 grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
 when detecting motion (i.e. only the ticked areas are used).
 
 It also has the following URLs you can use:
@@ -44,10 +54,11 @@ It uses WifiManager so first time the ESP starts it will create an access point 
  
 Note: It is vital that the ESP has a good 5volt supply (at least 0.5amp capable - although it draws around 
       100mA most of the time) otherwise you get all sorts of weird things happening including very slow network response times.
-      The esp camera board also seems very sensitive to what is around the antenna and this can cause wifi to slow or stop.
-      e.g. I mounted the camera on a strip board and this was enough to stop wifi responding.
-      I have also found that if you do not put a smoothing capacitor on the power, turning the LED on can disrupt wifi.
- 
+      The esp camera board also seems very sensitive to what is around the antenna and this can cause wifi to slow or stop
+      if you put it in a case or mount it on a pcb etc.  (If it is going in a case I think an external antenna is required).
+      Also I find that a smoothing capacitor is required on the 3.3v side otherwise the LED turning on/off can cause a
+      lot of problems (specifically causing it to keep re-triggering and other random behaviour).
+      
  
 -----------------
 

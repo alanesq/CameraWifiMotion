@@ -1,23 +1,22 @@
 /**************************************************************************************************
  *
- *                                 'Standard' procedures  - 30Jan20
+ *                                 'Standard' procedures  - 05Feb20
  *                                 
- *                                 Note: modified from my standard
+ *                                 Note: now modified from my standard
  *             
  *  
  **************************************************************************************************/
 
 
 // forward declarations
-  void log_system_message();
-  String webheader();
+  void log_system_message(String);
+  String webheader(int);
   String webfooter();
   void handleLogpage();
   void handleNotFound();
   String requestpage();
   void handleReboot();
   void WIFIcheck();
-  void UpdateBootlogSpiffs(String Info);   // in main code
 
 
 // ----------------------------------------------------------------
@@ -107,7 +106,7 @@ String webheader(int refresh) {
 // HTML at the end of each web page
 
 
-String webfooter(void) {
+String webfooter() {
 
      // NTP server link status
             String NTPtext = "NTP Link "; 

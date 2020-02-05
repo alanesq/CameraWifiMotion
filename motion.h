@@ -1,5 +1,5 @@
 /*
- *  Motion detection from camera image - 31Jan20 
+ *  Motion detection from camera image - 05Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -10,7 +10,7 @@
  * a threshold (block_threshold) are counted.  If enough of the blocks have changed beyond a threshold (image_threshold)
  * then motion is detected.
  * - Many thanks to eloquentarduino for creating this code and for taking the time to answer my questions whilst I was 
- *   developing my security camera sketch.
+ *   developing this security camera sketch.
  *  
  * For info on the camera module see: https://github.com/espressif/esp32-camera
  * 
@@ -50,8 +50,8 @@
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
   
 // detection parameters (these are set by user and stored in Spiffs)
-    int block_threshold = 20;
-    int image_threshold = 15;
+    int block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
+    int image_threshold = 15;     // changed blocks in image required to count as movement detected in percent
 
 // misc     
   #define WIDTH 320                 // motion sensing frame size
@@ -65,10 +65,11 @@
     uint16_t current_frame[H][W] = { 0 };   // current frame
     
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
-    bool mask_frame[][3] = { {1,1,1},
-                             {1,1,1},
-                             {1,1,1} };
-    int mask_active = 9;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
+    bool mask_frame[4][3] = { {1,1,1},
+                              {1,1,1},
+                              {1,1,1},
+                              {1,1,1} };
+    int mask_active = 12;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
     
 // pre declare procedures
     bool setup_camera(framesize_t);
@@ -191,30 +192,27 @@ float motion_detect() {
     uint16_t changes = 0;
     const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);
     
-    float threshold_dec = (float)(block_threshold / 100.0);     // convert from percentage to decimal (range 0 to 1)
-
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             float current = current_frame[y][x];
             float prev = prev_frame[y][x];
-            //float delta = abs(current - prev) / prev;   // original code (doesn't detect change from light to dark?)
-            float delta = abs(current - prev) / 255;     // modified code Feb20 - gives amount of change in range 0 to 1
-
-            if (delta >= threshold_dec) {                // if change in block has changed enough to qualify
+            float delta = abs(current - prev);             // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
+            // float delta = abs(current - prev) / prev;   // original code 
+            if (delta >= block_threshold) {                // if change in block has changed enough to qualify
+              if (Mask_active(y,x)) changes += 1;          // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
                 Serial.print(y);
                 Serial.print('\t');
                 Serial.println(x);
 #endif
-              if (Mask_active(y,x)) changes += 1;        // if detection mask is enabled for this block increment changed block count
             }
         }
     }
 
 
     // calc relative blocks depending on how many mask area sections are active (max = 9)
-      uint16_t tblocks = (blocks / 9) * mask_active; 
+      float tblocks = (blocks / 12.0) * mask_active; 
       
 #if DEBUG_MOTION
     Serial.print("Changed ");
@@ -223,31 +221,28 @@ float motion_detect() {
     Serial.println(tblocks);
 #endif
 
-    return (1.0 * changes / tblocks);
+    float cres = (1.0 * changes / tblocks);
+    if (cres > 0.99) cres = 0;                  // assume bogus result (glitch in video etc.)
+    return cres;
 }
 
 
 //   ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Is this image block active in the detection mask  (mask area is a 3 x 3 grid)
+ * Is this image block active in the detection mask  (mask area is a 4 x 3 grid)
  *    returns 1 for active, 0 for disabled
  */
 
 bool Mask_active(int y, int x) {
 
-    int thirdW = W / 3;         // third of image size 
+    int fourthW = W / 4;                    // find pixels in each mask area 
     int thirdH = H / 3;
 
     // Which mask area is this block in 
-      int Maskx = floor(x / thirdW);       // x mask area (0 to 2)
-      int Masky = floor(y / thirdH);       // y mask area (0 to 2)
-
-    // if at max width the result will actually be 3 so downgrade it
-      if (Maskx > 2) Maskx = 2;  
-      if (Masky > 2) Masky = 2;
-    
-    // Serial.println(String(x) + "," + String(y) + " = mask area " + String(Maskx) + "," + String(Masky));
+      int Maskx = floor(x / fourthW);       // x mask area (0 to 3)
+      int Masky = floor(y / thirdH);        // y mask area (0 to 2)
+   
     return mask_frame[Maskx][Masky];
       
 }

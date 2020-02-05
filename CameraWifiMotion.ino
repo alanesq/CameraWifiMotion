@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "04Feb20";                     // version of this sketch
+  const String sversion = "05Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -56,7 +56,7 @@
   const boolean ledON = HIGH;                            // Status LED control 
   const boolean ledOFF = LOW;
   
-  const int FrameRefreshTime = 200;                      // how often to check camera for motion (milliseconds)
+  const int FrameRefreshTime = 333;                      // how often to check camera for motion (milliseconds)
   
   int TriggerLimitTime = 2;                              // min time between motion detection triggers (seconds)
 
@@ -67,6 +67,10 @@
 
 // ---------------------------------------------------------------
 
+
+// forward declarations
+  void UpdateBootlogSpiffs(String);   
+  
 
 #include "soc/soc.h"                    // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"           // Disable brownout problems
@@ -225,7 +229,7 @@ void loop(void){
   if (DetectionEnabled == 1) {    
     if ((unsigned long)(millis() - CAMERAtimer) >= FrameRefreshTime ) {                     // limit camera motion detection rate
         CAMERAtimer = millis();                                                             // reset timer
-        if (!capture_still()) RebootCamera();                                               // capture image, if problem reboot camera and try again
+        if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
         float changes = motion_detect();                                                    // find amount of change in current video frame      
         update_frame();                                                                     // Copy current frame to previous
         if (changes >= (float)(image_threshold / 100.0)) {                                  // if motion detected 
@@ -250,28 +254,7 @@ void loop(void){
   delay(40);
 
 } 
-
-
-// reboot camera (used if camera is failing to respond)
-void RebootCamera() {  
-    log_system_message("Camera failed to capture image - rebooting camera"); 
-    // turn camera off then back on      
-        digitalWrite(PWDN_GPIO_NUM, HIGH);
-        delay(500);
-        digitalWrite(PWDN_GPIO_NUM, LOW); 
-        delay(500);
-    RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE); 
-    delay(1000);
-    // try camera again, if still problem reboot esp32
-        if (!capture_still()) {
-            Serial.println("unable to reboot camera so rebooting esp...");
-            UpdateBootlogSpiffs("Camera fault - rebooting");                     // store in bootlog
-            delay(500);
-            ESP.restart();   
-            delay(5000);      // restart will fail without this delay
-         }
-}
-         
+       
 
 // ----------------------------------------------------------------
 //              Load settings from text file in Spiffs
@@ -306,7 +289,7 @@ void LoadSettingsSpiffs() {
       // line 2 - block_threshold
         line = file.readStringUntil('\n');
         tnum = line.toInt();
-        if (tnum < 1 || tnum > 100) {
+        if (tnum < 1 || tnum > 255) {
           log_system_message("invalid block_threshold in settings");
           return;
         }
@@ -373,7 +356,7 @@ void LoadSettingsSpiffs() {
         bool gerr = 0;
         mask_active = 0;
         for (int y = 0; y < 3; y++) {
-          for (int x = 0; x < 3; x++) {
+          for (int x = 0; x < 4; x++) {
             line = file.readStringUntil('\n');
             tnum = line.toInt();
             if (tnum == 1) {
@@ -417,7 +400,7 @@ void SaveSettingsSpiffs() {
 
        // Detection mask grid
           for (int y = 0; y < 3; y++) {
-            for (int x = 0; x < 3; x++) {
+            for (int x = 0; x < 4; x++) {
               file.println(String(mask_frame[x][y]));
             }
           }
@@ -454,7 +437,7 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      block_threshold = 15;
+      block_threshold = 10;
       image_threshold= 20;
       TriggerLimitTime = 3;
       TRIGGERtimer = millis();            // reset last image captured timer (to prevent instant trigger)
@@ -464,9 +447,9 @@ void handleDefault() {
 
       // Detection mask grid
         for (int y = 0; y < 3; y++) 
-          for (int x = 0; x < 3; x++) 
+          for (int x = 0; x < 4; x++) 
             mask_frame[x][y] = 1;
-        mask_active = 9;
+        mask_active = 12;
 
     SaveSettingsSpiffs();     // save settings in Spiffs
 
@@ -493,7 +476,7 @@ void handleRoot() {
       if (server.hasArg("submit")) {                    // if submit button was pressed
         mask_active = 0;  
         for (int y = 0; y < 3; y++) {
-          for (int x = 0; x < 3; x++) {
+          for (int x = 0; x < 4; x++) {
             if (server.hasArg(String(x) + String(y))) {
               mask_frame[x][y] = 1;
               mask_active ++;
@@ -540,7 +523,7 @@ void handleRoot() {
       if (server.hasArg("blockt")) {
         String Tvalue = server.arg("blockt");   // read value
         int val = Tvalue.toInt();
-        if (val > 0 && val < 100 && val != block_threshold) { 
+        if (val > 0 && val < 256 && val != block_threshold) { 
           log_system_message("block_threshold changed to " + Tvalue ); 
           block_threshold = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
@@ -643,7 +626,7 @@ void handleRoot() {
     // detection mask check grid (right of screen)
       message += "<div style='float: right;'>Detection Mask<br>";
       for (int y = 0; y < 3; y++) {
-        for (int x = 0; x < 3; x++) {
+        for (int x = 0; x < 4; x++) {
           message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
           if (mask_frame[x][y]) message += "checked ";
           message += ">\n";
@@ -663,8 +646,8 @@ void handleRoot() {
 
     // detection parameters
       message += "<BR>Detection thresholds: ";
-      message += "Block<input type='number' style='width: 35px' name='blockt' title='Variation in a block to count as block has changed' min='1' max='99' value='" + String(block_threshold) + "'>%, \n";
-      message += "Image<input type='number' style='width: 35px' name='imaget' title='Changed blocks to count as motion is detected' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
+      message += "Block<input type='number' style='width: 40px' name='blockt' title='Average pixel variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
+      message += "Image<input type='number' style='width: 40px' name='imaget' title='Changed blocks in image required to count as movement detected in percent' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
                
     // input submit button  
       message += "<BR><input type='submit' name='submit'><BR><BR>\n";
@@ -969,8 +952,13 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     Serial.println("Taking a photo... attempt #" + String(TryCount));
     fb = esp_camera_fb_get();
     if (!fb) {
-      Serial.println("Camera capture failed");
-      return;
+      Serial.println("Camera capture failed - rebooting camera");
+      RebootCamera(PIXFORMAT_JPEG);
+      fb = esp_camera_fb_get();       // try again to capture frame
+      if (!fb) {
+        Serial.println("Capture still failed");
+        return;
+      }
     }
 
     // restore flash status after using it as a flash
@@ -984,6 +972,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
     // Serial.println("Picture file name: " + IFileName);
 
+    SPIFFS.remove(IFileName);                          // delete old image file if it exists
     File file = SPIFFS.open(IFileName, FILE_WRITE);
     if (!file) {
       Serial.println("Failed to open file in writing mode");
@@ -1086,13 +1075,14 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 
 
 // ----------------------------------------------------------------
-//                       -restart the camera
+//                 -restart / reboot the camera
 // ----------------------------------------------------------------
 //  pixformats = PIXFORMAT_ + YUV422,GRAYSCALE,RGB565,JPEG
 //  framesizes = FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
 
-void RestartCamera(framesize_t fsize, pixformat_t format) {
 
+// switches camera mode
+void RestartCamera(framesize_t fsize, pixformat_t format) {
     bool ok;
     esp_camera_deinit();
       config.frame_size = fsize;
@@ -1109,7 +1099,27 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
         if (ok == ESP_OK) Serial.println("Camera restarted");
         else Serial.println("Camera failed to restart");
     }
+}
 
+
+// reboots camera (used if camera is failing to respond)
+void RebootCamera(pixformat_t format) {  
+    log_system_message("Camera failed to capture image - rebooting camera"); 
+    // turn camera off then back on      
+        digitalWrite(PWDN_GPIO_NUM, HIGH);
+        delay(500);
+        digitalWrite(PWDN_GPIO_NUM, LOW); 
+        delay(500);
+    RestartCamera(FRAME_SIZE_MOTION, format); 
+    delay(1000);
+    // try camera again, if still problem reboot esp32
+        if (!capture_still()) {
+            Serial.println("unable to reboot camera so rebooting esp...");
+            UpdateBootlogSpiffs("Camera fault - rebooting");                     // store in bootlog
+            delay(500);
+            ESP.restart();   
+            delay(5000);      // restart will fail without this delay
+         }
 }
 
 
@@ -1121,7 +1131,7 @@ void MotionDetected(float changes) {
 
   if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting (prob. not required?)
   
-    log_system_message("Camera detected motion: " + String(changes)); 
+    log_system_message("Camera detected motion: " + String(changes * 100.0) + "%"); 
     TriggerTime = currentTime();                                 // store time of trigger
     capturePhotoSaveSpiffs(UseFlash);                            // capture an image
 
@@ -1177,7 +1187,7 @@ void handleTest(){
        
   // -----------------------------------------------------------------------------
 
-  message += webfooter();                                             // add the standard footer
+  message += webfooter();                      // add the standard footer
 
     
   server.send(200, "text/html", message);      // send the web page
