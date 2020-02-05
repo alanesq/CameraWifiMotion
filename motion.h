@@ -58,8 +58,7 @@
   #define HEIGHT 240
   #define W (WIDTH / BLOCK_SIZE)
   #define H (HEIGHT / BLOCK_SIZE)
-  uint32_t AveragePix = 0;               // average pixel reading from captured image (used for nighttime compensation)
-                                         //   bright day = around 120
+  uint32_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
   
 // frame stores (blocks)
     uint16_t prev_frame[H][W] = { 0 };      // last captured frame
@@ -135,7 +134,7 @@ bool setup_camera() {
  */
 bool capture_still() {
 
-    // Serial.flush();   // wait for serial data to be sent first as suspected this may cause interference (now think this not required?)
+    Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image 
 
     AveragePix = 0;     // average pixel reading
 
@@ -192,13 +191,14 @@ float motion_detect() {
     uint16_t changes = 0;
     const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);
     
-    float threshold_dec = (float)(block_threshold / 100.0);     // convert from percentage to decimal 
+    float threshold_dec = (float)(block_threshold / 100.0);     // convert from percentage to decimal (range 0 to 1)
 
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             float current = current_frame[y][x];
             float prev = prev_frame[y][x];
-            float delta = abs(current - prev) / prev;
+            //float delta = abs(current - prev) / prev;   // original code (doesn't detect change from light to dark?)
+            float delta = abs(current - prev) / 255;     // modified code Feb20 - gives amount of change in range 0 to 1
 
             if (delta >= threshold_dec) {                // if change in block has changed enough to qualify
 #if DEBUG_MOTION
@@ -236,12 +236,18 @@ float motion_detect() {
 
 bool Mask_active(int y, int x) {
 
+    int thirdW = W / 3;         // third of image size 
+    int thirdH = H / 3;
+
     // Which mask area is this block in 
-      int Maskx = floor(x / 3);       // x mask area (0 to 2)
-      int Masky = floor(y / 3);       // y mask area (0 to 2)
+      int Maskx = floor(x / thirdW);       // x mask area (0 to 2)
+      int Masky = floor(y / thirdH);       // y mask area (0 to 2)
 
+    // if at max width the result will actually be 3 so downgrade it
+      if (Maskx > 2) Maskx = 2;  
+      if (Masky > 2) Masky = 2;
+    
     // Serial.println(String(x) + "," + String(y) + " = mask area " + String(Maskx) + "," + String(Masky));
-
     return mask_frame[Maskx][Masky];
       
 }
