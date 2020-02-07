@@ -11,7 +11,7 @@ generates. If you install a sd card it will store all captured images on it alon
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
 if you set the highest.
 
-The motion detection works by capturing a greyscale image 3 times a second (320x240 pixels).  This image is split up in to 20x20 
+The motion detection works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
 number for each block between 0 and 255 (i.e. average brightness of the block).
 These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by more 
@@ -21,8 +21,12 @@ So the two settings you can vary equate to:
         Block = how much brighness variation in the image is required to trigger
         Image = how much of the image area needs to change to count as movement detected
 
-There is a 4 x 3 grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
-when detecting motion (i.e. only the ticked areas are used).
+There are three settings for the motion detection, the first is how much change in average brightness in a block will count as
+that block has changed, the second two numbers refer to the percentage of blocks in the image which have changed since the last 
+image was captured and it will trigger as movement detected if this is between these two values.
+
+There is a grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
+when detecting motion (i.e. only the ticked areas are used).  This 4 x 3 grid results in mask sections of 16 blocks (4x4) 
 
 It also has the following URLs you can use:
         http://<esp ip address> /ping - responds with OK, just so you know it is still working
@@ -35,6 +39,7 @@ It also has the following URLs you can use:
                                 /img - just display a plain jpg of the latest captured image
                                 /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
+                                
 
 Note: I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org
       This sketch includes a lot of other peoples code from many sources which I have included links to   
