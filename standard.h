@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                 'Standard' procedures  - 05Feb20
+ *                                 'Standard' procedures  - 06Feb20
  *                                 
  *                                 Note: now modified from my standard
  *             
@@ -17,6 +17,7 @@
   String requestpage();
   void handleReboot();
   void WIFIcheck();
+  void UpdateBootlogSpiffs(String);             // in CameraWifiMotion.ino
 
 
 // ----------------------------------------------------------------

@@ -1,4 +1,5 @@
-/*
+/**************************************************************************************************
+ *  
  *  Motion detection from camera image - 05Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
@@ -14,9 +15,11 @@
  *  
  * For info on the camera module see: https://github.com/espressif/esp32-camera
  * 
-*/
+ **************************************************************************************************/
 
 #define DEBUG_MOTION 0        // serial debug enable for motion.h
+
+#include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 
 
 // Settings
@@ -46,8 +49,6 @@
   
 //   ---------------------------------------------------------------------------------------------------------------------
 
-
-#include "esp_camera.h"       // https://github.com/espressif/esp32-camera
   
 // detection parameters (these are set by user and stored in Spiffs)
     int block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
@@ -65,19 +66,20 @@
     uint16_t current_frame[H][W] = { 0 };   // current frame
     
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
+//   4 x 3 grid results in mask sections of 16 blocks (4x4) - image = 320x240 pixels, blocks = 20x20 pixels
     bool mask_frame[4][3] = { {1,1,1},
                               {1,1,1},
                               {1,1,1},
                               {1,1,1} };
     int mask_active = 12;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
     
-// pre declare procedures
+// forward delarations
     bool setup_camera(framesize_t);
     bool capture_still();
     float motion_detect();
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
-    bool Mask_active(int y, int x);
+    bool block_active(int x, int y);
 
 // camera configuration settings
     camera_config_t config;
@@ -199,7 +201,7 @@ float motion_detect() {
             float delta = abs(current - prev);             // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
             // float delta = abs(current - prev) / prev;   // original code 
             if (delta >= block_threshold) {                // if change in block has changed enough to qualify
-              if (Mask_active(y,x)) changes += 1;          // if detection mask is enabled for this block increment changed block count
+              if (block_active(x,y)) changes += 1;          // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
                 Serial.print(y);
@@ -221,9 +223,7 @@ float motion_detect() {
     Serial.println(tblocks);
 #endif
 
-    float cres = (1.0 * changes / tblocks);
-    if (cres > 0.99) cres = 0;                  // assume bogus result (glitch in video etc.)
-    return cres;
+    return float(changes / tblocks);         // number of changed blocks in range 0 to 1
 }
 
 
@@ -234,14 +234,14 @@ float motion_detect() {
  *    returns 1 for active, 0 for disabled
  */
 
-bool Mask_active(int y, int x) {
+bool block_active(int x, int y) {
 
-    int fourthW = W / 4;                    // find pixels in each mask area 
-    int thirdH = H / 3;
+    int maskW = W / 4;                    // find pixels in each mask area 
+    int maskH = H / 3;
 
     // Which mask area is this block in 
-      int Maskx = floor(x / fourthW);       // x mask area (0 to 3)
-      int Masky = floor(y / thirdH);        // y mask area (0 to 2)
+      int Maskx = floor(x / maskW);       // x mask area (0 to 3)
+      int Masky = floor(y / maskH);       // y mask area (0 to 2)
    
     return mask_frame[Maskx][Masky];
       
