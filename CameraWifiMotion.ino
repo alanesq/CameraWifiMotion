@@ -9,7 +9,7 @@
  *             
  *             Note: The flash can not be used if using an SD Card as they both use pin 4
  *             
- *             GPIO16 is used as an input pin for external sensors etc.
+ *             GPIO16 is used as an input pin for external sensors etc. (not implemented yet)
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED.....chances are there is a problem with the 
@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "06Feb20";                     // version of this sketch
+  const String sversion = "07Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -226,7 +226,7 @@ void loop(void){
     if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
     float changes = motion_detect();                                                    // find amount of change in current video frame      
     update_frame();                                                                     // Copy current frame to previous
-    if (changes >= (float)(image_threshold / 100.0)) {                                  // if motion detected 
+    if ( (changes >= (float)(image_thresholdL / 100.0)) && (changes <= (float)(image_thresholdH / 100.0)) ) {                                  // if motion detected 
          if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between detection triggers
               TRIGGERtimer = millis();                                                  // reset last motion trigger time
               MotionDetected(changes);                                                  // run motion detected procedure (passing change level)
@@ -284,19 +284,25 @@ void LoadSettingsSpiffs() {
         if (tnum < 1 || tnum > 255) log_system_message("invalid block_threshold in settings");
         else block_threshold = tnum;
         
-      // line 3 - image_threshold
+      // line 3 - min image_thresholdL
         line = file.readStringUntil('\n');
         tnum = line.toInt();
-        if (tnum < 1 || tnum > 100) log_system_message("invalid image_threshold in settings");
-        else image_threshold = tnum;
+        if (tnum < 0 || tnum > 99) log_system_message("invalid min_image_threshold in settings");
+        else image_thresholdL = tnum;
   
-      // line 4 - TriggerLimitTime
+      // line 4 - min image_thresholdH
+        line = file.readStringUntil('\n');
+        tnum = line.toInt();
+        if (tnum < 1 || tnum > 100) log_system_message("invalid max_image_threshold in settings");
+        else image_thresholdH = tnum;
+
+      // line 5 - TriggerLimitTime
         line = file.readStringUntil('\n');
         tnum = line.toInt();
         if (tnum < 1 || tnum > 3600) log_system_message("invalid TriggerLimitTime in settings");
         else TriggerLimitTime = tnum;
   
-      // line 5 - DetectionEnabled
+      // line 6 - DetectionEnabled
         line = file.readStringUntil('\n');
         tnum = line.toInt();
         if (tnum == 2) tnum = 1;     // if it was paused restart it
@@ -304,20 +310,20 @@ void LoadSettingsSpiffs() {
         else if (tnum == 1) DetectionEnabled = 1;
         else log_system_message("Invalid DetectionEnabled in settings: " + line);
   
-      // line 6 - EmailLimitTime
+      // line 7 - EmailLimitTime
         line = file.readStringUntil('\n');
         tnum = line.toInt();
         if (tnum < 60 || tnum > 10000) log_system_message("invalid EmailLimitTime in settings");
         else EmailLimitTime = tnum;
   
-      // line 7 - UseFlash
+      // line 8 - UseFlash
         line = file.readStringUntil('\n');
         tnum = line.toInt();
         if (tnum == 0) UseFlash = 0;
         else if (tnum == 1) UseFlash = 1;
         else log_system_message("Invalid UseFlash in settings: " + line);
         
-      // line 8 - SpiffsFileCounter
+      // line 9 - SpiffsFileCounter
         line = file.readStringUntil('\n');
         tnum = line.toInt();
         if (tnum > MaxSpiffsImages) log_system_message("invalid SpiffsFileCounter in settings");
@@ -360,7 +366,8 @@ void SaveSettingsSpiffs() {
     // save settings in to file
         file.println(String(emailWhenTriggered));
         file.println(String(block_threshold));
-        file.println(String(image_threshold));
+        file.println(String(image_thresholdL));
+        file.println(String(image_thresholdH));
         file.println(String(TriggerLimitTime));
         file.println(String(DetectionEnabled));
         file.println(String(EmailLimitTime));
@@ -407,7 +414,8 @@ void handleDefault() {
     // default settings
       emailWhenTriggered = 0;
       block_threshold = 10;
-      image_threshold= 20;
+      image_thresholdL= 10;
+      image_thresholdH= 100;
       TriggerLimitTime = 3;
       TRIGGERtimer = millis();            // reset last image captured timer (to prevent instant trigger)
       DetectionEnabled = 1;
@@ -490,13 +498,24 @@ void handleRoot() {
         }
       }
       
-    // if imaget was entered - image_threshold
-      if (server.hasArg("imaget")) {
-        String Tvalue = server.arg("imaget");   // read value
+    // if imagetl was entered - min-image_threshold
+      if (server.hasArg("imagetl")) {
+        String Tvalue = server.arg("imagetl");   // read value
         int val = Tvalue.toInt();
-        if (val > 0 && val < 100 && val != image_threshold) { 
-          log_system_message("image_threshold changed to " + Tvalue ); 
-          image_threshold = val;
+        if (val >= 0 && val < 100 && val != image_thresholdL) { 
+          log_system_message("Min_image_threshold changed to " + Tvalue ); 
+          image_thresholdL = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+
+    // if imageth was entered - min-image_threshold
+      if (server.hasArg("imageth")) {
+        String Tvalue = server.arg("imageth");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val <= 100 && val != image_thresholdH) { 
+          log_system_message("Max_image_threshold changed to " + Tvalue ); 
+          image_thresholdH = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
@@ -606,8 +625,9 @@ void handleRoot() {
 
     // detection parameters
       message += "<BR>Detection thresholds: ";
-      message += "Block<input type='number' style='width: 40px' name='blockt' title='Average pixel variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
-      message += "Image<input type='number' style='width: 40px' name='imaget' title='Changed blocks in image required to count as movement detected in percent' min='1' max='99' value='" + String(image_threshold) + "'>% \n"; 
+      message += "Block changed threshold<input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
+      message += "Trigger between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as movement detected in percent' min='0' max='99' value='" + String(image_thresholdL) + "'>% \n"; 
+      message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as movement detected in percent' min='1' max='100' value='" + String(image_thresholdH) + "'>% blocks changed\n"; 
                
     // input submit button  
       message += "<BR><input type='submit' name='submit'><BR><BR>\n";
@@ -1089,7 +1109,7 @@ void RebootCamera(pixformat_t format) {
 // ----------------------------------------------------------------
 
 bool WipeSpiffs() {
-        log_system_message("Formatting/Wiping Spiffs)"); 
+        log_system_message("Formatting/Wiping Spiffs"); 
         bool wres = SPIFFS.format();
         if (!wres) {
           log_system_message("Unable to format Spiffs");
@@ -1112,8 +1132,8 @@ void MotionDetected(float changes) {
   if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting (prob. not required?)
   
     log_system_message("Camera detected motion: " + String(changes * 100.0) + "%"); 
-    TriggerTime = currentTime();                                 // store time of trigger
-    capturePhotoSaveSpiffs(UseFlash);                            // capture an image
+    TriggerTime = currentTime() + " - " + String(changes) + "%";    // store time of trigger and percent motion detected
+    capturePhotoSaveSpiffs(UseFlash);                               // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {

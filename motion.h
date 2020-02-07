@@ -8,7 +8,7 @@
  * This works by capturing a greyscale image from the camera, splitting this up in to blocks of pixels (BLOCK_SIZE x BLOCK_SIZE)
  * then reading all the pixel values inside each block and producing an average value for the block. 
  * The previous frames block values are then compared with the current and the number of blocks which have changed beyond
- * a threshold (block_threshold) are counted.  If enough of the blocks have changed beyond a threshold (image_threshold)
+ * a threshold (block_threshold) are counted.  If enough of the blocks have changed between two thresholds (image_thresholdL and H)
  * then motion is detected.
  * - Many thanks to eloquentarduino for creating this code and for taking the time to answer my questions whilst I was 
  *   developing this security camera sketch.
@@ -52,7 +52,8 @@
   
 // detection parameters (these are set by user and stored in Spiffs)
     int block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
-    int image_threshold = 15;     // changed blocks in image required to count as movement detected in percent
+    int image_thresholdL = 15;     // min changed blocks in image required to count as movement detected in percent
+    int image_thresholdH = 100;    // max changed blocks in image required to count as movement detected in percent
 
 // misc     
   #define WIDTH 320                 // motion sensing frame size
