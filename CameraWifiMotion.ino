@@ -41,25 +41,25 @@
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
-  const int datarefresh = 4000;                          // Refresh rate of the updating data on web page (1000 = 1 second)
+  const uint16_t datarefresh = 4000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
   String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript)
   
-  const int LogNumber = 40;                              // number of entries to store in the system log
+  const uint16_t LogNumber = 40;                         // number of entries to store in the system log
 
-  const int ServerPort = 80;                             // ip port to serve web pages on
+  const uint16_t ServerPort = 80;                        // ip port to serve web pages on
 
-  const int Illumination_led = 4;                        // illumination LED pin
+  const uint16_t Illumination_led = 4;                   // illumination LED pin
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input)
   
-  const int SystemCheckRate = 5000;                      // how often to do routine system checks (milliseconds)
+  const uint16_t SystemCheckRate = 5000;                      // how often to do routine system checks (milliseconds)
   
   const boolean ledON = HIGH;                            // Status LED control 
   const boolean ledOFF = LOW;
   
-  int TriggerLimitTime = 2;                              // min time between motion detection triggers (seconds)
+  uint16_t TriggerLimitTime = 2;                         // min time between motion detection triggers (seconds)
 
-  int EmailLimitTime = 60;                               // min time between email sends (seconds)
+  uint16_t EmailLimitTime = 60;                          // min time between email sends (seconds)
 
   bool UseFlash = 1;                                     // use flash when taking a picture
   
@@ -269,7 +269,7 @@ void LoadSettingsSpiffs() {
     
     // read contents of file
       String line;
-      int tnum;
+      uint16_t tnum;
   
       // line 1 - emailWhenTriggered
         line = file.readStringUntil('\n');
@@ -587,6 +587,7 @@ void handleRoot() {
           SaveSettingsSpiffs();     // save settings in Spiffs
       }
 
+  latestChanges = 0;                                                 // reset stored motion values as could be out of date 
 
   // build the HTML code 
   
@@ -680,13 +681,13 @@ void handleData(){
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
-        message += "<BR>Current readings: brightness:" + String(AveragePix);
-        int blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);         // blocks in complete image
-        float tblocks = float(blocks / 12.0) * mask_active;                // blocks in active mask area
-        float tpercent = float(latestChanges / tblocks) * 100;             // percent of blocks which had changed
+        message += "<BR>Readings: brightness:" + String(AveragePix);
+        uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);          // blocks in complete image
+        uint16_t tblocks = ((blocks / 12.0) * mask_active);                      // blocks in active mask area
+        float tpercent = float(latestChanges * 100.0) / tblocks;                 // percent of blocks which had changed
         message += ", " + String(latestChanges) + " changed blocks out of " + String(tblocks);
         message += " = " + String(tpercent) + "%\n";
-        latestChanges = 0;                                                 // reset stored values once displayed
+        latestChanges = 0;                                                       // reset stored values once displayed
     }
     
   // email when motion detected
@@ -764,7 +765,7 @@ void handleLive(){
 void handleImages(){
 
   log_system_message("Stored images page requested");   
-  int ImageToShow = SpiffsFileCounter;     // set current image to display when /img called
+  uint16_t ImageToShow = SpiffsFileCounter;     // set current image to display when /img called
 
   // action any buttons presses etc.
 
@@ -876,7 +877,7 @@ void handleBootLog() {
 
 void handleImg(){
     
-    int ImageToShow = SpiffsFileCounter;     // set image to display as current image
+    uint16_t ImageToShow = SpiffsFileCounter;     // set image to display as current image
         
     // if a image to show is specified in url
       if (server.hasArg("pic")) {
@@ -995,7 +996,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       fs::FS &fs = SD_MMC; 
       
       // read image number from counter text file
-        int Inum = 0;  
+        uint16_t Inum = 0;  
         String CFileName = "/counter.txt";   
         file = fs.open(CFileName, FILE_READ);
         if (!file) Serial.println("Unable to read counter.txt from sd card"); 
@@ -1057,7 +1058,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
 // check file saved to Spiffs ok
 bool checkPhoto( fs::FS &fs, String IFileName ) {
   File f_pic = fs.open( IFileName );
-  unsigned int pic_sz = f_pic.size();
+  uint16_t pic_sz = f_pic.size();
   bool tres = ( pic_sz > 100 );
   if (!tres) log_system_message("Problem detected taking/storing image");
   f_pic.close();

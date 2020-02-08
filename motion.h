@@ -51,9 +51,9 @@
 
   
 // detection parameters (these are set by user and stored in Spiffs)
-    int block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
-    int image_thresholdL = 15;     // min changed blocks in image required to count as movement detected in percent
-    int image_thresholdH = 100;    // max changed blocks in image required to count as movement detected in percent
+    uint16_t block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
+    uint16_t image_thresholdL = 15;     // min changed blocks in image required to count as movement detected in percent
+    uint16_t image_thresholdH = 100;    // max changed blocks in image required to count as movement detected in percent
 
 // misc     
   #define WIDTH 320                 // motion sensing frame size
@@ -63,7 +63,7 @@
   uint32_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
 
 // store most current readings for display on main page
-    int latestChanges = 0;
+    uint16_t latestChanges = 0;
 
 // frame stores (blocks)
     uint16_t prev_frame[H][W] = { 0 };      // last captured frame
@@ -75,7 +75,7 @@
                               {1,1,1},
                               {1,1,1},
                               {1,1,1} };
-    int mask_active = 12;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
+    uint16_t mask_active = 12;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
     
 // forward delarations
     bool setup_camera(framesize_t);
@@ -240,12 +240,12 @@ float motion_detect() {
 
 bool block_active(int x, int y) {
 
-    int maskW = W / 4;                    // find pixels in each mask area 
-    int maskH = H / 3;
+    uint16_t maskW = W / 4;                    // find pixels in each mask area 
+    uint16_t maskH = H / 3;
 
     // Which mask area is this block in 
-      int Maskx = floor(x / maskW);       // x mask area (0 to 3)
-      int Masky = floor(y / maskH);       // y mask area (0 to 2)
+      uint16_t Maskx = floor(x / maskW);       // x mask area (0 to 3)
+      uint16_t Masky = floor(y / maskH);       // y mask area (0 to 2)
    
     return mask_frame[Maskx][Masky];
       
