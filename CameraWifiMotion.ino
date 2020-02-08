@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "07Feb20";                     // version of this sketch
+  const String sversion = "08Feb20";                     // version of this sketch
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -678,6 +678,17 @@ void handleData(){
     else if (DetectionEnabled == 2) message += red + "disabled" + endcolour + "\n";
     else message += red + "disabled" + endcolour + "\n";
 
+  // display adnl info if detection is enabled
+    if (DetectionEnabled == 1) {
+        message += "<BR>Current readings: brightness:" + String(AveragePix);
+        int blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);         // blocks in complete image
+        float tblocks = float(blocks / 12.0) * mask_active;                // blocks in active mask area
+        float tpercent = float(latestChanges / tblocks) * 100;             // percent of blocks which had changed
+        message += ", " + String(latestChanges) + " changed blocks out of " + String(tblocks);
+        message += " = " + String(tpercent) + "%\n";
+        latestChanges = 0;                                                 // reset stored values once displayed
+    }
+    
   // email when motion detected
     message += "<BR>Send an Email when motion detected: "; 
     if (emailWhenTriggered) message += red + "enabled" + endcolour;  
@@ -706,8 +717,6 @@ void handleData(){
 //    message += "<BR>External sensor pin is: ";
 //    if (digitalRead(gioPin)) message += "High\n";
 //    else message += "Low\n";
-
-  if (AveragePix) message += "<BR>Average brightness: " + String(AveragePix);
 
   message += "</body></htlm>\n";
   
@@ -1129,11 +1138,11 @@ bool WipeSpiffs() {
 
 void MotionDetected(float changes) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting (prob. not required?)
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (prob. not required?)
   
     log_system_message("Camera detected motion: " + String(changes * 100.0) + "%"); 
-    TriggerTime = currentTime() + " - " + String(changes) + "%";    // store time of trigger and percent motion detected
-    capturePhotoSaveSpiffs(UseFlash);                               // capture an image
+    TriggerTime = currentTime() + " - " + String(changes * 100) + "%";    // store time of trigger and percent motion detected
+    capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {

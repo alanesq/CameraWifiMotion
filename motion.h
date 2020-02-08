@@ -61,7 +61,10 @@
   #define W (WIDTH / BLOCK_SIZE)
   #define H (HEIGHT / BLOCK_SIZE)
   uint32_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
-  
+
+// store most current readings for display on main page
+    int latestChanges = 0;
+
 // frame stores (blocks)
     uint16_t prev_frame[H][W] = { 0 };      // last captured frame
     uint16_t current_frame[H][W] = { 0 };   // current frame
@@ -193,7 +196,7 @@ bool capture_still() {
  */
 float motion_detect() {
     uint16_t changes = 0;
-    const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);
+    const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
     
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
@@ -213,9 +216,9 @@ float motion_detect() {
         }
     }
 
+    float tblocks = (blocks / 12.0) * mask_active;       // blocks in active mask
 
-    // calc relative blocks depending on how many mask area sections are active (max = 9)
-      float tblocks = (blocks / 12.0) * mask_active; 
+    if (changes > latestChanges) latestChanges = changes;           // store latest readings for display on main page (it is zeroed when displayed)
       
 #if DEBUG_MOTION
     Serial.print("Changed ");
