@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 05Feb20 
+ *  Motion detection from camera image - 09Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 

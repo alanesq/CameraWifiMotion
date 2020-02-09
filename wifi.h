@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Stuff - 24Jan20
+ *                                    Wifi / NTP Stuff - 09Feb20
  *             
  *                    Set up wifi for either esp8266 or esp32 plus NTP (network time)
  *  
@@ -23,11 +23,12 @@
 byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
   
 // Wifi libraries (for both ESP8266 and ESP32)
-    #include <WiFiManager.h>            // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
+    #include <WiFiManager.h>              // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
     #if defined(ESP8266)                  // esp8266 section
       ESP8266WebServer server(ServerPort);
       const String ESPType = "ESP8266";
     #elif defined(ESP32)                  // esp32 section
+      #include <ESPmDNS.h>                // see https://github.com/espressif/arduino-esp32/tree/master/libraries/ESPmDNS
       WebServer server(ServerPort); 
       const String ESPType = "ESP32";
     #else

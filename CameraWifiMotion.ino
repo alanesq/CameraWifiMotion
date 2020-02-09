@@ -37,14 +37,16 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "08Feb20";                     // version of this sketch
+  const String sversion = "09Feb20";                     // version of this sketch
+
+  const char* MDNStitle = "ESPcam1";                     // Mdns title (use http://<MDNStitle>.local )
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 4000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
   String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript)
   
-  const uint16_t LogNumber = 40;                         // number of entries to store in the system log
+  const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
   const uint16_t ServerPort = 80;                        // ip port to serve web pages on
 
@@ -52,45 +54,13 @@
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input)
   
-  const uint16_t SystemCheckRate = 5000;                      // how often to do routine system checks (milliseconds)
-  
-  const boolean ledON = HIGH;                            // Status LED control 
-  const boolean ledOFF = LOW;
-  
-  uint16_t TriggerLimitTime = 2;                         // min time between motion detection triggers (seconds)
-
-  uint16_t EmailLimitTime = 60;                          // min time between email sends (seconds)
-
-  bool UseFlash = 1;                                     // use flash when taking a picture
+  const uint16_t SystemCheckRate = 5000;                 // how often to do routine system checks (milliseconds)
   
 
 // ---------------------------------------------------------------
-  
 
-#include "soc/soc.h"                    // Disable brownout problems
-#include "soc/rtc_cntl_reg.h"           // Disable brownout problems
 
-// spiffs used to store images and settings
-  #include <SPIFFS.h>
-  #include <FS.h>                       // gives file access on spiffs
-  int SpiffsFileCounter = 0;            // counter of last image stored
-
-// sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
-  #include "SD_MMC.h"
-  // #include <SPI.h>                   // (already loaded)
-  // #include <FS.h>                    // gives file access on spiffs (already loaded)
-  #define SD_CS 5                       // sd chip select pin
-  bool SD_Present;                      // flag if sd card is found (0 = no)
-
-#include "wifi.h"                       // Load the Wifi / NTP stuff
-
-#include "standard.h"                   // Standard procedures
-
-#include "gmail_esp32.h"                // send email via smtp
-
-#include "motion.h"                     // motion detection / camera
-
-// misc
+// Misc 
   unsigned long CAMERAtimer = 0;             // used for timing camera motion refresh timing
   unsigned long TRIGGERtimer = 0;            // used for limiting camera motion trigger rate
   unsigned long EMAILtimer = 0;              // used for limiting rate emails can be sent
@@ -99,7 +69,35 @@
   unsigned long MaintTiming = millis();      // used for timing maintenance tasks
   bool emailWhenTriggered = 0;               // flag if to send emails when motion detection triggers
   bool ReqLEDStatus = 0;                     // desired status of the illuminator led (i.e. should it be on or off when not being used as a flash)
-  
+  const boolean ledON = HIGH;                // Status LED control 
+  const boolean ledOFF = LOW;
+  uint16_t TriggerLimitTime = 2;             // min time between motion detection triggers (seconds)
+  uint16_t EmailLimitTime = 60;              // min time between email sends (seconds)
+  bool UseFlash = 1;                         // use flash when taking a picture
+
+#include "soc/soc.h"                         // Disable brownout problems
+#include "soc/rtc_cntl_reg.h"                // Disable brownout problems
+
+// spiffs used to store images and settings
+  #include <SPIFFS.h>
+  #include <FS.h>                            // gives file access on spiffs
+  int SpiffsFileCounter = 0;                 // counter of last image stored
+
+// sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
+  #include "SD_MMC.h"
+  // #include <SPI.h>                        // (already loaded)
+  // #include <FS.h>                         // gives file access on spiffs (already loaded)
+  #define SD_CS 5                            // sd chip select pin
+  bool SD_Present;                           // flag if sd card is found (0 = no)
+
+#include "wifi.h"                            // Load the Wifi / NTP stuff
+
+#include "standard.h"                        // Standard procedures
+
+#include "gmail_esp32.h"                     // send email via smtp
+
+#include "motion.h"                          // motion detection / camera
+
   
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
@@ -117,7 +115,7 @@ void setup(void) {
   Serial.println("Starting - " + stitle + " - " + sversion);
   Serial.println(F("---------------------------------------"));
   
-  // Serial.setDebugOutput(true);                                // enable extra diagnostic info  
+  // Serial.setDebugOutput(true);            // enable extra diagnostic info  
    
   // configure the LED
     pinMode(Illumination_led, OUTPUT); 
@@ -128,7 +126,11 @@ void setup(void) {
   // configure the I/O pin (with pullup resistor)
     pinMode(gioPin,  INPUT_PULLUP);                                
     
-  startWifiManager();                                            // Connect to wifi (procedure is in wifi.h)
+  startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
+  
+  if (MDNS.begin(MDNStitle)) {
+    Serial.println("MDNS responder started");
+  }
   
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
 
@@ -244,8 +246,7 @@ void loop(void){
         else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
     }
 
-  delay(40);
-
+  delay(50);
 } 
        
 
@@ -626,7 +627,7 @@ void handleRoot() {
 
     // detection parameters
       message += "<BR>Detection thresholds: ";
-      message += "Block changed threshold<input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
+      message += "Block change<input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
       message += "Trigger between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as movement detected in percent' min='0' max='99' value='" + String(image_thresholdL) + "'>% \n"; 
       message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as movement detected in percent' min='1' max='100' value='" + String(image_thresholdH) + "'>% blocks changed\n"; 
                

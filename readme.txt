@@ -5,11 +5,16 @@ This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards 
 The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
 internal memory or on to an sd card and also emails it if required.
 
-
 It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
 if you set the highest.
+
+It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
+             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
+             see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
+             Once you have entered your wifi password it will restart and you can then connect to it in your browser
+             at the address:     http://ESPcam1.local
 
 The motion detection works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
@@ -17,9 +22,11 @@ number for each block between 0 and 255 (i.e. average brightness of the block).
 These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by more 
 then the "block" setting then this block is declared changed.
 If enough blocks have changed (percentage of active image detection area, the "image" setting) then motion is detected.
-So the two settings you can vary equate to:
-        Block = how much brighness variation in the image is required to trigger
+So the settings you can vary equate to:
+        Block = how much brighness variation in a block is required to flag it as changed
         Image = how much of the image area needs to change to count as movement detected
+When motion detecting is enabled it will show the current average image britness along with what motion it is currently detecting
+in the format "Readings: brightness:113, 0 changed blocks out of 64 = 0.00%".  You can use this to fine tune your detection settings.
 
 There are three settings for the motion detection, the first is how much change in average brightness in a block will count as
 that block has changed, the second two numbers refer to the percentage of blocks in the image which have changed since the last 
@@ -51,11 +58,6 @@ I have it using my gmail account to send the emails
     you then need to edit gmail_esp32.h with your details
 
 Libraries used by this sketch are in the folder "libraries used"
-
-It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
-             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
-             see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
- 
  
 Note: It is vital that the ESP has a good 5volt supply (at least 0.5amp capable - although it draws around 
       100mA most of the time) otherwise you get all sorts of weird things happening including very slow network response times.
