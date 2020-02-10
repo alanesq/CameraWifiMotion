@@ -46,6 +46,7 @@ It also has the following URLs you can use:
                                 /img - just display a plain jpg of the latest captured image
                                 /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
+                                /imagedata - show raw block data
                                 
 
 Note: I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org

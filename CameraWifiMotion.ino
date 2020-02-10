@@ -37,14 +37,15 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "09Feb20";                     // version of this sketch
+  const String sversion = "10Feb20";                     // version of this sketch
 
-  const char* MDNStitle = "ESPcam1";                     // Mdns title (use http://<MDNStitle>.local )
+  const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 4000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
-  String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript)
+
+  String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
   
   const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
@@ -52,25 +53,25 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte gioPin = 16;                                // I/O pin (for external sensor input)
+  const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
-  const uint16_t SystemCheckRate = 5000;                 // how often to do routine system checks (milliseconds)
+  const uint16_t SystemCheckRate = 5000;                 // how often to do the routine system checks (milliseconds)
   
 
 // ---------------------------------------------------------------
 
 
 // Misc 
-  unsigned long CAMERAtimer = 0;             // used for timing camera motion refresh timing
-  unsigned long TRIGGERtimer = 0;            // used for limiting camera motion trigger rate
-  unsigned long EMAILtimer = 0;              // used for limiting rate emails can be sent
+  uint32_t CAMERAtimer = 0;                  // used for timing camera motion refresh timing
+  uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
+  uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
   String TriggerTime = "Not yet triggered";  // Time of last motion trigger
-  unsigned long MaintTiming = millis();      // used for timing maintenance tasks
+  uint32_t MaintTiming = millis();           // used for timing maintenance tasks
   bool emailWhenTriggered = 0;               // flag if to send emails when motion detection triggers
   bool ReqLEDStatus = 0;                     // desired status of the illuminator led (i.e. should it be on or off when not being used as a flash)
-  const boolean ledON = HIGH;                // Status LED control 
-  const boolean ledOFF = LOW;
+  const bool ledON = HIGH;                   // Status LED control 
+  const bool ledOFF = LOW;
   uint16_t TriggerLimitTime = 2;             // min time between motion detection triggers (seconds)
   uint16_t EmailLimitTime = 60;              // min time between email sends (seconds)
   bool UseFlash = 1;                         // use flash when taking a picture
@@ -86,9 +87,9 @@
 // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
   #include "SD_MMC.h"
   // #include <SPI.h>                        // (already loaded)
-  // #include <FS.h>                         // gives file access on spiffs (already loaded)
+  // #include <FS.h>                         // gives file access (already loaded)
   #define SD_CS 5                            // sd chip select pin
-  bool SD_Present;                           // flag if sd card is found (0 = no)
+  bool SD_Present;                           // flag if an sd card was found (0 = no)
 
 #include "wifi.h"                            // Load the Wifi / NTP stuff
 
@@ -102,8 +103,6 @@
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
 // ---------------------------------------------------------------
-//
-// setup section (runs once at startup)
 
 void setup(void) {
     
@@ -129,7 +128,7 @@ void setup(void) {
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
   
   if (MDNS.begin(MDNStitle)) {
-    Serial.println("MDNS responder started");
+    Serial.println(F("MDNS responder started"));
   }
   
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
@@ -146,43 +145,45 @@ void setup(void) {
     server.on("/images", handleImages);      // display images
     server.on("/img", handleImg);            // latest captured image
     server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
+    server.on("/imagedata", handleImagedata);// Show raw image data
     server.onNotFound(handleNotFound);       // invalid page requested
     
   // start web server
     Serial.println(F("Starting web server"));
     server.begin();
 
+  // Finished connecting to network
+    BlinkLed(2);                             // flash the led twice
+    log_system_message(stitle + " Started");   
+       
   // set up camera
     Serial.print(F("Initialising camera: "));
     Serial.println(setup_camera() ? "OK" : "ERR INIT");
 
   // Spiffs - see: https://circuits4you.com/2018/01/31/example-of-esp8266-flash-file-system-spiffs/
     if (!SPIFFS.begin(true)) {
-      Serial.println("An Error has occurred while mounting SPIFFS");
+      Serial.println(F("An Error has occurred while mounting SPIFFS"));
       delay(5000);
       ESP.restart();
       delay(5000);
     } else {
-      Serial.print("SPIFFS mounted successfully. ");
+      Serial.print(F("SPIFFS mounted successfully."));
       Serial.print("total bytes: " + String(SPIFFS.totalBytes()));
       Serial.println(", used bytes: " + String(SPIFFS.usedBytes()));
       LoadSettingsSpiffs();     // Load settings from text file in Spiffs
     }
 
   // start sd card
+      SD_Present = 0;
       pinMode(Illumination_led, INPUT);            // disable led pin as sdcard uses it
       if(!SD_MMC.begin()){                         // if loading sd card fails     ("/sdcard", true = 1 wire?)
-          log_system_message("SD Card not found"); 
+          log_system_message("SD Card not found");   
           pinMode(Illumination_led, OUTPUT);       // re-enable led pin
-          digitalWrite(Illumination_led, ledOFF); 
-          SD_Present = 0;                          // flag no sd card found
       } else {
-      uint8_t cardType = SD_MMC.cardType();
+        uint8_t cardType = SD_MMC.cardType();
         if(cardType == CARD_NONE){                 // if no sd card found
             log_system_message("SD Card type detect failed"); 
-            pinMode(Illumination_led, OUTPUT);     // re-enable led pin
-            digitalWrite(Illumination_led, ledOFF); 
-            SD_Present = 0;                        // flag no sd card found
+            pinMode(Illumination_led, OUTPUT);       // re-enable led pin
         } else {
             log_system_message("SD Card found"); 
             SD_Present = 1;                        // flag working sd card found
@@ -192,17 +193,13 @@ void setup(void) {
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
-  // Finished connecting to network
-    BlinkLed(2);      // flash the led twice
-    log_system_message(stitle + " Started");   
-    TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
-    
+  TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
 }
 
 
 // blink the led 
 void BlinkLed(byte Bcount) {
-  for (int i = 0; i < Bcount; i++) {                    // flash led
+  for (int i = 0; i < Bcount; i++) { 
     digitalWrite(Illumination_led, ledON);
     delay(50);
     digitalWrite(Illumination_led, ledOFF);
@@ -414,13 +411,13 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      block_threshold = 10;
-      image_thresholdL= 10;
+      block_threshold = 18;
+      image_thresholdL= 6;
       image_thresholdH= 100;
-      TriggerLimitTime = 3;
+      TriggerLimitTime = 10;
+      EmailLimitTime = 600;
       TRIGGERtimer = millis();            // reset last image captured timer (to prevent instant trigger)
       DetectionEnabled = 1;
-      EmailLimitTime = 600;
       UseFlash = 1;
 
       // Detection mask grid
@@ -435,7 +432,7 @@ void handleDefault() {
     String message = "reset to default";
 
     server.send(404, "text/plain", message);   // send reply as plain text
-    message = "";      // clear variable
+    message = "";      // clear string
       
 }
 
@@ -656,7 +653,7 @@ void handleRoot() {
     message += webfooter();        // add the standard footer
 
     server.send(200, "text/html", message);      // send the web page
-    message = "";      // clear variable
+    message = "";      // clear string
 
 }
 
@@ -723,7 +720,7 @@ void handleData(){
   message += "</body></htlm>\n";
   
   server.send(200, "text/html", message);   // send reply as plain text
-  message = "";      // clear variable
+  message = "";      // clear string
 
   
 }
@@ -755,7 +752,7 @@ void handleLive(){
   message += webfooter();                                             // add the standard footer
   
   server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear variable  
+  message = "";      // clear string  
 }
 
 
@@ -814,7 +811,7 @@ void handleImages(){
 
     
   server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear variable
+  message = "";      // clear string
   
 }
 
@@ -829,8 +826,83 @@ void handlePing(){
   String message = "ok";
 
   server.send(404, "text/plain", message);   // send reply as plain text
-  message = "";      // clear variable
+  message = "";      // clear string
   
+}
+
+
+// ----------------------------------------------------------------
+//   -Imagedata web page requested    i.e. http://x.x.x.x/imagedata
+// ----------------------------------------------------------------
+// display raw greyscale image data
+
+void handleImagedata() {
+
+    log_system_message("Imagedata webpage requested");     
+
+    capture_still();         // capture current image
+
+    // build the html 
+
+    String message = webheader(0);       // add the standard header
+
+      message += "<P>\n";                // start of section
+  
+      message += "<br>RAW IMAGE DATA (Blocks) - Detection is ";
+      message += DetectionEnabled ? "enabled" : "disabled";
+
+      message += "<BR>If detection is disabled image is refreshed when this page is refreshed, " 
+      message += "otherwise it refreshes around twice a second";
+  
+      // show raw image data in html tables
+
+      String tdIns = "<td width='30px' style='border: 1px solid black;'>";           // table cell style
+
+      // difference between images
+      message += "<BR><BR><center>Difference<BR><table>";
+      for (int y = 0; y < H; y++) {
+        message += "<tr>\n";
+        for (int x = 0; x < W; x++) {
+          uint16_t current = current_frame[y][x];
+          uint16_t prev = prev_frame[y][x];
+          uint16_t timg = abs(current - prev);
+          message += tdIns + String(timg) + "</td>\n";
+        }
+        message += "</tr>\n";
+      }
+      message += "</table>";
+      
+      // current image
+      message += "<BR><BR>Current<BR><center><table>";
+      for (int y = 0; y < H; y++) {
+        message += "<tr>\n";
+        for (int x = 0; x < W; x++) {
+          message += tdIns + String(current_frame[y][x]) + "</td>";
+        }
+        message += "</tr>\n";
+      }
+      message += "</table>";
+
+      // Previous image
+      message += "<BR><BR>Previous<BR><center><table>";
+      for (int y = 0; y < H; y++) {
+        message += "<tr>\n";
+        for (int x = 0; x < W; x++) {
+          message += tdIns + String(prev_frame[y][x]) + "</td>";
+        }
+        message += "</tr>\n";
+      }
+      message += "</table>";
+
+
+      message += "</center><BR><BR>" + webfooter();     // add standard footer html
+    
+
+    server.send(200, "text/html", message);    // send the web page
+
+    if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous 
+
+
 }
 
 
@@ -1202,7 +1274,7 @@ void handleTest(){
 
     
   server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear variable
+  message = "";      // clear string
   
 }
 
