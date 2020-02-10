@@ -17,7 +17,8 @@ It uses WifiManager so first time the ESP starts it will create an access point 
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
              see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
              Once you have entered your wifi password it will restart and you can then connect to it in your browser
-             at the address:     http://ESPcam1.local
+             at the address:     http://ESPcam1.local   
+             failing that check the serial interface or your router to find out what IP address it has been given
 
 The motion detection works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
