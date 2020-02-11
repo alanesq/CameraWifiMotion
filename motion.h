@@ -61,7 +61,8 @@
   #define W (WIDTH / BLOCK_SIZE)
   #define H (HEIGHT / BLOCK_SIZE)
   uint32_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
-
+  const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
+  
 // store most current readings for display on main page
     uint16_t latestChanges = 0;
 
@@ -205,7 +206,7 @@ float motion_detect() {
             float delta = abs(current - prev);             // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
             // float delta = abs(current - prev) / prev;   // original code 
             if (delta >= block_threshold) {                // if change in block has changed enough to qualify
-              if (block_active(x,y)) changes += 1;          // if detection mask is enabled for this block increment changed block count
+            if (block_active(x,y)) changes += 1;           // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
                 Serial.print(y);
@@ -216,18 +217,16 @@ float motion_detect() {
         }
     }
 
-    float tblocks = (blocks / 12.0) * mask_active;       // blocks in active mask
-
     if (changes > latestChanges) latestChanges = changes;           // store latest readings for display on main page (it is zeroed when displayed)
       
 #if DEBUG_MOTION
     Serial.print("Changed ");
     Serial.print(changes);
     Serial.print(" out of ");
-    Serial.println(tblocks);
+    Serial.println(mask_active * blocksPerMaskUnit);
 #endif
 
-    return float(changes / tblocks);         // number of changed blocks in range 0 to 1
+    return changes;                                                 // number of changed blocks 
 }
 
 
@@ -240,7 +239,7 @@ float motion_detect() {
 
 bool block_active(int x, int y) {
 
-    uint16_t maskW = W / 4;                    // find pixels in each mask area 
+    uint16_t maskW = W / 4;                    // find pixels in each mask area (each mask should be 4x4 blocks)
     uint16_t maskH = H / 3;
 
     // Which mask area is this block in 

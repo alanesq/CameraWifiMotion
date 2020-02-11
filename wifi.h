@@ -22,17 +22,13 @@
 
 byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
   
-// Wifi libraries (for both ESP8266 and ESP32)
+// Wifi libraries
     #include <WiFiManager.h>              // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
-    #if defined(ESP8266)                  // esp8266 section
-      ESP8266WebServer server(ServerPort);
-      const String ESPType = "ESP8266";
-    #elif defined(ESP32)                  // esp32 section
+    #if defined(ESP32) 
       #include <ESPmDNS.h>                // see https://github.com/espressif/arduino-esp32/tree/master/libraries/ESPmDNS
       WebServer server(ServerPort); 
-      const String ESPType = "ESP32";
     #else
-        #error "Only works with ESP8266 or ESP32"
+        #error "Only works with ESP32"
     #endif
 
 
@@ -50,7 +46,7 @@ byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
   // How often to resync the time (under normal and error conditions)
     const int _resyncSeconds = 7200;           // 7200 = 2 hours
     const int _resyncErrorSeconds = 60;        // 60 = 1 min
-  boolean NTPok = 0;                           // Flag if NTP is curently connecting ok
+  bool NTPok = 0;                              // Flag if NTP is curently connecting ok
 
 
 
@@ -80,8 +76,8 @@ void startWifiManager() {
       // Failed to connect to wifi and access point timed out
         Serial.println(F("failed to connect to wifi and access point timed out so rebooting to try again..."));
         delay(500);
-        ESP.restart();                                             // reboot and try again
-        delay(5000);                                               // restart will fail without this delay
+        ESP.restart();                                           // reboot and try again
+        delay(5000);                                             // restart will fail without this delay
     }
 
     // Now connected to Wifi network
@@ -97,16 +93,8 @@ void startWifiManager() {
     NTPUdp.begin(localPort);                  // What port will the UDP/NTP packet respond on?
     setSyncProvider(getNTPTime);              // What is the function that gets the time (in ms since 01/01/1900)?
     setSyncInterval(_resyncErrorSeconds);     // How often should we synchronise the time on this machine (in seconds) 
-    
-  // turn off sleep mode for esp8266
-  #if defined(ESP8266)
-    Serial.println(F("Setting sleep mode to off"));
-    WiFi.setSleepMode(WIFI_NONE_SLEEP);     // Stops wifi turning off (if on causes wifi to drop out randomly)
-  #endif
-       
+           
 }
-
-
 
 
 // ----------------------------------------------------------------

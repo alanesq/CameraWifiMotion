@@ -223,13 +223,15 @@ void loop(void){
   if (DetectionEnabled == 1) {    
     CAMERAtimer = millis();                                                             // reset timer
     if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
-    float changes = motion_detect();                                                    // find amount of change in current video frame      
+    uint16_t changes = motion_detect();                                                 // find amount of change in current video frame      
     update_frame();                                                                     // Copy current frame to previous
-    if ( (changes >= (float)(image_thresholdL / 100.0)) && (changes <= (float)(image_thresholdH / 100.0)) ) {                                  // if motion detected 
+    if ( (changes >= image_thresholdL) && (changes <= image_thresholdH) ) {             // if motion detected 
          if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between detection triggers
-              TRIGGERtimer = millis();                                                  // reset last motion trigger time
-              MotionDetected(changes);                                                  // run motion detected procedure (passing change level)
-         } 
+            TRIGGERtimer = millis();                                                  // reset last motion trigger time
+            MotionDetected(changes);                                                  // run motion detected procedure (passing change level)
+         } else {
+            // log_system_message("Motion detected but too soon since last trigger"); 
+         }
      }
   } else AveragePix = 0;        // clear brightness reading as frames are not being captured
 
@@ -500,7 +502,7 @@ void handleRoot() {
       if (server.hasArg("imagetl")) {
         String Tvalue = server.arg("imagetl");   // read value
         int val = Tvalue.toInt();
-        if (val >= 0 && val < 100 && val != image_thresholdL) { 
+        if (val >= 0 && val < 192 && val != image_thresholdL) { 
           log_system_message("Min_image_threshold changed to " + Tvalue ); 
           image_thresholdL = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
@@ -511,7 +513,7 @@ void handleRoot() {
       if (server.hasArg("imageth")) {
         String Tvalue = server.arg("imageth");   // read value
         int val = Tvalue.toInt();
-        if (val > 0 && val <= 100 && val != image_thresholdH) { 
+        if (val > 0 && val <= 192 && val != image_thresholdH) { 
           log_system_message("Max_image_threshold changed to " + Tvalue ); 
           image_thresholdH = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
@@ -611,7 +613,8 @@ void handleRoot() {
         }
         message += "<BR>";
       }
-      message += String(mask_active) + " active";
+      message += "<BR>" + String(mask_active) + " active";
+      message += "<BR>(" + String(mask_active * blocksPerMaskUnit) + " blocks)";
       message += "</div>\n";
       
     // minimum seconds between triggers
@@ -623,10 +626,11 @@ void handleRoot() {
       message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
 
     // detection parameters
-      message += "<BR>Detection thresholds: ";
-      message += "Block change<input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
-      message += "Trigger between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as movement detected in percent' min='0' max='99' value='" + String(image_thresholdL) + "'>% \n"; 
-      message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as movement detected in percent' min='1' max='100' value='" + String(image_thresholdH) + "'>% blocks changed\n"; 
+      if (image_thresholdH > (mask_active * blocksPerMaskUnit)) image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
+      message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
+      message += "Trigger when between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as movement detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdL) + "'> \n"; 
+      message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as movement detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdH) + "'> blocks changed";
+      message += " out of " + String(mask_active * blocksPerMaskUnit); 
                
     // input submit button  
       message += "<BR><input type='submit' name='submit'><BR><BR>\n";
@@ -680,11 +684,7 @@ void handleData(){
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
         message += "<BR>Readings: brightness:" + String(AveragePix);
-        uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);          // blocks in complete image
-        uint16_t tblocks = ((blocks / 12.0) * mask_active);                      // blocks in active mask area
-        float tpercent = float(latestChanges * 100.0) / tblocks;                 // percent of blocks which had changed
-        message += ", " + String(latestChanges) + " changed blocks out of " + String(tblocks);
-        message += " = " + String(tpercent) + "%\n";
+        message += ", " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
         latestChanges = 0;                                                       // reset stored values once displayed
     }
     
@@ -844,15 +844,11 @@ void handleImagedata() {
   
       message += "<br>RAW IMAGE DATA (Blocks) - Detection is ";
       message += DetectionEnabled ? "enabled" : "disabled";
-
-      message += "<BR>If detection is disabled the previous frame only updates when this page is refreshed, ";
-      message += "otherwise it automatically refreshes around twice a second";
-  
-      
+     
       // show raw image data in html tables
 
       // difference between images table
-      message += "<BR><BR><center>Difference<BR><table>\n";
+      message += "<BR><center>Difference<BR><table>\n";
       for (int y = 0; y < H; y++) {
         message += "<tr>";
         for (int x = 0; x < W; x++) {
@@ -883,9 +879,14 @@ void handleImagedata() {
         }
         message += "</tr>\n";
       }
-      message += "</table>";
+      message += "</table></center>\n";
 
-      message += "</center><BR>\n" + webfooter();     // add standard footer html
+      message += "<BR>If detection is disabled the previous frame only updates when this page is refreshed, ";
+      message += "otherwise it automatically refreshes around twice a second";
+      message += "<BR>Each block shown here is the average reading from 16x12 pixels on the camera image, ";
+      message += "The detection mask selection works on 4x4 groups of blocks";
+      
+      message += "<BR>\n" + webfooter();     // add standard footer html
     
 
     server.send(200, "text/html", message);    // send the web page
@@ -1206,12 +1207,12 @@ bool WipeSpiffs() {
 //                       -motion has been detected
 // ----------------------------------------------------------------
 
-void MotionDetected(float changes) {
+void MotionDetected(uint16_t changes) {
 
   if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (prob. not required?)
   
-    log_system_message("Camera detected motion: " + String(changes * 100.0) + "%"); 
-    TriggerTime = currentTime() + " - " + String(changes * 100) + "%";    // store time of trigger and percent motion detected
+    log_system_message("Camera detected motion: " + String(changes)); 
+    TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
     capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)
