@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "10Feb20";                     // version of this sketch
+  const String sversion = "11Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -589,7 +589,7 @@ void handleRoot() {
 
   // build the HTML code 
   
-    String message = webheader(0);                                      // add the standard html header
+    String message = webheader();                                      // add the standard html header
     message += "<FORM action='/' method='post'>\n";                     // used by the buttons (action = the page send it to)
     message += "<P>";                                                   // start of section
     
@@ -690,24 +690,18 @@ void handleData(){
     
   // email when motion detected
     message += "<BR>Send an Email when motion detected: "; 
-    if (emailWhenTriggered) message += red + "enabled" + endcolour;  
-    else message += "disabled";
+    message += emailWhenTriggered ? red + "enabled" + endcolour : "disabled";
     
   // Illumination
     message += "<BR>Illumination LED is ";    
     if (digitalRead(Illumination_led) == ledON) message += red + "On" + endcolour;
     else message += "Off";
-    if (!SD_Present) {    // if no sd card in use
-      // show status of use flash 
-      if (UseFlash) message += " - Flash enabled\n";
-      else message += " - Flash disabled\n";
+    if (!SD_Present) {    // if no sd card in use show status of use flash 
+      message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
     }
 
   // show current time
     message += "<BR>Time: " + currentTime() + "\n";      // show current time
-
-  // last log entry
-  //  message += "<BR>log: " + system_message[LogNumber];
 
   // show if a sd card is present
     if (SD_Present) message += "<BR>SD-Card present (Flash disabled)\n";
@@ -735,7 +729,7 @@ void handleLive(){
   log_system_message("Live image requested");      
 
 
-  String message = webheader(0);                                      // add the standard html header
+  String message = webheader();                                      // add the standard html header
 
   message += "<BR><H1>Live Image - " + currentTime() +"</H1><BR>\n";
 
@@ -776,17 +770,16 @@ void handleImages(){
       }
 
       
-  String message = webheader(0);                                      // add the standard html header
+  String message = webheader();                                      // add the standard html header
   message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page send it to)
 
-  message += "<H1>Stored Images</H1>";
+  message += "<H1>Stored Images</H1>\n";
   
   // create image selection buttons
-    String sins;   // style for button
     for(int i=1; i <= MaxSpiffsImages; i++) {
-        if (i == ImageToShow) sins = "background-color: #0f8; height: 30px;";
-        else sins = "height: 30px;";
-        message += "<input style='" + sins + "' name='button' value='" + String(i) + "' type='submit'>\n";
+        message += "<input style='height: 30px; ";
+        if (i == ImageToShow) message += "background-color: #0f8;";
+        message += "' name='button' value='" + String(i) + "' type='submit'>\n";
     }
 
   // Insert time info. from text file
@@ -807,7 +800,7 @@ void handleImages(){
                 "  setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "' ; }, " + JavaRefreshTime + ");\n"
                 "</script>\n";
 
-  message += webfooter();                                             // add the standard footer
+  message += webfooter();                      // add the standard footer
 
     
   server.send(200, "text/html", message);      // send the web page
@@ -834,7 +827,7 @@ void handlePing(){
 // ----------------------------------------------------------------
 //   -Imagedata web page requested    i.e. http://x.x.x.x/imagedata
 // ----------------------------------------------------------------
-// display raw greyscale image data
+// display raw greyscale image block data
 
 void handleImagedata() {
 
@@ -844,65 +837,68 @@ void handleImagedata() {
 
     // build the html 
 
-    String message = webheader(0);       // add the standard header
+    // add the standard header with some adnl style 
+    String message = webheader("td {border: 1px solid grey; width: 30px; color: red;}");       
 
       message += "<P>\n";                // start of section
   
       message += "<br>RAW IMAGE DATA (Blocks) - Detection is ";
       message += DetectionEnabled ? "enabled" : "disabled";
 
-      message += "<BR>If detection is disabled image is refreshed when this page is refreshed, " 
-      message += "otherwise it refreshes around twice a second";
+      message += "<BR>If detection is disabled the previous frame only updates when this page is refreshed, ";
+      message += "otherwise it automatically refreshes around twice a second";
   
+      
       // show raw image data in html tables
 
-      String tdIns = "<td width='30px' style='border: 1px solid black;'>";           // table cell style
-
-      // difference between images
-      message += "<BR><BR><center>Difference<BR><table>";
+      // difference between images table
+      message += "<BR><BR><center>Difference<BR><table>\n";
       for (int y = 0; y < H; y++) {
-        message += "<tr>\n";
+        message += "<tr>";
         for (int x = 0; x < W; x++) {
-          uint16_t current = current_frame[y][x];
-          uint16_t prev = prev_frame[y][x];
-          uint16_t timg = abs(current - prev);
-          message += tdIns + String(timg) + "</td>\n";
-        }
+          uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
+          message += generateTD(timg);
+        }         
         message += "</tr>\n";
       }
       message += "</table>";
       
-      // current image
-      message += "<BR><BR>Current<BR><center><table>";
+      // current image table
+      message += "<BR><BR>Current Frame<BR><table>\n";
       for (int y = 0; y < H; y++) {
-        message += "<tr>\n";
+        message += "<tr>";
         for (int x = 0; x < W; x++) {
-          message += tdIns + String(current_frame[y][x]) + "</td>";
+          message += generateTD(current_frame[y][x]);       
         }
         message += "</tr>\n";
       }
       message += "</table>";
 
-      // Previous image
-      message += "<BR><BR>Previous<BR><center><table>";
+      // current image table
+      message += "<BR><BR>Previous Frame<BR><table>\n";
       for (int y = 0; y < H; y++) {
-        message += "<tr>\n";
+        message += "<tr>";
         for (int x = 0; x < W; x++) {
-          message += tdIns + String(prev_frame[y][x]) + "</td>";
+          message += generateTD(prev_frame[y][x]);       
         }
         message += "</tr>\n";
       }
       message += "</table>";
 
-
-      message += "</center><BR><BR>" + webfooter();     // add standard footer html
+      message += "</center><BR>\n" + webfooter();     // add standard footer html
     
 
     server.send(200, "text/html", message);    // send the web page
 
     if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous 
+}
 
 
+// generate the html for a table cell 
+String generateTD(uint16_t idat) {
+          String bcol = String(idat, HEX);     // block color in hex  (for style command 'background-color: #fff;')
+          if (bcol.length() == 1) bcol = "0" + bcol;
+          return "<td style='background-color: #" + bcol + bcol + bcol + ";'>" + String(idat) + "</td>";
 }
 
 
@@ -917,7 +913,7 @@ void handleBootLog() {
 
     // build the html for /bootlog page
 
-    String message = webheader(0);     // add the standard header
+    String message = webheader();     // add the standard header
 
       message += "<P>\n";                // start of section
   
@@ -1250,7 +1246,7 @@ void handleTest(){
 
   log_system_message("Testing page requested");      
 
-  String message = webheader(0);                                      // add the standard html header
+  String message = webheader();                                      // add the standard html header
 
   message += "<BR>Testing page<BR><BR>\n";
 

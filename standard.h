@@ -10,7 +10,7 @@
 
 // forward declarations
   void log_system_message(String);
-  String webheader(int);
+  String webheader(String);
   String webfooter();
   void handleLogpage();
   void handleNotFound();
@@ -64,9 +64,7 @@ void log_system_message(String smes) {
 //    more info on html here - https://randomnerdtutorials.com/esp8266-web-server/
 
 
-String webheader(int refresh) {
-
-    if ( (refresh < 0) || (refresh > 1000) ) refresh = 0;      // verify valid refresh rate
+String webheader(String style = "") {
 
     String message = 
       "<!DOCTYPE html>\n"
@@ -74,23 +72,22 @@ String webheader(int refresh) {
          "<head>\n"
            "<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n"
            "<link rel=\'icon\' href=\'data:,\'>\n"
-           "<title>" + stitle + "</title>\n";
-           // Auto refresh page if requested
-              if (refresh > 0) message += "<meta http-equiv='refresh' content='" + String(refresh) + "' />\n";
-              message +=
+           "<title>" + stitle + "</title>\n"
            "<style>\n"                             /* Settings here for the top of screen menu appearance */
              "ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);}\n"
              "li {float: left;}\n"
              "li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}\n"
-             "li a:hover { background-color: rgb(100, 0, 0);}\n"
+             "li a:hover { background-color: rgb(100, 0, 0);}\n" 
+             + style + "\n"
            "</style>\n"
          "</head>\n"
          "<body style='color: rgb(0, 0, 0); background-color: yellow; text-align: center;'>\n"
            "<ul>\n"                  
              "<li><a href='/'>Home</a></li>\n"                       /* home menu button */
              "<li><a href='/log'>Log</a></li>\n"                     /* log menu button */
-             "<li><a href='/bootlog'>BootLog</a></li>\n"             /* boot log menu button */
+             // "<li><a href='/bootlog'>BootLog</a></li>\n"          /* boot log menu button */
              "<li><a href='/live'>Live Image</a></li>\n"             /* live menu button */
+             "<li><a href='/imagedata'>Raw Data</a></li>\n"          /* raw data menu button */
              "<li><a href='/images'>Stored Images</a></li>\n"        /* last menu button */
              "<h1>" + red + stitle + endcolour + "</h1>\n"           /* display the project title in red */
            "</ul>\n";
@@ -149,7 +146,7 @@ void handleLogpage() {
 
     // build the html for /log page
 
-    String message = webheader(0);     // add the standard header
+    String message = webheader();      // add the standard header
 
       message += "<P>\n";                // start of section
   
