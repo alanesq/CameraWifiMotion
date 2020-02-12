@@ -15,7 +15,10 @@
  *  
  * For info on the camera module see: https://github.com/espressif/esp32-camera
  * 
+ * Handy way to try out your C++ code:   https://coliru.stacked-crooked.com/
+ * 
  **************************************************************************************************/
+
 
 #define DEBUG_MOTION 0        // serial debug enable for motion.h
 
@@ -52,8 +55,8 @@
   
 // detection parameters (these are set by user and stored in Spiffs)
     uint16_t block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
-    uint16_t image_thresholdL = 15;     // min changed blocks in image required to count as movement detected in percent
-    uint16_t image_thresholdH = 100;    // max changed blocks in image required to count as movement detected in percent
+    uint16_t image_thresholdL = 15;     // min changed blocks in image required to count as motion detected in percent
+    uint16_t image_thresholdH = 100;    // max changed blocks in image required to count as motion detected in percent
 
 // misc     
   #define WIDTH 320                 // motion sensing frame size
@@ -71,12 +74,16 @@
     uint16_t current_frame[H][W] = { 0 };   // current frame
     
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
-//   4 x 3 grid results in mask sections of 16 blocks (4x4) - image = 320x240 pixels, blocks = 20x20 pixels
-    bool mask_frame[4][3] = { {1,1,1},
-                              {1,1,1},
-                              {1,1,1},
-                              {1,1,1} };
-    uint16_t mask_active = 12;     // number of mask blocks active (used to calculate trigger as percentage of active screen area)
+//   4 x 3 grid results in mask areas of 16 blocks (4x4) - image = 320x240 pixels, blocks = 20x20 pixels
+    const uint8_t mask_columns = 4;         // columns in detection mask
+    const uint8_t mask_rows = 3;            // rows in detection mask
+    uint16_t mask_active = 12;              // number of mask sections active
+    const uint16_t maskPixelWidth = W / 4;  // pixel size of each mask area
+    const uint16_t maskPixelHeight = H / 3;
+    bool mask_frame[mask_columns][mask_rows] = { {1,1,1},
+                                                 {1,1,1},
+                                                 {1,1,1},
+                                                 {1,1,1} };
     
 // forward delarations
     bool setup_camera(framesize_t);
@@ -122,12 +129,13 @@ bool setup_camera() {
     config.jpeg_quality = 12;                     //0-63 lower number means higher quality
     config.fb_count = 1;                          //if more than one, i2s runs in continuous mode. Use only with JPEG
 
-    bool ok = esp_camera_init(&config) == ESP_OK;
+    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
+    if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    sensor_t *sensor = esp_camera_sensor_get();
+    sensor_t *sensor = esp_camera_sensor_get();   // set camera resolution
     sensor->set_framesize(sensor, FRAME_SIZE_MOTION);
 
-    return ok;
+    return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
 
 
@@ -239,12 +247,9 @@ float motion_detect() {
 
 bool block_active(int x, int y) {
 
-    uint16_t maskW = W / 4;                    // find pixels in each mask area (each mask should be 4x4 blocks)
-    uint16_t maskH = H / 3;
-
     // Which mask area is this block in 
-      uint16_t Maskx = floor(x / maskW);       // x mask area (0 to 3)
-      uint16_t Masky = floor(y / maskH);       // y mask area (0 to 2)
+      uint16_t Maskx = floor(x / maskPixelWidth);        // x mask area (0 to 3)
+      uint16_t Masky = floor(y / maskPixelHeight);       // y mask area (0 to 2)
    
     return mask_frame[Maskx][Masky];
       

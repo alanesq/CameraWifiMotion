@@ -17,8 +17,8 @@
   String requestpage();
   void handleReboot();
   void WIFIcheck();
-  void UpdateBootlogSpiffs(String);             // in CameraWifiMotion.ino
-
+  void UpdateBootlogSpiffs(String);             // in CameraWifiMotion.ino  
+  
 
 // ----------------------------------------------------------------
 //                              -Startup
@@ -87,8 +87,8 @@ String webheader(String style = "") {
              "<li><a href='/log'>Log</a></li>\n"                     /* log menu button */
              // "<li><a href='/bootlog'>BootLog</a></li>\n"          /* boot log menu button */
              "<li><a href='/live'>Live Image</a></li>\n"             /* live menu button */
-             "<li><a href='/imagedata'>Raw Data</a></li>\n"          /* raw data menu button */
              "<li><a href='/images'>Stored Images</a></li>\n"        /* last menu button */
+             "<li><a href='/imagedata'>Raw Data</a></li>\n"          /* raw data menu button */
              "<h1>" + red + stitle + endcolour + "</h1>\n"           /* display the project title in red */
            "</ul>\n";
 
@@ -122,7 +122,7 @@ String webfooter() {
                     " | Memory:" + String(ESP.getFreeHeap()) + 
                     " | Wifi: " + String(WiFi.RSSI()) + "dBm" 
                     " | " + NTPtext + 
-                    " | Free Spiffs:" + (SPIFFS.totalBytes() - SPIFFS.usedBytes()) +  
+                    " | Spiffs:" + (SPIFFS.totalBytes() - SPIFFS.usedBytes()) +  
                 endcolour + "</small>\n" 
              "</div>\n" 
                
@@ -176,7 +176,7 @@ void handleLogpage() {
 
 void handleNotFound() {
   
-  log_system_message("invalid web page requested");      
+  log_system_message("Invalid web page requested");      
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -214,7 +214,7 @@ String requestpage(const char* ip, String page, int port){
     WiFiClient client;
     if (!client.connect(ip, port)) {
       Serial.println("Connection failed :-(");
-      log_system_message("web connection failed");      
+      log_system_message("Error: Web connection failed");      
       return "connection failed";
     }  
     Serial.println("Connected to host - sending request...");

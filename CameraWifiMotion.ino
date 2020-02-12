@@ -12,9 +12,9 @@
  *             GPIO16 is used as an input pin for external sensors etc. (not implemented yet)
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
- *                          response times especially when using the LED.....chances are there is a problem with the 
- *                          power to the board.  It needs a good 500ma supply and ideally a smoothing capacitor on 
- *                          the 3.3volts.
+ *                          response times especially when using the LED), chances are there is a problem with the 
+ *                          power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
+ *                          capacitor.
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
  *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "11Feb20";                     // version of this sketch
+  const String sversion = "12Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -55,14 +55,12 @@
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
-  const uint16_t SystemCheckRate = 5000;                 // how often to do the routine system checks (milliseconds)
+  const uint16_t MaintCheckRate = 4;                     // how often to do the routine system checks (seconds)
   
 
 // ---------------------------------------------------------------
 
 
-// Misc 
-  uint32_t CAMERAtimer = 0;                  // used for timing camera motion refresh timing
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
   uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
@@ -124,7 +122,7 @@ void setup(void) {
 
   // configure the I/O pin (with pullup resistor)
     pinMode(gioPin,  INPUT_PULLUP);                                
-    
+
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
   
   if (MDNS.begin(MDNStitle)) {
@@ -193,7 +191,9 @@ void setup(void) {
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
-  TRIGGERtimer = millis();                            // reset retrigger timer to stop instant movement trigger
+  if (!SD_Present) BlinkLed(2);                    // flash the led twice
+
+  TRIGGERtimer = millis();                         // reset retrigger timer to stop instant motion trigger
 }
 
 
@@ -206,6 +206,8 @@ void BlinkLed(byte Bcount) {
     delay(300);
   }
 
+if (!psramFound()) log_system_message("Warning: No PSRam found");
+
 UpdateBootlogSpiffs("Booted");                          // store time of boot in bootlog
 }
 
@@ -216,27 +218,23 @@ UpdateBootlogSpiffs("Booted");                          // store time of boot in
 
 void loop(void){
 
-  server.handleClient();                         // service any web page requests 
+  server.handleClient();                           // service any web requests 
 
   // camera motion detection 
-  //        explanation of timing here: https://www.baldengineer.com/arduino-millis-plus-addition-does-not-add-up.html
   if (DetectionEnabled == 1) {    
-    CAMERAtimer = millis();                                                             // reset timer
     if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
-    uint16_t changes = motion_detect();                                                 // find amount of change in current video frame      
+    uint16_t changes = motion_detect();                                                 // find amount of change in current image frame compared to the last one     
     update_frame();                                                                     // Copy current frame to previous
     if ( (changes >= image_thresholdL) && (changes <= image_thresholdH) ) {             // if motion detected 
-         if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between detection triggers
-            TRIGGERtimer = millis();                                                  // reset last motion trigger time
-            MotionDetected(changes);                                                  // run motion detected procedure (passing change level)
-         } else {
-            // log_system_message("Motion detected but too soon since last trigger"); 
+         if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between triggers
+            TRIGGERtimer = millis();                                                    // update last trigger time
+            MotionDetected(changes);                                                    // run motion detected procedure
          }
      }
-  } else AveragePix = 0;        // clear brightness reading as frames are not being captured
+  } 
 
-  // periodically check Wifi is connected and refresh NTP time
-    if ((unsigned long)(millis() - MaintTiming) >= SystemCheckRate ) {   
+  // periodically run some checks
+    if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
       WIFIcheck();                                 // check if wifi connection is ok
       MaintTiming = millis();                      // reset timer
       time_t t=now();                              // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
@@ -271,82 +269,82 @@ void LoadSettingsSpiffs() {
       String line;
       uint16_t tnum;
   
-      // line 1 - emailWhenTriggered
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum == 0) emailWhenTriggered = 0;
-        else if (tnum == 1) emailWhenTriggered = 1;
-        else log_system_message("Invalid emailWhenTriggered in settings: " + line);
-        
-      // line 2 - block_threshold
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum < 1 || tnum > 255) log_system_message("invalid block_threshold in settings");
-        else block_threshold = tnum;
-        
-      // line 3 - min image_thresholdL
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum < 0 || tnum > 99) log_system_message("invalid min_image_threshold in settings");
-        else image_thresholdL = tnum;
-  
-      // line 4 - min image_thresholdH
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum < 1 || tnum > 100) log_system_message("invalid max_image_threshold in settings");
-        else image_thresholdH = tnum;
+    // line 1 - emailWhenTriggered
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum == 0) emailWhenTriggered = 0;
+      else if (tnum == 1) emailWhenTriggered = 1;
+      else log_system_message("Invalid emailWhenTriggered in settings: " + line);
+      
+    // line 2 - block_threshold
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 1 || tnum > 255) log_system_message("invalid block_threshold in settings");
+      else block_threshold = tnum;
+      
+    // line 3 - min image_thresholdL
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 0 || tnum > 255) log_system_message("invalid min_image_threshold in settings");
+      else image_thresholdL = tnum;
 
-      // line 5 - TriggerLimitTime
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum < 1 || tnum > 3600) log_system_message("invalid TriggerLimitTime in settings");
-        else TriggerLimitTime = tnum;
-  
-      // line 6 - DetectionEnabled
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum == 2) tnum = 1;     // if it was paused restart it
-        if (tnum == 0) DetectionEnabled = 0;
-        else if (tnum == 1) DetectionEnabled = 1;
-        else log_system_message("Invalid DetectionEnabled in settings: " + line);
-  
-      // line 7 - EmailLimitTime
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum < 60 || tnum > 10000) log_system_message("invalid EmailLimitTime in settings");
-        else EmailLimitTime = tnum;
-  
-      // line 8 - UseFlash
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum == 0) UseFlash = 0;
-        else if (tnum == 1) UseFlash = 1;
-        else log_system_message("Invalid UseFlash in settings: " + line);
-        
-      // line 9 - SpiffsFileCounter
-        line = file.readStringUntil('\n');
-        tnum = line.toInt();
-        if (tnum > MaxSpiffsImages) log_system_message("invalid SpiffsFileCounter in settings");
-        else SpiffsFileCounter = tnum;
+    // line 4 - min image_thresholdH
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 0 || tnum > 255) log_system_message("invalid max_image_threshold in settings");
+      else image_thresholdH = tnum;
 
-      // Detection mask grid
-        bool gerr = 0;
-        mask_active = 0;
-        for (int y = 0; y < 3; y++) {
-          for (int x = 0; x < 4; x++) {
-            line = file.readStringUntil('\n');
-            tnum = line.toInt();
-            if (tnum == 1) {
-              mask_frame[x][y] = 1;
-              mask_active ++;  
-            }
-            else if (tnum == 0) mask_frame[x][y] = 0;
-            else gerr = 1;    // flag invalid entry
+    // line 5 - TriggerLimitTime
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 1 || tnum > 3600) log_system_message("invalid TriggerLimitTime in settings");
+      else TriggerLimitTime = tnum;
+
+    // line 6 - DetectionEnabled
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum == 2) tnum = 1;     // if it was paused restart it
+      if (tnum == 0) DetectionEnabled = 0;
+      else if (tnum == 1) DetectionEnabled = 1;
+      else log_system_message("Invalid DetectionEnabled in settings: " + line);
+
+    // line 7 - EmailLimitTime
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 60 || tnum > 10000) log_system_message("invalid EmailLimitTime in settings");
+      else EmailLimitTime = tnum;
+
+    // line 8 - UseFlash
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum == 0) UseFlash = 0;
+      else if (tnum == 1) UseFlash = 1;
+      else log_system_message("Invalid UseFlash in settings: " + line);
+      
+    // line 9 - SpiffsFileCounter
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum > MaxSpiffsImages) log_system_message("invalid SpiffsFileCounter in settings");
+      else SpiffsFileCounter = tnum;
+
+    // Detection mask grid
+      bool gerr = 0;
+      mask_active = 0;
+      for (int y = 0; y < mask_rows; y++) {
+        for (int x = 0; x < mask_columns; x++) {
+          ReadLineSpiffs(&file, &line, &tnum);
+          if (tnum == 1) {
+            mask_frame[x][y] = 1;
+            mask_active ++;  
           }
+          else if (tnum == 0) mask_frame[x][y] = 0;
+          else gerr = 1;    // flag invalid entry
         }
-        if (gerr) log_system_message("invalid mask entry in settings");
+      }
+      if (gerr) log_system_message("invalid mask entry in settings");
 
-      file.close();
+    file.close();
+}
+
+
+// read a line of text from Spiffs file and parse an integer from it
+//     I realise this is complicating things for no real benefit but I wanted to learn to use pointers ;-)
+void ReadLineSpiffs(File* file, String* line, uint16_t* tnum) {
+      File tfile = *file;
+      String tline = *line;
+      tline = tfile.readStringUntil('\n');
+      *tnum = tline.toInt();
 }
 
 
@@ -375,8 +373,8 @@ void SaveSettingsSpiffs() {
         file.println(String(SpiffsFileCounter));
 
        // Detection mask grid
-          for (int y = 0; y < 3; y++) {
-            for (int x = 0; x < 4; x++) {
+          for (int y = 0; y < mask_rows; y++) {
+            for (int x = 0; x < mask_columns; x++) {
               file.println(String(mask_frame[x][y]));
             }
           }
@@ -390,18 +388,17 @@ void SaveSettingsSpiffs() {
 // ----------------------------------------------------------------
 
 void UpdateBootlogSpiffs(String Info) {
+  
     Serial.println("Updating bootlog: " + Info);
+    Serial.flush();   // trying to fix odd problem where the above message shows 3 times on boot?????
     String TFileName = "/bootlog.txt";
     File file = SPIFFS.open(TFileName, FILE_APPEND);
     if (!file) {
-      log_system_message("Unable to open boot log in Spiffs");
-      return;
-    } 
-
-    // add entry including time to file
-      file.println(currentTime() + " - " + Info);
-    
-    file.close();
+      log_system_message("Error: Unable to open boot log in Spiffs");
+    } else {
+      file.println(currentTime() + " - " + Info);       // add entry to log file   
+      file.close();
+    }
 }
 
 
@@ -423,12 +420,12 @@ void handleDefault() {
       UseFlash = 1;
 
       // Detection mask grid
-        for (int y = 0; y < 3; y++) 
-          for (int x = 0; x < 4; x++) 
+        for (int y = 0; y < mask_rows; y++) 
+          for (int x = 0; x < mask_columns; x++) 
             mask_frame[x][y] = 1;
         mask_active = 12;
 
-    SaveSettingsSpiffs();     // save settings in Spiffs
+    SaveSettingsSpiffs();                      // save settings in Spiffs
 
     log_system_message("Defauls web page request");      
     String message = "reset to default";
@@ -452,8 +449,8 @@ void handleRoot() {
     // Mask grid check array
       if (server.hasArg("submit")) {                    // if submit button was pressed
         mask_active = 0;  
-        for (int y = 0; y < 3; y++) {
-          for (int x = 0; x < 4; x++) {
+        for (int y = 0; y < mask_rows; y++) {
+          for (int x = 0; x < mask_columns; x++) {
             if (server.hasArg(String(x) + String(y))) {
               mask_frame[x][y] = 1;
               mask_active ++;
@@ -572,28 +569,29 @@ void handleRoot() {
           SaveSettingsSpiffs();     // save settings in Spiffs
       }
       
-    // if button "toggle movement detection" was pressed  
+    // if button "toggle motion detection" was pressed  
       if (server.hasArg("detection")) {
         // button was pressed 
           if (DetectionEnabled == 0) {
             TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant 
             DetectionEnabled = 1;
-            log_system_message("Movement detection enabled"); 
+            log_system_message("Motion detection enabled"); 
             TriggerTime = "Not since detection enabled";
           } else {
             DetectionEnabled = 0;
-            log_system_message("Movement detection disabled");    
+            log_system_message("Motion detection disabled");  
+            AveragePix = 0;                                         // clear average brightness reading as frames no longer being captured
           }
-          SaveSettingsSpiffs();     // save settings in Spiffs
+          SaveSettingsSpiffs();                                     // save settings in Spiffs
       }
 
-  latestChanges = 0;                                                 // reset stored motion values as could be out of date 
+  latestChanges = 0;                                                // reset stored motion values as could be out of date 
 
   // build the HTML code 
   
-    String message = webheader();                                      // add the standard html header
-    message += "<FORM action='/' method='post'>\n";                     // used by the buttons (action = the page send it to)
-    message += "<P>";                                                   // start of section
+    String message = webheader();                                   // add the standard html header
+    message += "<FORM action='/' method='post'>\n";                 // used by the buttons (action = the page send it to)
+    message += "<P>";                                               // start of section
     
 
     // insert an iframe containing the changing data (updates every few seconds using java script)
@@ -605,8 +603,8 @@ void handleRoot() {
 
     // detection mask check grid (right of screen)
       message += "<div style='float: right;'>Detection Mask<br>";
-      for (int y = 0; y < 3; y++) {
-        for (int x = 0; x < 4; x++) {
+      for (int y = 0; y < mask_rows; y++) {
+        for (int x = 0; x < mask_columns; x++) {
           message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
           if (mask_frame[x][y]) message += "checked ";
           message += ">\n";
@@ -628,8 +626,8 @@ void handleRoot() {
     // detection parameters
       if (image_thresholdH > (mask_active * blocksPerMaskUnit)) image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
       message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='blockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(block_threshold) + "'>, \n";
-      message += "Trigger when between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as movement detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdL) + "'> \n"; 
-      message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as movement detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdH) + "'> blocks changed";
+      message += "Trigger when between<input type='number' style='width: 40px' name='imagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdL) + "'> \n"; 
+      message += " and <input type='number' style='width: 40px' name='imageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(image_thresholdH) + "'> blocks changed";
       message += " out of " + String(mask_active * blocksPerMaskUnit); 
                
     // input submit button  
@@ -641,10 +639,10 @@ void handleRoot() {
     // Toggle 'use flash' button
       if (!SD_Present) message += "<input style='height: 30px;' name='flash' title='Toggle use of flash when capturing image On/Off' value='Flash' type='submit'> \n";
 
-    // Toggle movement detection
-      message += "<input style='height: 30px;' name='detection' title='Movement detection enable/disable' value='Detection' type='submit'> \n";
+    // Toggle motion detection
+      message += "<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n";
 
-    // Toggle email when movement detection
+    // Toggle email when motion detection
       message += "<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n";
 
     // Clear images in spiffs
@@ -675,8 +673,8 @@ void handleData(){
       "<html><body>\n";
    
           
-  // Movement detection
-    message += "<BR>Movement detection is ";
+  // Motion detection
+    message += "<BR>Motion detection is ";
     if (DetectionEnabled == 1) message +=  "enabled, last triggered: " + TriggerTime + "\n";
     else if (DetectionEnabled == 2) message += red + "disabled" + endcolour + "\n";
     else message += red + "disabled" + endcolour + "\n";
@@ -989,7 +987,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
 
   // ------------------- capture an image -------------------
     
-  RestartCamera(FRAME_SIZE_PHOTO, PIXFORMAT_JPEG);      // restart camera in jpg mode to take a photo (uses greyscale mode for movement detection)
+  RestartCamera(FRAME_SIZE_PHOTO, PIXFORMAT_JPEG);      // restart camera in jpg mode to take a photo (uses greyscale mode for motion detection)
 
   camera_fb_t * fb = NULL; // pointer
   ok = 0; // Boolean to indicate if the picture has been taken correctly
@@ -1039,10 +1037,10 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
         Serial.print(file.size());
         Serial.println(" bytes");
       } else {
-        log_system_message("Error writing image to Spiffs...will format and try again");
+        log_system_message("Error: writing image to Spiffs...will format and try again");
         WipeSpiffs();     // format spiffs 
         file = SPIFFS.open(IFileName, FILE_WRITE);
-        if (!file.write(fb->buf, fb->len)) log_system_message("Still unable to write image to Spiffs");
+        if (!file.write(fb->buf, fb->len)) log_system_message("Error: Still unable to write image to Spiffs");
         return;
       }
     }
@@ -1052,7 +1050,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       SPIFFS.remove(TFileName);   // delete old file with same name if present
       file = SPIFFS.open(TFileName, "w");
       if (!file) {
-        log_system_message("Failed to create date file in spiffs");
+        log_system_message("Error: Failed to create date file in spiffs");
         return;
       }
       else file.println(currentTime());
@@ -1116,11 +1114,11 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     
   } while ( !ok && TryCount < 3);             // if there was a problem taking photo try again 
 
-  if (TryCount == 3) log_system_message("Unable to capture/store image");
+  if (TryCount == 3) log_system_message("Error: Unable to capture/store image");
   
-  RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    // restart camera back to greyscale mode for movement detection
+  RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    // restart camera back to greyscale mode for motion detection
 
-  TRIGGERtimer = millis();                                  // reset retrigger timer to stop instant movement trigger
+  TRIGGERtimer = millis();                                  // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;          // restart paused motion detecting 
 }
 
@@ -1130,7 +1128,7 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
   File f_pic = fs.open( IFileName );
   uint16_t pic_sz = f_pic.size();
   bool tres = ( pic_sz > 100 );
-  if (!tres) log_system_message("Problem detected taking/storing image");
+  if (!tres) log_system_message("Error: Problem detected taking/storing image");
   f_pic.close();
   return ( tres );
 }
@@ -1165,7 +1163,7 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
 
 // reboot camera (used if camera is failing to respond)
 void RebootCamera(pixformat_t format) {  
-    log_system_message("Camera failed to capture image - rebooting camera"); 
+    log_system_message("Error: Camera failed to capture image - rebooting camera"); 
     // turn camera off then back on      
         digitalWrite(PWDN_GPIO_NUM, HIGH);
         delay(500);
@@ -1192,7 +1190,7 @@ bool WipeSpiffs() {
         log_system_message("Formatting/Wiping Spiffs"); 
         bool wres = SPIFFS.format();
         if (!wres) {
-          log_system_message("Unable to format Spiffs");
+          log_system_message("Error: Unable to format Spiffs");
           return 0;
         }
         SpiffsFileCounter = 0;
@@ -1226,13 +1224,13 @@ void MotionDetected(uint16_t changes) {
               String emessage = "Camera triggered at " + currentTime();
               byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
               if (q==0) log_system_message("email sent ok" );
-              else log_system_message("Error sending email, error code=" + String(q) );
+              else log_system_message("Error: sending email, error code=" + String(q) );
   
          }
          else log_system_message("Too soon to send another email");
     }
 
-  TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant movement trigger
+  TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
 
 }
@@ -1261,7 +1259,7 @@ void handleTest(){
 //          String emessage = "Test email";
 //          byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
 //          if (q==0) log_system_message("email sent ok" );
-//          else log_system_message("Error sending email code=" + String(q) );
+//          else log_system_message("Error: sending email code=" + String(q) );
 
 
        
