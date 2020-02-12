@@ -29,11 +29,17 @@ So the settings you can vary equate to:
         Block = how much brighness variation in a block is required to flag it as changed
         Image = how much of the image area needs to change to count as movement detected
 When motion detecting is enabled it will show the current average image britness along with what motion it is currently detecting
-in the format "Readings: brightness:113, 0 changed blocks out of 64 = 0.00%".  You can use this to fine tune your detection settings.
+in the format "Readings: brightness:113, 0 changed blocks out of 64".  You can use this to fine tune your detection settings.
 
 There are three settings for the motion detection, the first is how much change in average brightness in a block will count as
-that block has changed, the second two numbers refer to the percentage of blocks in the image which have changed since the last 
-image was captured and it will trigger as movement detected if this is between these two values.
+that block has changed, the second two numbers refer to the number of blocks in the image which have changed since the last 
+image was captured and it will trigger as motion detected if this is between these two values.
+So the easiest way to set it up is to set the two trigger levels to max and the trigger level to around 15, then in the "raw data"
+page with motion detection disabled refresh a couple of times until you are seeing very low values in the top window (difference).
+now if you move someone/something in to the view of the camera and refresh the page you will be able to see what differences
+the software has detected in the image (fine tune the detection threshold for the best results).
+Now if you go back to the main page and enable motion detection you can watch the levels being detected on the second line
+on the page (i.e. "Readings: brightness:105, 1 changed blocks out of 64").
 
 There is a grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
 when detecting motion (i.e. only the ticked areas are used).  This 4 x 3 grid results in mask sections of 16 blocks (4x4) 
