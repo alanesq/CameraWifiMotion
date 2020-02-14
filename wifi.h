@@ -124,8 +124,6 @@ void startWifiManager() {
   
   //  Serial.println("Stored: SSID = " + Router_SSID + ", Pass = " + Router_Pass);    // show stored wifi password
 
-  Router_SSID.toUpperCase();  
-
   // if no stored wifi credentials open config portal
   if (Router_SSID == "") {   
     Serial.println(F("No stored access point credentials, starting access point")); 
