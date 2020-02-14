@@ -1,9 +1,12 @@
-                        CameraWifiMotion - alanesq@disroot.org - Feb2020
-                        ================================================
+                        CameraWifiMotion - alanesq@disroot.org - 13Feb2020
+                        ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
 The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
 internal memory or on to an sd card and also emails it if required.
+
+NOTE: I have recently re-written the wifi.h to use the more recent libraries, specifically https://github.com/khoih-prog/ESP_WiFiManager
+
 
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
 people are finding this project of interest/use etc.
@@ -45,13 +48,13 @@ There is a grid of tick boxes on the right of the main screen, this is a mask to
 when detecting motion (i.e. only the ticked areas are used).  This 4 x 3 grid results in mask sections of 16 blocks (4x4) 
 
 It also has the following URLs you can use:
-        http://<esp ip address> /ping - responds with OK, just so you know it is still working
+        http://<esp ip address> /ping - responds with either 'enabled' or 'disabled', just so you know it is still working
                                 /log - log page of the device activities
                                 /test - used for testing bits of code etc.
                                 /reboot - restarts the esp32 camera module
                                 /default - sets all settings back to defaults
                                 /live - capture and display a live image from the camera
-                                /images - display the 10 images stored in Spiffs
+                                /images - display the 10 images stored in Spiffs (Image width in percent can be specified in URL with http://x.x.x.x/images?width=90)
                                 /img - just display a plain jpg of the latest captured image
                                 /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
@@ -79,21 +82,3 @@ Note: It is vital that the ESP has a good 5volt supply (at least 0.5amp capable 
  
 -----------------
 
-compiling info:
-
-    Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
-
-    Using library SPIFFS at version 1.0 
-    Using library FS at version 1.0 
-    Using library WiFi at version 1.0
-    Using library WebServer at version 1.0 
-    Using library WiFiManager at version 0.99.9 
-    Using library DNSServer at version 1.1.0 
-    Using library Time at version 1.6 
-    Using library ESP32_Mail_Client at version 2.1.1 
-    Using library SD at version 1.0.5
-    Using library SPI at version 1.0 
-    Using library HTTPClient at version 1.2 
-    Using library WiFiClientSecure at version 1.0 
-    
----------------

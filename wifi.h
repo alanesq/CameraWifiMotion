@@ -1,11 +1,35 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Stuff - 09Feb20
+ *                                    Wifi / NTP Connections - 14Feb20
  *             
  *                    Set up wifi for either esp8266 or esp32 plus NTP (network time)
+ *                    
+ *                    Libraries used: 
+ *                      ESP_Wifimanager - https://github.com/khoih-prog/ESP_WiFiManager
+ *                      TimeLib
+ *                      ESPmDNS
+ *                    
  *  
  **************************************************************************************************/
 
+
+
+// **************************************** S e t t i n g s ****************************************
+
+    
+    // Configuration Portal (Wifimanager)
+      const String portalName = "espcam1";
+      const String portalPassword = "12345678";
+      // String portalName = "ESP_" + String(ESP_getChipId(), HEX);               // use chip id
+      // String portalName = stitle;                                              // use sketch title
+
+    // mDNS name
+      const String mDNS_name = "espcam1";
+      // const String mDNS_name = stitle;                                         // use sketch title
+      
+
+// *************************************************************************************************
+    
 
 // forward declarations
   void startWifiManager();
@@ -13,6 +37,7 @@
   bool IsBST();
   void sendNTPpacket();
   time_t getNTPTime();
+  void ClearWifimanagerSettings();
 
 
 
@@ -20,32 +45,53 @@
 //                              -Startup
 // ----------------------------------------------------------------
 
-byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
+byte wifiok = 0;          // flag if wifi is connected ok (1 = ok)
   
-// Wifi libraries
-    #include <WiFiManager.h>              // see https://github.com/zhouhan0126/WIFIMANAGER-ESP32
-    #if defined(ESP32) 
-      #include <ESPmDNS.h>                // see https://github.com/espressif/arduino-esp32/tree/master/libraries/ESPmDNS
-      WebServer server(ServerPort); 
-    #else
-        #error "Only works with ESP32"
-    #endif
+// wifi for esp8266/esp32
+  #ifdef ESP32
+    #include <esp_wifi.h>
+    #include <WiFi.h>
+    #include <WiFiClient.h>
+    #include <WebServer.h>
+    #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
+    WebServer server(ServerPort);
+    const String ESPType = "ESP32";
+  #elif
+    #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+    #include <DNSServer.h>
+    #include <ESP8266WebServer.h>  
+    #define ESP_getChipId()   (ESP.getChipId())
+    ESP8266WebServer server(ServerPort);
+    const String ESPType = "ESP8266";
+  #else
+      #error "Only works with ESP8266 or ESP32"
+  #endif
+ 
+  // SSID and Password for wifi 
+    String Router_SSID;
+    String Router_Pass;
+
+  #define USE_AVAILABLE_PAGES     false      // Use false if you don't like to display Available Pages in Information Page of Config Portal
+  
+  #include <ESP_WiFiManager.h>      
+  #include <ESPmDNS.h>                // see https://github.com/espressif/arduino-esp32/tree/master/libraries/ESPmDNS      
+
 
 
 // Time from NTP server
 //      from https://raw.githubusercontent.com/RalphBacon/No-Real-Time-Clock-RTC-required---use-an-NTP/master
   #include <TimeLib.h>
   #include <WiFiUdp.h>                         // UDP library which is how we communicate with Time Server
-  unsigned int localPort = 8888;               // Just an open port we can use for the UDP packets coming back in
-  char timeServer[] = "uk.pool.ntp.org"; 
-  const int NTP_PACKET_SIZE = 48;              // NTP time stamp is in the first 48 bytes of the message
+  const uint16_t localPort = 8888;              // Just an open port we can use for the UDP packets coming back in
+  const char timeServer[] = "uk.pool.ntp.org"; 
+  const uint16_t NTP_PACKET_SIZE = 48;          // NTP time stamp is in the first 48 bytes of the message
   byte packetBuffer[NTP_PACKET_SIZE];          // buffer to hold incoming and outgoing packets
   WiFiUDP NTPUdp;                              // A UDP instance to let us send and receive packets over UDP
-  const int timeZone = 0;                      // timezone (0=GMT)
-  String DoW[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+  const uint16_t timeZone = 0;                  // timezone (0=GMT)
+  const String DoW[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
   // How often to resync the time (under normal and error conditions)
-    const int _resyncSeconds = 7200;           // 7200 = 2 hours
-    const int _resyncErrorSeconds = 60;        // 60 = 1 min
+    const uint16_t _resyncSeconds = 7200;       // 7200 = 2 hours
+    const uint16_t _resyncErrorSeconds = 60;    // 60 = 1 min
   bool NTPok = 0;                              // Flag if NTP is curently connecting ok
 
 
@@ -56,39 +102,88 @@ byte wifiok = 0;                    // flag if wifi is connected ok (1 = ok)
 
 void startWifiManager() {
 
-//  // clear stored wifimanager settings
-//        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); //load the flash-saved configs
-//        esp_wifi_init(&cfg); //initiate and allocate wifi resources (does not matter if connection fails)
-//        delay(2000); //wait a bit
-//        if(esp_wifi_restore()!=ESP_OK)
-//        {
-//            Serial.println("WiFi is not initialized by esp_wifi_init ");
-//         }else{
-//             Serial.println("WiFi Configurations Cleared!");
-//         }
-//         while(1);   // stop
+  // ClearWifimanagerSettings();      // Erase stored wifi configuration (wifimanager)
+ 
+  uint32_t startedAt = millis();
 
-  // WiFiManager - connect to wifi with stored settings - ref: https://github.com/tzapu/WiFiManager/wiki/API-reference
-    WiFiManager wifiManager;                                     // Local intialisation 
-    wifiManager.setTimeout(600);                                 // sets timeout for configuration portal (in seconds)
-    Serial.println(F("Starting Wifi Manager"));
-    if(!wifiManager.autoConnect( "ESPcamera" , "12345678" )) {   // Activate wifi - access point name and password are set here (password must be 8 characters for some reason)
-      // Failed to connect to wifi and access point timed out
-        Serial.println(F("failed to connect to wifi and access point timed out so rebooting to try again..."));
+  ESP_WiFiManager ESP_wifiManager(stitle.c_str());     
+  
+  ESP_wifiManager.setMinimumSignalQuality(-1);
+
+  ESP_wifiManager.setDebugOutput(true);
+
+  // wifimanager config portal settings
+    ESP_wifiManager.setSTAStaticIPConfig(IPAddress(192,168,2,114), IPAddress(192,168,2,1), IPAddress(255,255,255,0), 
+                                         IPAddress(192,168,2,1), IPAddress(8,8,8,8));
+  
+  // We can't use WiFi.SSID() in ESP32as it's only valid after connected. 
+  // SSID and Password stored in ESP32 wifi_ap_record_t and wifi_config_t are also cleared in reboot
+  // Have to create a new function to store in EEPROM/SPIFFS for this purpose
+    Router_SSID = ESP_wifiManager.WiFi_SSID();
+    Router_Pass = ESP_wifiManager.WiFi_Pass();
+  
+  //  Serial.println("Stored: SSID = " + Router_SSID + ", Pass = " + Router_Pass);    // show stored wifi password
+
+  Router_SSID.toUpperCase();  
+
+  // if no stored wifi credentials open config portal
+  if (Router_SSID == "") {   
+    Serial.println(F("No stored access point credentials, starting access point")); 
+    ESP_wifiManager.setConfigPortalTimeout(600);       // Config portal timeout  
+    if (ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) Serial.println("Portal config sucessful");
+    else Serial.println(F("Portal config failed"));    
+  }
+
+  // connect to wifi
+    #define WIFI_CONNECT_TIMEOUT        30000L
+    #define WHILE_LOOP_DELAY            200L
+    #define WHILE_LOOP_STEPS            (WIFI_CONNECT_TIMEOUT / ( 3 * WHILE_LOOP_DELAY ))
+    
+    startedAt = millis();
+    
+    while ( (WiFi.status() != WL_CONNECTED) && (millis() - startedAt < WIFI_CONNECT_TIMEOUT ) )
+    {   
+      WiFi.mode(WIFI_STA);
+      WiFi.persistent (true);
+      Serial.print("Connecting to ");
+      Serial.println(Router_SSID);
+      WiFi.begin(Router_SSID.c_str(), Router_Pass.c_str());
+      int i = 0;
+      while((!WiFi.status() || WiFi.status() >= WL_DISCONNECTED) && i++ < WHILE_LOOP_STEPS) delay(WHILE_LOOP_DELAY);   
+    }
+  
+    Serial.print("After waiting ");
+    Serial.print((millis()- startedAt) / 1000);
+    Serial.print(F(" secs more in setup() connection result is: \n "));
+  
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.print(F("connected. Local IP: "));
+      Serial.println(WiFi.localIP());
+      wifiok = 1;     // flag wifi now ok
+    } else {
+      Serial.println(F("Failed to connect to Wifi"));
+      Serial.println(ESP_wifiManager.getStatus(WiFi.status()));
+          
+      // open config portal 
+      ESP_wifiManager.setConfigPortalTimeout(120);       // Config portal timeout
+      if (!ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) {
+        wifiok = 0;     // flag wifi not connected
+        Serial.println(F("failed to connect to wifi / access point timed out so rebooting to try again..."));
         delay(500);
         ESP.restart();                                           // reboot and try again
         delay(5000);                                             // restart will fail without this delay
-    }
+      }
+      else {
+        Serial.println(F("Wifi connected"));
+        wifiok = 1;     // flag wifi now ok
+      }
+    }  
 
-    // Now connected to Wifi network
-    if (WiFi.status() == WL_CONNECTED) {
-      wifiok = 1;     // flag wifi now ok  
-      Serial.println(F("Wifi connected ok"));           
-    } else {
-      wifiok = 0;     // flag wifi down
-      Serial.println(F("Problem connecting to Wifi"));   
-    }
 
+  // Set up mDNS responder:
+    Serial.println( MDNS.begin(mDNS_name.c_str()) ? F("mDNS responder started ok") : F("Error setting up mDNS responder") );
+
+    
   // start NTP
     NTPUdp.begin(localPort);                  // What port will the UDP/NTP packet respond on?
     setSyncProvider(getNTPTime);              // What is the function that gets the time (in ms since 01/01/1900)?
@@ -273,6 +368,27 @@ time_t getNTPTime() {
 
     return 0;
   
+}
+
+
+
+//-----------------------------------------------------------------------------
+//                     Clear stored wifi settings (Wifimanager)
+//-----------------------------------------------------------------------------
+//
+
+void ClearWifimanagerSettings() {
+  
+    // clear stored wifimanager settings
+          Serial.println(F("Clearing stored wifimanager settings"));
+          wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); //load the flash-saved configs
+          esp_wifi_init(&cfg); //initiate and allocate wifi resources (does not matter if connection fails)
+          delay(2000); //wait a bit
+          if(esp_wifi_restore()!=ESP_OK)  Serial.println(F("WiFi is not initialized by esp_wifi_init"));
+          else Serial.println(F("Cleared!"));
+          Serial.println(F("System stopped..."));
+          while(1);   // stop
+
 }
 
 

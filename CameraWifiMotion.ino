@@ -37,13 +37,13 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "12Feb20";                     // version of this sketch
+  const String sversion = "13Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
-  const uint16_t datarefresh = 4000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
+  const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
   String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
   
@@ -445,22 +445,7 @@ void handleRoot() {
 
   
   // Action any buttons presses etc.
-
-    // Mask grid check array
-      if (server.hasArg("submit")) {                    // if submit button was pressed
-        mask_active = 0;  
-        for (int y = 0; y < mask_rows; y++) {
-          for (int x = 0; x < mask_columns; x++) {
-            if (server.hasArg(String(x) + String(y))) {
-              mask_frame[x][y] = 1;
-              mask_active ++;
-            } else mask_frame[x][y] = 0;
-          }
-        }
-        log_system_message("Detection mask updated"); 
-        SaveSettingsSpiffs();     // save settings in Spiffs
-      }
-      
+     
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
         if (!emailWhenTriggered) {
@@ -515,6 +500,22 @@ void handleRoot() {
           image_thresholdH = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
+      }
+
+    // Mask grid check array
+      if (server.hasArg("submit")) {                           // if submit button was pressed
+        mask_active = 0;  
+        for (int y = 0; y < mask_rows; y++) {
+          for (int x = 0; x < mask_columns; x++) {
+            if (server.hasArg(String(x) + String(y))) {
+              mask_frame[x][y] = 1;
+              mask_active ++;
+            } else mask_frame[x][y] = 0;
+          }
+        }
+        image_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting
+        SaveSettingsSpiffs();                                  // save settings in Spiffs
+        log_system_message("Detection mask updated"); 
       }
       
     // if emailtime was entered - min time between email sends
@@ -751,13 +752,15 @@ void handleLive(){
 // ----------------------------------------------------------------
 //    -Display captured images     i.e. http://x.x.x.x/images
 // ----------------------------------------------------------------
+// Image width in percent can be specified in URL with http://x.x.x.x/images?width=90
 
 void handleImages(){
 
   log_system_message("Stored images page requested");   
   uint16_t ImageToShow = SpiffsFileCounter;     // set current image to display when /img called
+  String ImageWidthSetting = "90";              // percentage of screen width to use for displaying the image
 
-  // action any buttons presses etc.
+  // action any buttons presses or url parameters
 
     // if a image select button was pressed
       if (server.hasArg("button")) {
@@ -766,7 +769,14 @@ void handleImages(){
         Serial.println("Button " + Bvalue + " was pressed");
         ImageToShow = val;     // select which image to display when /img called
       }
-
+      
+    // if a image width is specified in the URL    (i.e.  '...?width=')
+      if (server.hasArg("width")) {
+        String Bvalue = server.arg("width");   // read value
+        uint16_t val = Bvalue.toInt();
+        if (val >= 10 && val <= 100) ImageWidthSetting = String(val);
+        else log_system_message("Error: Invalid image width specified in URL: " + Bvalue);
+      }
       
   String message = webheader();                                      // add the standard html header
   message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page send it to)
@@ -791,7 +801,7 @@ void handleImages(){
     file.close();
     
   // insert image in to html
-    message += "<BR><img id='img' alt='Camera Image' width='90%'>\n";      // content is set in javascript
+    message += "<BR><img id='img' alt='Camera Image' width='" + ImageWidthSetting + "%'>\n";      // content is set in javascript
 
   // javascript to refresh the image after short delay (bug fix as it often rejects the request otherwise)
     message +=  "<script type='text/javascript'>\n"
@@ -810,11 +820,12 @@ void handleImages(){
 // ----------------------------------------------------------------
 //      -ping web page requested     i.e. http://x.x.x.x/ping
 // ----------------------------------------------------------------
+// responds with either 'enabled' or 'disabled'
 
 void handlePing(){
 
   log_system_message("ping web page requested");      
-  String message = "ok";
+  String message = DetectionEnabled ? "enabled" : "disabled";
 
   server.send(404, "text/plain", message);   // send reply as plain text
   message = "";      // clear string
@@ -868,7 +879,7 @@ void handleImagedata() {
       }
       message += "</table>";
 
-      // current image table
+      // previous image table
       message += "<BR><BR>Previous Frame<BR><table>\n";
       for (int y = 0; y < H; y++) {
         message += "<tr>";
