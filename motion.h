@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 09Feb20 
+ *  Motion detection from camera image - 13Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -59,18 +59,18 @@
     uint16_t image_thresholdH = 100;    // max changed blocks in image required to count as motion detected in percent
 
 // misc     
-  #define WIDTH 320                 // motion sensing frame size
-  #define HEIGHT 240
-  #define W (WIDTH / BLOCK_SIZE)
-  #define H (HEIGHT / BLOCK_SIZE)
-  uint32_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
-  const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
-  
-// store most current readings for display on main page
+    #define WIDTH 320                 // motion sensing frame size
+    #define HEIGHT 240
+    #define W (WIDTH / BLOCK_SIZE)
+    #define H (HEIGHT / BLOCK_SIZE)
+    uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
+    const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
+    
+// store most current motion detection reading for display on main page
     uint16_t latestChanges = 0;
 
 // frame stores (blocks)
-    uint16_t prev_frame[H][W] = { 0 };      // last captured frame
+    uint16_t prev_frame[H][W] = { 0 };      // previously captured frame
     uint16_t current_frame[H][W] = { 0 };   // current frame
     
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
@@ -78,8 +78,8 @@
     const uint8_t mask_columns = 4;         // columns in detection mask
     const uint8_t mask_rows = 3;            // rows in detection mask
     uint16_t mask_active = 12;              // number of mask sections active
-    const uint16_t maskPixelWidth = W / 4;  // pixel size of each mask area
-    const uint16_t maskPixelHeight = H / 3;
+    const uint16_t maskBlockWidth = W / 4;  // number of blocks in each mask area
+    const uint16_t maskBlockHeight = H / 3;
     bool mask_frame[mask_columns][mask_rows] = { {1,1,1},
                                                  {1,1,1},
                                                  {1,1,1},
@@ -91,7 +91,7 @@
     float motion_detect();
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
-    bool block_active(int x, int y);
+    bool block_active(uint16_t x,uint16_t y);
 
 // camera configuration settings
     camera_config_t config;
@@ -124,10 +124,10 @@ bool setup_camera() {
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-    config.pixel_format = PIXFORMAT_GRAYSCALE;    // PIXFORMAT_ + YUV422,GRAYSCALE,RGB565,JPEG
-    config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA 
-    config.jpeg_quality = 12;                     //0-63 lower number means higher quality
-    config.fb_count = 1;                          //if more than one, i2s runs in continuous mode. Use only with JPEG
+    config.pixel_format = PIXFORMAT_GRAYSCALE;    // PIXFORMAT_ + YUV422, GRAYSCALE, RGB565, JPEG
+    config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA, CIF, VGA, SVGA, XGA, SXGA, UXGA 
+    config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
+    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
@@ -145,46 +145,47 @@ bool setup_camera() {
 /**
  * Capture image and down-sample in to blocks
  *   this sets all blocks to value zero then goes through each pixel in the greyscale image and adds its value to 
- *   the blocks total that it is in.  After this each blocks value is divided by the number of pixels in it 
+ *   the relevant blocks total.  After this each blocks value is divided by the number of pixels in it 
  *   resulting in each blocks value being the average value of all the pixels within it.
  */
 bool capture_still() {
 
     Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image 
 
-    AveragePix = 0;     // average pixel reading
-
+    uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
+    uint16_t temp_frame[H][W] = { 0 }; 
+    
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
     if (!frame_buffer) return false;
 
-    // set all 0s in current frame
-    for (int y = 0; y < H; y++)
-        for (int x = 0; x < W; x++)
-            current_frame[y][x] = 0;
-
-
-    // down-sample image in blocks
+    // down-sample image in to blocks
       for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
           const uint16_t x = i % WIDTH;
           const uint16_t y = floor(i / WIDTH);
           const uint8_t block_x = floor(x / BLOCK_SIZE);
           const uint8_t block_y = floor(y / BLOCK_SIZE);
           const uint8_t pixel = frame_buffer->buf[i];
-          const uint16_t current = current_frame[block_y][block_x];
+          // const uint16_t current = current_frame[block_y][block_x];
 
       // accumulate all the pixels in each block
-          current_frame[block_y][block_x] += pixel;
+          temp_frame[block_y][block_x] += pixel;
   
-      AveragePix += pixel;    // add pixel to average counter
+      TempAveragePix += pixel;    // add all pixels together for calculation of image average brightness 
     }
 
-    AveragePix = AveragePix / (WIDTH * HEIGHT);     // convert to average
-
-    // average pixels in each block (rescale)
-    for (int y = 0; y < H; y++)
-        for (int x = 0; x < W; x++)
-            current_frame[y][x] /= BLOCK_SIZE * BLOCK_SIZE;
+    AveragePix = TempAveragePix / (WIDTH * HEIGHT);     // convert to average
+   
+    // average values for all pixels in each block 
+      bool frameChanged = 0;                            // flag if any change since last frame 
+      for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            uint16_t currentBlock = temp_frame[y][x] / (BLOCK_SIZE * BLOCK_SIZE);
+            if (current_frame[y][x] != currentBlock) frameChanged = 1;
+            current_frame[y][x] = currentBlock;
+        }
+      }
+     if (!frameChanged) log_system_message(F("Suspect camera problem as no change since last frame"));
 
 #if DEBUG_MOTION
     Serial.println("Current frame:");
@@ -200,21 +201,22 @@ bool capture_still() {
 
 
 /**
- * Compute the number of different blocks.  If there are enough, then motion happened
- *    returns the average number of changes per block
+ * Compute the number of different blocks in the frames.  If there are enough, then motion has happened
+ *    returns the number of changed active blocks
  */
 float motion_detect() {
     uint16_t changes = 0;
     const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
     
+    // go through all blocks in current frame and check for changes since previous frame
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
-            float current = current_frame[y][x];
-            float prev = prev_frame[y][x];
-            float delta = abs(current - prev);             // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
-            // float delta = abs(current - prev) / prev;   // original code 
-            if (delta >= block_threshold) {                // if change in block has changed enough to qualify
-            if (block_active(x,y)) changes += 1;           // if detection mask is enabled for this block increment changed block count
+            uint16_t current = current_frame[y][x];
+            uint16_t prev = prev_frame[y][x];
+            uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
+            // float pChange = abs(current - prev) / prev;   // original code 
+            if (pChange >= block_threshold) {                // if change in block is enough to qualify as changed
+                if (block_active(x,y)) changes += 1;         // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
                 Serial.print(y);
@@ -225,7 +227,7 @@ float motion_detect() {
         }
     }
 
-    if (changes > latestChanges) latestChanges = changes;           // store latest readings for display on main page (it is zeroed when displayed)
+    if (changes > latestChanges) latestChanges = changes;           // store highest reading for display on main page (it is zeroed when displayed)
       
 #if DEBUG_MOTION
     Serial.print("Changed ");
@@ -234,7 +236,7 @@ float motion_detect() {
     Serial.println(mask_active * blocksPerMaskUnit);
 #endif
 
-    return changes;                                                 // number of changed blocks 
+    return changes;                                                 // return number of changed blocks 
 }
 
 
@@ -245,11 +247,11 @@ float motion_detect() {
  *    returns 1 for active, 0 for disabled
  */
 
-bool block_active(int x, int y) {
+bool block_active(uint16_t x, uint16_t y) {
 
     // Which mask area is this block in 
-      uint16_t Maskx = floor(x / maskPixelWidth);        // x mask area (0 to 3)
-      uint16_t Masky = floor(y / maskPixelHeight);       // y mask area (0 to 2)
+      uint16_t Maskx = floor(x / maskBlockWidth);        // x mask area (0 to 3)
+      uint16_t Masky = floor(y / maskBlockHeight);       // y mask area (0 to 2)
    
     return mask_frame[Maskx][Masky];
       

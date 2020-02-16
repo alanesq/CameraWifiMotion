@@ -6,10 +6,22 @@ The idea is that the camera looks for movement in the image and when detected it
 internal memory or on to an sd card and also emails it if required.
 
 NOTE: I have recently re-written the wifi.h to use the more recent libraries, specifically https://github.com/khoih-prog/ESP_WiFiManager
+so if you have used an older version of this sketch you may need to update the libraries you have installed.
 
+The sketch can use OTA (Over the air updates) this can be enabled/disabled in the settings of the main sketch.
+If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled.
 
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
 people are finding this project of interest/use etc.
+
+
+If you want to quickly get this sketch installed on your ESP32-cam without messing about installing libraries etc. you can use 
+OTA as follows:
+In the Arduino IDE under TOOLS/BOARD select "ESP32 Dev Module" and select TOOLS/PSRAM/ENABLED
+Select FILES/EXAMPLES/WEBSERVER/WEBUPDATE
+Enter your wifi SSID/password details and upload the sketch to your ESP32-cam module
+You can now go to the main web page of your ESP32 and upload the .bin file for this sketch
+
 
 It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 

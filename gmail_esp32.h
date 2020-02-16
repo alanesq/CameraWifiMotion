@@ -41,7 +41,7 @@
   
   const String _mailUser = "<email address to send from>";
   
-  const String _mailPassword = "<email password>";
+  const String _mailPassword = "<address password>";
 
   const String _SMTP = "smtp.gmail.com";
 

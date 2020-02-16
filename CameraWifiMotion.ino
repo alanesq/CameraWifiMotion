@@ -34,10 +34,11 @@
 //                          -SETTINGS
 // ---------------------------------------------------------------
 
+  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "13Feb20";                     // version of this sketch
+  const String sversion = "16Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -46,7 +47,7 @@
   const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
   String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
-  
+    
   const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
   const uint16_t ServerPort = 80;                        // ip port to serve web pages on
@@ -55,7 +56,7 @@
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
-  const uint16_t MaintCheckRate = 4;                     // how often to do the routine system checks (seconds)
+  const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
   
 
 // ---------------------------------------------------------------
@@ -96,6 +97,10 @@
 #include "gmail_esp32.h"                     // send email via smtp
 
 #include "motion.h"                          // motion detection / camera
+
+#if ENABLE_OTA
+  #include "ota.h"                           // Over The Air updates (OTA)
+#endif
 
   
 // ---------------------------------------------------------------
@@ -145,7 +150,11 @@ void setup(void) {
     server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
     server.on("/imagedata", handleImagedata);// Show raw image data
     server.onNotFound(handleNotFound);       // invalid page requested
-    
+
+  #if ENABLE_OTA
+    otaSetup();    // Over The Air updates (OTA)
+  #endif
+
   // start web server
     Serial.println(F("Starting web server"));
     server.begin();
@@ -194,6 +203,11 @@ void setup(void) {
   if (!SD_Present) BlinkLed(2);                    // flash the led twice
 
   TRIGGERtimer = millis();                         // reset retrigger timer to stop instant motion trigger
+
+  if (!psramFound()) log_system_message("Warning: No PSRam found");
+  
+  UpdateBootlogSpiffs("Booted");                   // store time of boot in bootlog
+
 }
 
 
@@ -205,10 +219,6 @@ void BlinkLed(byte Bcount) {
     digitalWrite(Illumination_led, ledOFF);
     delay(300);
   }
-
-if (!psramFound()) log_system_message("Warning: No PSRam found");
-
-UpdateBootlogSpiffs("Booted");                          // store time of boot in bootlog
 }
 
 
@@ -242,7 +252,7 @@ void loop(void){
         if (ReqLEDStatus && !SD_Present) digitalWrite(Illumination_led, ledON); 
         else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
     }
-
+    
   delay(50);
 } 
        
@@ -390,7 +400,6 @@ void SaveSettingsSpiffs() {
 void UpdateBootlogSpiffs(String Info) {
   
     Serial.println("Updating bootlog: " + Info);
-    Serial.flush();   // trying to fix odd problem where the above message shows 3 times on boot?????
     String TFileName = "/bootlog.txt";
     File file = SPIFFS.open(TFileName, FILE_APPEND);
     if (!file) {
@@ -505,17 +514,26 @@ void handleRoot() {
     // Mask grid check array
       if (server.hasArg("submit")) {                           // if submit button was pressed
         mask_active = 0;  
+        bool maskChanged = 0;                                  // flag if the mask has changed
         for (int y = 0; y < mask_rows; y++) {
           for (int x = 0; x < mask_columns; x++) {
-            if (server.hasArg(String(x) + String(y))) {
+            if (server.hasArg(String(x) + String(y))) { 
+              // set to active
+              if (mask_frame[x][y] == 0) maskChanged = 1;      
               mask_frame[x][y] = 1;
               mask_active ++;
-            } else mask_frame[x][y] = 0;
+            } else {
+              // set to disabled
+              if (mask_frame[x][y] == 1) maskChanged = 1;    
+              mask_frame[x][y] = 0;
+            }
           }
         }
-        image_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting
-        SaveSettingsSpiffs();                                  // save settings in Spiffs
-        log_system_message("Detection mask updated"); 
+        if (maskChanged) {
+          image_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting to max possible
+          SaveSettingsSpiffs();                                  // save settings in Spiffs
+          log_system_message("Detection mask updated"); 
+        }
       }
       
     // if emailtime was entered - min time between email sends
@@ -1174,7 +1192,7 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
 
 // reboot camera (used if camera is failing to respond)
 void RebootCamera(pixformat_t format) {  
-    log_system_message("Error: Camera failed to capture image - rebooting camera"); 
+    log_system_message("ERROR: Problem with camera detected so rebooting it"); 
     // turn camera off then back on      
         digitalWrite(PWDN_GPIO_NUM, HIGH);
         delay(500);
