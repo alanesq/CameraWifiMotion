@@ -734,17 +734,16 @@ void handleRoot() {
 
     // detection parameters (day)
       if (dayImage_thresholdH > (mask_active * blocksPerMaskUnit)) dayImage_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-      message += "<BR>";
-      message += dayNightBrightness ? "D" : "Daytime d";
-      message += "etection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(dayBlock_threshold) + "'>, \n";
+      if (dayNightBrightness != 0) message += "<BR>Day: ";
+      message += "Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(dayBlock_threshold) + "'>, \n";
       message += "Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(dayImage_thresholdL) + "'> \n"; 
       message += " and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(dayImage_thresholdH) + "'> blocks changed";
       message += " out of " + String(mask_active * blocksPerMaskUnit); 
                
     // detection parameters (night)
       if (dayNightBrightness != 0) {
-        if (dayImage_thresholdH > (mask_active * blocksPerMaskUnit)) dayImage_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-        message += "<BR>Nighttime detection threshold: <input type='number' style='width: 40px' name='nblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(nightBlock_threshold) + "'>, \n";
+        if (nightImage_thresholdH > (mask_active * blocksPerMaskUnit)) nightImage_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
+        message += "<BR>Night: Detection threshold: <input type='number' style='width: 40px' name='nblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(nightBlock_threshold) + "'>, \n";
         message += "Trigger when between<input type='number' style='width: 40px' name='nimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(nightImage_thresholdL) + "'> \n"; 
         message += " and <input type='number' style='width: 40px' name='nimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(nightImage_thresholdH) + "'> blocks changed";
         message += " out of " + String(mask_active * blocksPerMaskUnit); 
