@@ -15,14 +15,6 @@ BTW - Please let me know if you are using this (my email = alanesq@disroot.org),
 people are finding this project of interest/use etc.
 
 
-If you want to quickly get this sketch installed on your ESP32-cam without messing about installing libraries etc. you can use 
-OTA as follows:
-In the Arduino IDE under TOOLS/BOARD select "ESP32 Dev Module" and select TOOLS/PSRAM/ENABLED
-Select FILES/EXAMPLES/WEBSERVER/WEBUPDATE
-Enter your wifi SSID/password details and upload the sketch to your ESP32-cam module
-You can now go to the main web page of your ESP32 and upload the .bin file for this sketch
-
-
 It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
