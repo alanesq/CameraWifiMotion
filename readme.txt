@@ -16,12 +16,6 @@ people are finding this project of interest/use etc.
 
                    -------------------------------------------------------------------------------------
 
-To compile this app the following files need to be in a folder named "CameraWifiMotion"
-  CameraWifiMotion.ino, gmail_esp32.h, motion.h, ota.h, standard.h and wifi.h.
-If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
-There is a zip file containing the libraries used.  The main ones you will need to install are:
-  ESP32_mail_client, ESP_wifimanager and Time.
-
 
 The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
