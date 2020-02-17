@@ -14,11 +14,19 @@ If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 D
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
 people are finding this project of interest/use etc.
 
+                   -------------------------------------------------------------------------------------
 
-It stores the last 10 images captured in the onboard Spiffs memory and these can be viewed on the web page this device 
+To compile this app the following files need to be in a folder named "CameraWifiMotion"
+  CameraWifiMotion.ino, gmail_esp32.h, motion.h, ota.h, standard.h and wifi.h.
+If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
+There is a zip file containing the libraries used.  The main ones you will need to install are:
+  ESP32_mail_client, ESP_wifimanager and Time.
+
+
+The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
-if you set the highest.
+if you set the highest (although I think the device struggles with the higher resolution images?).
 
 It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
