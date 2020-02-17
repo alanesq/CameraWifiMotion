@@ -800,7 +800,12 @@ void handleData(){
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
-        message += "<BR>Readings: brightness:" + String(AveragePix);
+        message += "<BR>Readings: Brightness:" + String(AveragePix);
+        // day/night mode
+          if (dayNightBrightness > 0) {
+            if (AveragePix < dayNightBrightness) message += " (Night)";
+            else message += " (Day)";
+          }
         message += ", " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
         latestChanges = 0;                                                       // reset stored values once displayed
     }
@@ -1389,6 +1394,7 @@ void handleTest(){
 //          byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
 //          if (q==0) log_system_message("email sent ok" );
 //          else log_system_message("Error: sending email code=" + String(q) );
+
 
 
        
