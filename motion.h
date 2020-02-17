@@ -8,7 +8,7 @@
  * This works by capturing a greyscale image from the camera, splitting this up in to blocks of pixels (BLOCK_SIZE x BLOCK_SIZE)
  * then reading all the pixel values inside each block and producing an average value for the block. 
  * The previous frames block values are then compared with the current and the number of blocks which have changed beyond
- * a threshold (block_threshold) are counted.  If enough of the blocks have changed between two thresholds (image_thresholdL and H)
+ * a threshold (dayBlock_threshold) are counted.  If enough of the blocks have changed between two thresholds (dayImage_thresholdL and H)
  * then motion is detected.
  * - Many thanks to eloquentarduino for creating this code and for taking the time to answer my questions whilst I was 
  *   developing this security camera sketch.
@@ -54,9 +54,13 @@
 
   
 // detection parameters (these are set by user and stored in Spiffs)
-    uint16_t block_threshold = 10;     // average pixel variation in block required to count as changed - range 0 to 255
-    uint16_t image_thresholdL = 15;     // min changed blocks in image required to count as motion detected in percent
-    uint16_t image_thresholdH = 100;    // max changed blocks in image required to count as motion detected in percent
+    uint16_t dayNightBrightness = 100;       // Brightness level which determins if it is in day or night mode
+    uint16_t dayBlock_threshold = 10;        // average pixel variation in block required to count as changed - range 0 to 255
+    uint16_t dayImage_thresholdL = 15;       // min changed blocks in image required to count as motion detected in percent
+    uint16_t dayImage_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
+    uint16_t nightBlock_threshold = 10;      // average pixel variation in block required to count as changed - range 0 to 255
+    uint16_t nightImage_thresholdL = 15;     // min changed blocks in image required to count as motion detected in percent
+    uint16_t nightImage_thresholdH = 100;    // max changed blocks in image required to count as motion detected in percent
 
 // misc     
     #define WIDTH 320                 // motion sensing frame size
@@ -128,13 +132,16 @@ bool setup_camera() {
     config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA, CIF, VGA, SVGA, XGA, SXGA, UXGA 
     config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-
+    
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    sensor_t *sensor = esp_camera_sensor_get();   // set camera resolution
-    sensor->set_framesize(sensor, FRAME_SIZE_MOTION);
-
+    sensor_t *sensor = esp_camera_sensor_get();   
+    sensor->set_framesize(sensor, FRAME_SIZE_MOTION);      // set camera resolution
+    sensor->set_brightness(sensor, 2);                     // brightness (-2 to 2)
+    sensor->set_saturation(sensor, 0);                     // saturation (-2 to 2)
+    sensor->set_contrast(sensor, 0);                       // contrast (-2 to 2)
+    
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
 
@@ -215,7 +222,7 @@ float motion_detect() {
             uint16_t prev = prev_frame[y][x];
             uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
             // float pChange = abs(current - prev) / prev;   // original code 
-            if (pChange >= block_threshold) {                // if change in block is enough to qualify as changed
+            if (pChange >= dayBlock_threshold) {                // if change in block is enough to qualify as changed
                 if (block_active(x,y)) changes += 1;         // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
