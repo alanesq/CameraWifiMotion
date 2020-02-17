@@ -38,7 +38,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "16Feb20";                     // version of this sketch
+  const String sversion = "17Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -1196,45 +1196,14 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     if (SD_Present) {
 
       fs::FS &fs = SD_MMC; 
-      
-      // read image number from counter text file
-        uint16_t Inum = 0;  
-        String CFileName = "/counter.txt";   
-        file = fs.open(CFileName, FILE_READ);
-        if (!file) Serial.println("Unable to read counter.txt from sd card"); 
-        else {
-          // read contents
-          String line = file.readStringUntil('\n');    
-          Inum = line.toInt();
-          if (Inum > 0 && Inum < 2000) Serial.println("Last stored image on SD Card was #" + line);
-          else Inum = 0;
-        }
-        file.close();
-        Inum ++;
-        
-      // store new image number to counter text file
-        if (fs.exists(CFileName)) fs.remove(CFileName);
-        file = fs.open(CFileName, FILE_WRITE);
-        if (!file) Serial.println("Unable to create counter file on sd card");
-        else file.println(String(Inum));
-        file.close();
-        
-      IFileName = "/" + String(Inum) + ".jpg";     // file names to store on sd card
-      TFileName = "/" + String(Inum) + ".txt";
+             
+      String SDfilename = "/" + currentTime() + ".jpg";     // file names to store on sd card
       
       // save image
-        file = fs.open(IFileName, FILE_WRITE);
-        if (!file) Serial.println("Failed to create image file on sd-card: " + IFileName);
+        file = fs.open(SDfilename, FILE_WRITE);
+        if (!file) Serial.println("Failed to create image file on sd-card: " + SDfilename);
         else {
             file.write(fb->buf, fb->len);  
-            file.close();
-        }
-        
-      // save text (time and date info)
-        file = fs.open(TFileName, FILE_WRITE);
-        if (!file) Serial.println("Failed to create date file on sd-card: " + TFileName);
-        else {
-            file.println(currentTime());
             file.close();
         }
     }    
@@ -1262,7 +1231,7 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
   File f_pic = fs.open( IFileName );
   uint16_t pic_sz = f_pic.size();
   bool tres = ( pic_sz > 100 );
-  if (!tres) log_system_message("Error: Problem detected taking/storing image");
+  if (!tres) log_system_message("Error: Problem detected verifying image stored in Spiffs");
   f_pic.close();
   return ( tres );
 }

@@ -200,11 +200,11 @@ String currentTime(){
 
    if (IsBST()) t+=3600;     // add one hour if it is Summer Time
 
-   String ttime = String(hour(t)) + ":" ;                                               // hours
-   if (minute(t) < 10) ttime += "0";                                                  // minutes
-   ttime += String(minute(t)) + " ";
-   ttime += DoW[weekday(t)-1] + " ";                                                  // day of week
-   ttime += String(day(t)) + "/" + String(month(t)) + "/" + String(year(t)) + " ";    // date
+   String ttime = String(hour(t)) + "-" ;                                               // hours
+   if (minute(t) < 10) ttime += "0";                                                    // minutes
+   ttime += String(minute(t)) + "_";
+   ttime += DoW[weekday(t)-1] + "-";                                                    // day of week
+   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t));            // date
 
    return ttime;
 
