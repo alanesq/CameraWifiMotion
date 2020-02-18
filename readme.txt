@@ -8,13 +8,23 @@ internal memory or on to an sd card and also emails it if required.
 NOTE: I have recently re-written the wifi.h to use the more recent libraries, specifically https://github.com/khoih-prog/ESP_WiFiManager
 so if you have used an older version of this sketch you may need to update the libraries you have installed.
 
-The sketch can use OTA (Over the air updates) this can be enabled/disabled in the settings of the main sketch.
+The sketch can use OTA (Over the air updates) this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled.
+In an attempt to give some form of security I have set up the sketch so that when OTA is enabled you can not access it
+until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".
+You can check it has worked by looking in the log and once this has been done you can then access "http://<ip address of esp>/ota". 
+You can change this password in the main settings (OTAPassword).
 
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
 people are finding this project of interest/use etc.
 
                    -------------------------------------------------------------------------------------
+
+To compile this app the following files need to be in a folder named "CameraWifiMotion"
+  CameraWifiMotion.ino, gmail_esp32.h, motion.h, ota.h, standard.h and wifi.h.
+If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
+There is a zip file containing the libraries used.  The main ones you will need to install are:
+  ESP32_mail_client, ESP_wifimanager and Time.
 
 
 The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
