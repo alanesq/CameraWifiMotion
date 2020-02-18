@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Connections - 14Feb20
+ *                                    Wifi / NTP Connections - 17Feb20
  *             
  *                    Set up wifi for either esp8266 or esp32 plus NTP (network time)
  *                    
@@ -126,10 +126,10 @@ void startWifiManager() {
 
   // if no stored wifi credentials open config portal
   if (Router_SSID == "") {   
-    Serial.println(F("No stored access point credentials, starting access point")); 
+    Serial.println("No stored access point credentials, starting access point"); 
     ESP_wifiManager.setConfigPortalTimeout(600);       // Config portal timeout  
     if (ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) Serial.println("Portal config sucessful");
-    else Serial.println(F("Portal config failed"));    
+    else Serial.println("Portal config failed");    
   }
 
   // connect to wifi
@@ -152,34 +152,34 @@ void startWifiManager() {
   
     Serial.print("After waiting ");
     Serial.print((millis()- startedAt) / 1000);
-    Serial.print(F(" secs more in setup() connection result is: \n "));
+    Serial.print(" secs more in setup() connection result is: \n ");
   
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.print(F("connected. Local IP: "));
+      Serial.print("connected. Local IP: ");
       Serial.println(WiFi.localIP());
       wifiok = 1;     // flag wifi now ok
     } else {
-      Serial.println(F("Failed to connect to Wifi"));
+      Serial.println("Failed to connect to Wifi");
       Serial.println(ESP_wifiManager.getStatus(WiFi.status()));
           
       // open config portal 
       ESP_wifiManager.setConfigPortalTimeout(120);       // Config portal timeout
       if (!ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) {
         wifiok = 0;     // flag wifi not connected
-        Serial.println(F("failed to connect to wifi / access point timed out so rebooting to try again..."));
+        Serial.println("failed to connect to wifi / access point timed out so rebooting to try again...");
         delay(500);
         ESP.restart();                                           // reboot and try again
         delay(5000);                                             // restart will fail without this delay
       }
       else {
-        Serial.println(F("Wifi connected"));
+        Serial.println("Wifi connected");
         wifiok = 1;     // flag wifi now ok
       }
     }  
 
 
   // Set up mDNS responder:
-    Serial.println( MDNS.begin(mDNS_name.c_str()) ? F("mDNS responder started ok") : F("Error setting up mDNS responder") );
+    Serial.println( MDNS.begin(mDNS_name.c_str()) ? "mDNS responder started ok" : "Error setting up mDNS responder" );
 
     
   // start NTP
@@ -314,7 +314,7 @@ void sendNTPpacket(const char* address) {
 time_t getNTPTime() {
 
   // Send a UDP packet to the NTP pool address
-  Serial.print(F("\nSending NTP packet to "));
+  Serial.print("\nSending NTP packet to ");
   Serial.println(timeServer);
   sendNTPpacket(timeServer);
 
@@ -360,7 +360,7 @@ time_t getNTPTime() {
   }
 
   // Failed to get an NTP/UDP response
-    Serial.println(F("No NTP response"));
+    Serial.println("No response received from NTP");
     setSyncInterval(_resyncErrorSeconds);       // try more frequently until a response is received
     NTPok = 0;                                  // flag NTP not currently connecting
 
@@ -378,13 +378,13 @@ time_t getNTPTime() {
 void ClearWifimanagerSettings() {
   
     // clear stored wifimanager settings
-          Serial.println(F("Clearing stored wifimanager settings"));
+          Serial.println("Clearing stored wifimanager settings");
           wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT(); //load the flash-saved configs
           esp_wifi_init(&cfg); //initiate and allocate wifi resources (does not matter if connection fails)
           delay(2000); //wait a bit
-          if(esp_wifi_restore()!=ESP_OK)  Serial.println(F("WiFi is not initialized by esp_wifi_init"));
-          else Serial.println(F("Cleared!"));
-          Serial.println(F("System stopped..."));
+          if(esp_wifi_restore()!=ESP_OK)  Serial.println("WiFi is not initialized by esp_wifi_init");
+          else Serial.println("Cleared!");
+          Serial.println("System stopped...");
           while(1);   // stop
 
 }

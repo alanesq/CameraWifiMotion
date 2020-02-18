@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                 'Standard' procedures  - 09Feb20
+ *                                 'Standard' procedures  - 17Feb20
  *                                 
  *                                 Note: now modified from my standard
  *             

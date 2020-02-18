@@ -9,7 +9,7 @@
  *             
  *             Note: The flash can not be used if using an SD Card as they both use pin 4
  *             
- *             GPIO16 is used as an input pin for external sensors etc. (not implemented yet)
+ *             GPIO16 is used as an input pin for external sensors etc. (just reports status change in log at the moment)
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED), chances are there is a problem with the 
@@ -34,13 +34,14 @@
 //                          -SETTINGS
 // ---------------------------------------------------------------
 
-  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
-
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
   const String sversion = "17Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
+
+  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
+  const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -57,7 +58,7 @@
   const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
-  
+
 
 // ---------------------------------------------------------------
 
@@ -74,6 +75,8 @@
   uint16_t TriggerLimitTime = 2;             // min time between motion detection triggers (seconds)
   uint16_t EmailLimitTime = 60;              // min time between email sends (seconds)
   bool UseFlash = 1;                         // use flash when taking a picture
+  bool SensorStatus = 1;                     // Status of the sensor i/o pin (gioPin)
+  bool OTAEnabled = 0;                       // flag if OTA has been enabled (via supply of password)
 
 #include "soc/soc.h"                         // Disable brownout problems
 #include "soc/rtc_cntl_reg.h"                // Disable brownout problems
@@ -86,7 +89,7 @@
 // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
   #include "SD_MMC.h"
   // #include <SPI.h>                        // (already loaded)
-  // #include <FS.h>                         // gives file access (already loaded)
+  #include <FS.h>                            // gives file access (already loaded?)
   #define SD_CS 5                            // sd chip select pin
   bool SD_Present;                           // flag if an sd card was found (0 = no)
 
@@ -113,21 +116,21 @@ void setup(void) {
   // Serial.setTimeout(2000);
   // while(!Serial) { }        // Wait for serial to initialize.
 
-  Serial.println(F("\n\n\n---------------------------------------"));
+  Serial.println(("\n\n\n---------------------------------------"));
   Serial.println("Starting - " + stitle + " - " + sversion);
-  Serial.println(F("---------------------------------------"));
+  Serial.println(("---------------------------------------"));
   
   // Serial.setDebugOutput(true);            // enable extra diagnostic info  
 
 
   // Spiffs - see: https://circuits4you.com/2018/01/31/example-of-esp8266-flash-file-system-spiffs/
     if (!SPIFFS.begin(true)) {
-      Serial.println(F("An Error has occurred while mounting SPIFFS"));
+      Serial.println(("An Error has occurred while mounting SPIFFS"));
       delay(5000);
       ESP.restart();
       delay(5000);
     } else {
-      Serial.print(F("SPIFFS mounted successfully."));
+      Serial.print(("SPIFFS mounted successfully."));
       Serial.print("total bytes: " + String(SPIFFS.totalBytes()));
       Serial.println(", used bytes: " + String(SPIFFS.usedBytes()));
       LoadSettingsSpiffs();     // Load settings from text file in Spiffs
@@ -135,36 +138,35 @@ void setup(void) {
 
   // start sd card
       SD_Present = 0;
-      pinMode(Illumination_led, INPUT);            // disable led pin as sdcard uses it
-      if(!SD_MMC.begin()){                         // if loading sd card fails     ("/sdcard", true = 1 wire?)
+      if (!SD_MMC.begin()) {                        // if loading sd card fails     ("/sdcard", true = 1 wire?)
           log_system_message("SD Card not found");   
-          pinMode(Illumination_led, OUTPUT);       // re-enable led pin
       } else {
         uint8_t cardType = SD_MMC.cardType();
-        if(cardType == CARD_NONE){                 // if no sd card found
+        if (cardType == CARD_NONE) {                // if no sd card found
             log_system_message("SD Card type detect failed"); 
-            pinMode(Illumination_led, OUTPUT);       // re-enable led pin
         } else {
-            log_system_message("SD Card found"); 
-            SD_Present = 1;                        // flag working sd card found
+          uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
+          log_system_message("SD Card found, free space = " + String(SDfreeSpace) + "MB"); 
+          SD_Present = 1;                           // flag working sd card found
         }
       }
-      
+    
   // configure the LED
     if (!SD_Present) {
       pinMode(Illumination_led, OUTPUT); 
       digitalWrite(Illumination_led, ledOFF); 
     }
     
-  if (!SD_Present) BlinkLed(1);           // flash the led once
+  BlinkLed(1);           // flash the led once
 
   // configure the I/O pin (with pullup resistor)
-    pinMode(gioPin,  INPUT_PULLUP);                                
+    pinMode(gioPin,  INPUT_PULLUP);      
+    SensorStatus = 1;                          
 
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
   
   if (MDNS.begin(MDNStitle)) {
-    Serial.println(F("MDNS responder started"));
+    Serial.println(("MDNS responder started"));
   }
   
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
@@ -182,14 +184,11 @@ void setup(void) {
     server.on("/img", handleImg);            // latest captured image
     server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
     server.on("/imagedata", handleImagedata);// Show raw image data
+    server.on("/download", handleDownload);  // download settings file from Spiffs
     server.onNotFound(handleNotFound);       // invalid page requested
 
-  #if ENABLE_OTA
-    otaSetup();    // Over The Air updates (OTA)
-  #endif
-
   // start web server
-    Serial.println(F("Starting web server"));
+    Serial.println(("Starting web server"));
     server.begin();
 
   // Finished connecting to network
@@ -197,20 +196,17 @@ void setup(void) {
     log_system_message(stitle + " Started");   
        
   // set up camera
-    Serial.print(F("Initialising camera: "));
+    Serial.print(("Initialising camera: "));
     Serial.println(setup_camera() ? "OK" : "ERR INIT");
 
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
-  if (!SD_Present) BlinkLed(2);                    // flash the led twice
-
-  TRIGGERtimer = millis();                         // reset retrigger timer to stop instant motion trigger
-
   if (!psramFound()) log_system_message("Warning: No PSRam found");
   
   UpdateBootlogSpiffs("Booted");                   // store time of boot in bootlog
 
+  TRIGGERtimer = millis();                         // reset retrigger timer to stop instant motion trigger
 }
 
 
@@ -251,9 +247,23 @@ void loop(void){
          if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between triggers
             TRIGGERtimer = millis();                                                    // update last trigger time
             MotionDetected(changes);                                                    // run motion detected procedure
-         } else Serial.println(F("Too soon to re-trigger"));
+         } else Serial.println("Too soon to re-trigger");
      }
   } 
+
+  // report when sensor i/o pin status changes
+    bool tstatus = digitalRead(gioPin);
+    if (tstatus != SensorStatus) {
+      delay(20);                             // debounce
+      tstatus = digitalRead(gioPin);
+      if (tstatus == 1) {
+        SensorStatus = 1;
+        log_system_message("Sensor input pin has gone high");
+      } else {
+        SensorStatus = 0;
+        log_system_message("Sensor input pin has gone low");        
+      }
+    }
 
   // periodically run some checks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
@@ -291,6 +301,7 @@ void LoadSettingsSpiffs() {
       String line;
       uint16_t tnum;
   
+    ReadLineSpiffs(&file, &line, &tnum);      // ignore first line as it is just a title 
 
     // line 1 - dayBlock_threshold
       ReadLineSpiffs(&file, &line, &tnum);
@@ -405,6 +416,7 @@ void SaveSettingsSpiffs() {
     } 
 
     // save settings in to file
+        file.println("CameraWifiMotion settings file " + currentTime());   // title
         file.println(String(dayBlock_threshold));
         file.println(String(dayImage_thresholdL));
         file.println(String(dayImage_thresholdH));      
@@ -456,17 +468,17 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      dayNightBrightness = 0;
+      dayNightBrightness = 50;
       dayBlock_threshold = 18;
-      dayImage_thresholdL= 10;
+      dayImage_thresholdL= 15;
       dayImage_thresholdH= 192;
-      nightBlock_threshold = 5;
-      nightImage_thresholdL= 6;
+      nightBlock_threshold = 3;
+      nightImage_thresholdL= 10;
       nightImage_thresholdH= 192;
-      TriggerLimitTime = 10;
+      TriggerLimitTime = 20;
       EmailLimitTime = 600;
       DetectionEnabled = 1;
-      UseFlash = 1;
+      UseFlash = 0;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++) 
@@ -495,6 +507,18 @@ void handleRoot() {
 
   
   // Action any buttons presses etc.
+
+    // enable OTA if password supplied in url parameters   (?pass=xxx)
+      if (server.hasArg("pwd")) {
+          String Tvalue = server.arg("pwd");   // read value
+            if (Tvalue == OTAPassword) {
+            #if ENABLE_OTA
+              otaSetup();    // Over The Air updates (OTA)
+              log_system_message("OTA enabled");
+              OTAEnabled = 1;
+            #endif
+            }
+      }
      
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
@@ -826,7 +850,13 @@ void handleData(){
     message += "<BR>Time: " + currentTime() + "\n";      // show current time
 
   // show if a sd card is present
-    if (SD_Present) message += "<BR>SD-Card present (Flash disabled)\n";
+    if (SD_Present) {
+        uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
+        message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB (no flash control)";
+    }
+
+  // OTA enabled status
+    if (OTAEnabled) message += red + "<BR>OTA UPDATES ENABLED!" + endcolour;
 
 //  // show io pin status
 //    message += "<BR>External sensor pin is: ";
@@ -953,6 +983,28 @@ void handlePing(){
   server.send(404, "text/plain", message);   // send reply as plain text
   message = "";      // clear string
   
+}
+
+
+// ----------------------------------------------------------------
+// -download settings file from Spiffs     i.e. http://x.x.x.x/download
+// ----------------------------------------------------------------
+// download the settings file from Spiffs
+// Note - for future development, how to upload a file - https://tttapa.github.io/ESP8266/Chap12%20-%20Uploading%20to%20Server.html
+
+void handleDownload() {
+
+    log_system_message("Download settings web page requested");    
+
+    String TFileName = "settings.txt";
+    File download = SPIFFS.open("/" + TFileName, "r");
+    if (download) {
+      server.sendHeader("Content-Type", "text/text");
+      server.sendHeader("Content-Disposition", "attachment; filename="+TFileName);
+      server.sendHeader("Connection", "close");
+      server.streamFile(download, "application/octet-stream");
+      download.close();
+    }
 }
 
 
@@ -1197,11 +1249,11 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
 
       fs::FS &fs = SD_MMC; 
              
-      String SDfilename = "/" + currentTime() + ".jpg";     // file names to store on sd card
+      String SDfilename = "/" + currentTime() + ".jpg";     // file name on sd card
       
       // save image
         file = fs.open(SDfilename, FILE_WRITE);
-        if (!file) Serial.println("Failed to create image file on sd-card: " + SDfilename);
+        if (!file) log_system_message("Error: Failed to create file on sd-card: " + SDfilename);
         else {
             file.write(fb->buf, fb->len);  
             file.close();

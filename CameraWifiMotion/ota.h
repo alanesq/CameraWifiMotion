@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *                                Over The Air updates (OTA) - 15Feb20 
+ *                                Over The Air updates (OTA) - 17Feb20 
  * 
  *                                   part of the Webserver library
  *                                   
@@ -72,6 +72,8 @@ void otaSetup() {
 
 void handleOTA(){
 
+  bool OTAEnabled = 0;
+
   log_system_message("OTA web page requested");      
    String message = webheader();
 
@@ -82,7 +84,9 @@ void handleOTA(){
   message += "<input type='file' style='width: 300px' name='update'>\n";
   message += "<BR><BR><input type='submit' value='Update'></form><BR>\n";
 
-  message += "<BR><BR>Device will reboot when upload complete<BR>";
+  message += "<BR><BR>Device will reboot when upload complete";
+  message += red + "<BR>OTA is enabled - Restart device to disable<BR>" + endcolour;
+
                           
   message += webfooter();     // add standard footer html
   

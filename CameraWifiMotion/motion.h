@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 13Feb20 
+ *  Motion detection from camera image - 17Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -192,7 +192,7 @@ bool capture_still() {
             current_frame[y][x] = currentBlock;
         }
       }
-     if (!frameChanged) log_system_message(F("Suspect camera problem as no change since last frame"));
+     if (!frameChanged) log_system_message("Suspect camera problem as no change since last frame");
 
 #if DEBUG_MOTION
     Serial.println("Current frame:");
