@@ -20,8 +20,6 @@ people are finding this project of interest/use etc.
 
                    -------------------------------------------------------------------------------------
 
-To compile this app the following files need to be in a folder named "CameraWifiMotion"
-  CameraWifiMotion.ino, gmail_esp32.h, motion.h, ota.h, standard.h and wifi.h.
 If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
@@ -36,7 +34,7 @@ It uses WifiManager so first time the ESP starts it will create an access point 
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
              see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
              Once you have entered your wifi password it will restart and you can then connect to it in your browser
-             at the address:     http://ESPcam1.local
+             at the address:     http://ESPcam1.local     (if your browser / config. supports it)
 
 The motion detection works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
@@ -63,7 +61,9 @@ on the page (i.e. "Readings: brightness:105, 1 changed blocks out of 64").
 There is a grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
 when detecting motion (i.e. only the ticked areas are used).  This 4 x 3 grid results in mask sections of 16 blocks (4x4) 
 
+
 It also has the following URLs you can use:
+
         http://<esp ip address> /ping - responds with either 'enabled' or 'disabled', just so you know it is still working
                                 /log - log page of the device activities
                                 /test - used for testing bits of code etc.
@@ -75,26 +75,34 @@ It also has the following URLs you can use:
                                 /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
                                 /imagedata - show raw block data
+                                /ota - update firmware (requires password entered first)
                                 
 
-Note: I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org
-      This sketch includes a lot of other peoples code from many sources which I have included links to   
-      Most specifically - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
-      which was just what I had been looking for and without which I could not have created this project.                  
 
 I have it using my gmail account to send the emails
     Your gmail account needs to be set to "Allow less secure apps: ON"   see:  https://myaccount.google.com/lesssecureapps
     you then need to edit gmail_esp32.h with your details
 
-Libraries used by this sketch are in the folder "libraries used"
  
-Note: It is vital that the ESP has a good 5volt supply (at least 0.5amp capable - although it draws around 
-      100mA most of the time) otherwise you get all sorts of weird things happening including very slow network response times.
-      The esp camera board also seems very sensitive to what is around the antenna and this can cause wifi to slow or stop
-      if you put it in a case or mount it on a pcb etc.  (If it is going in a case I think an external antenna is required).
-      Also I find that a smoothing capacitor is required on the 3.3v side otherwise the LED turning on/off can cause a
-      lot of problems (specifically causing it to keep re-triggering and other random behaviour).
-      
+
  
 -----------------
+
+Notes:
+
+If you ever need to erase the stored wifi settings or if the esp32 goes in to a power loop where you are unable to get
+Wifimanager to work see - https://www.robmiles.com/journal/2019/05/26/esp32reset
+
+I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org
+This sketch includes a lot of other peoples code from many sources which I have included links to   
+Most specifically - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
+which was just what I had been looking for and without which I could not have created this project.                  
+
+It is vital that the ESP has a good 5volt supply (at least 0.5amp capable - although it draws around 
+120mA most of the time) otherwise you get all sorts of weird things happening including very slow network response times.
+The esp camera board also seems very sensitive to what is around the antenna and this can cause wifi to slow or stop
+if you put it in a case or mount it on a pcb etc.  (If it is going in a case I think an external antenna is required).
+Also I find that a smoothing capacitor is required on the 3.3v side otherwise the LED turning on/off can cause a
+lot of problems (specifically causing it to keep re-triggering and other random behaviour).
+Using the flash can often trigger such problems if there is any problem with the power supply.
 
