@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 13Feb2020
+                        CameraWifiMotion - alanesq@disroot.org - 19Feb2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
@@ -36,7 +36,8 @@ It uses WifiManager so first time the ESP starts it will create an access point 
              Once you have entered your wifi password it will restart and you can then connect to it in your browser
              at the address:     http://ESPcam1.local     (if your browser / config. supports it)
 
-The motion detection works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
+The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
+It works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
 number for each block between 0 and 255 (i.e. average brightness of the block).
 These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by more 
@@ -45,7 +46,7 @@ If enough blocks have changed (percentage of active image detection area, the "i
 So the settings you can vary equate to:
         Block = how much brighness variation in a block is required to flag it as changed
         Image = how much of the image area needs to change to count as movement detected
-When motion detecting is enabled it will show the current average image britness along with what motion it is currently detecting
+When motion detecting is enabled it will show the current average image brightness along with what motion it is currently detecting
 in the format "Readings: brightness:113, 0 changed blocks out of 64".  You can use this to fine tune your detection settings.
 
 There are three settings for the motion detection, the first is how much change in average brightness in a block will count as
@@ -106,3 +107,13 @@ Also I find that a smoothing capacitor is required on the 3.3v side otherwise th
 lot of problems (specifically causing it to keep re-triggering and other random behaviour).
 Using the flash can often trigger such problems if there is any problem with the power supply.
 
+The camera on these modules is not very good in dark conditions but I have found that if you take the lens of the camera 
+(I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
+and the chip) and this improves it a good deal.  This will make some colours display wrong.
+
+Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
+
+The SD Card uses the same i/o pin as the LED so if you use an sd card the LED can not be controlled but it will still
+flash when the sd card is accessed.  I don't know why they did this?
+The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
+to the LED.
