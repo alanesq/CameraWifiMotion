@@ -1,8 +1,8 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Connections - 17Feb20
+ *                                    Wifi / NTP Connections - 18Feb20
  *             
- *                    Set up wifi for either esp8266 or esp32 plus NTP (network time)
+ *                               Set up wifi for esp32 plus NTP (network time)
  *                    
  *                    Libraries used: 
  *                      ESP_Wifimanager - https://github.com/khoih-prog/ESP_WiFiManager
@@ -38,6 +38,7 @@
   void sendNTPpacket();
   time_t getNTPTime();
   void ClearWifimanagerSettings();
+  String formatDateNumber(int);
 
 
 
@@ -47,7 +48,7 @@
 
 byte wifiok = 0;          // flag if wifi is connected ok (1 = ok)
   
-// wifi for esp8266/esp32
+// wifi for esp32
   #ifdef ESP32
     #include <esp_wifi.h>
     #include <WiFi.h>
@@ -56,15 +57,8 @@ byte wifiok = 0;          // flag if wifi is connected ok (1 = ok)
     #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
     WebServer server(ServerPort);
     const String ESPType = "ESP32";
-  #elif
-    #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
-    #include <DNSServer.h>
-    #include <ESP8266WebServer.h>  
-    #define ESP_getChipId()   (ESP.getChipId())
-    ESP8266WebServer server(ServerPort);
-    const String ESPType = "ESP8266";
   #else
-      #error "Only works with ESP8266 or ESP32"
+      #error "Only works with ESP32-cam board"
   #endif
  
   // SSID and Password for wifi 
@@ -193,6 +187,7 @@ void startWifiManager() {
 // ----------------------------------------------------------------
 //               -Return current time and date as string
 // ----------------------------------------------------------------
+// supplies time in the format:   '23-04-2020_09:23-Mon'
 
 String currentTime(){
 
@@ -200,14 +195,28 @@ String currentTime(){
 
    if (IsBST()) t+=3600;     // add one hour if it is Summer Time
 
-   String ttime = String(hour(t)) + "-" ;                                               // hours
-   if (minute(t) < 10) ttime += "0";                                                    // minutes
-   ttime += String(minute(t)) + "_";
-   ttime += DoW[weekday(t)-1] + "-";                                                    // day of week
-   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t));            // date
+   String ttime = formatDateNumber(day(t));
+   ttime += "-";
+   ttime += formatDateNumber(month(t));
+   ttime += "-";
+   ttime += formatDateNumber(year(t));
+   ttime += "_";
+   ttime += formatDateNumber(hour(t));
+   ttime += ":";
+   ttime += formatDateNumber(minute(t));
+   ttime += "-";
+   ttime += DoW[weekday(t)-1];
 
    return ttime;
+}
 
+
+// convert number to String and add leading zero if required
+String formatDateNumber(int input) {
+  String tval = "";
+  if (input < 10) tval = "0";    // add leading zero if required   
+  tval += String(input);
+  return tval;
 }
 
 

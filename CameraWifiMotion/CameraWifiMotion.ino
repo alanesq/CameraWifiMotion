@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "17Feb20";                     // version of this sketch
+  const String sversion = "19Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -47,7 +47,7 @@
   
   const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
-  String JavaRefreshTime = "500";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
+  String JavaRefreshTime = "800";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
     
   const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
@@ -59,7 +59,11 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-
+  int cameraImageBrightness = 2;                         // brightness setting on camera (in the range -2 to 2)
+  bool cameraImageInvert = 0;                            // flip image vertically (i.e. upside down)
+  bool cameraImageContrast = 0;                          // contrast setting on camera (in the range -2 to 2)
+  
+  
 // ---------------------------------------------------------------
 
 
@@ -197,7 +201,7 @@ void setup(void) {
        
   // set up camera
     Serial.print(("Initialising camera: "));
-    Serial.println(setup_camera() ? "OK" : "ERR INIT");
+    Serial.println(setupCameraHardware() ? "OK" : "ERR INIT");
 
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -251,17 +255,19 @@ void loop(void){
      }
   } 
 
-  // report when sensor i/o pin status changes
+  // report when sensor i/o pin status changes (debounce input)
     bool tstatus = digitalRead(gioPin);
     if (tstatus != SensorStatus) {
-      delay(20);                             // debounce
+      delay(20);                             
       tstatus = digitalRead(gioPin);
-      if (tstatus == 1) {
-        SensorStatus = 1;
-        log_system_message("Sensor input pin has gone high");
-      } else {
-        SensorStatus = 0;
-        log_system_message("Sensor input pin has gone low");        
+      if (tstatus != SensorStatus) {
+        if (tstatus == 1) {
+          SensorStatus = 1;
+          log_system_message("Sensor input pin has gone high");
+        } else {
+          SensorStatus = 0;
+          log_system_message("Sensor input pin has gone low");        
+        }
       }
     }
 
@@ -720,14 +726,16 @@ void handleRoot() {
     String message = webheader();                                   // add the standard html header
     message += "<FORM action='/' method='post'>\n";                 // used by the buttons (action = the page send it to)
     message += "<P>";                                               // start of section
-    
 
-    // insert an iframe containing the changing data (updates every few seconds using java script)
-       message += "<BR><iframe id='dataframe' height=160; width=600; frameborder='0';></iframe>\n"
-      "<script type='text/javascript'>\n"
-         "setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + JavaRefreshTime +");\n"
-         "window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n"
-      "</script>\n"; 
+  // insert an iFrame containing changing data in to the page
+    message += "<BR><iframe id='dataframe' height=165; width=600; frameborder='0';></iframe>\n";
+
+  // javascript to refresh the iFrame every few seconds
+  //      also refreshes after short delay (bug fix as it often rejects the first request)
+    message +=  "<script type='text/javascript'>\n"
+                "  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + String(JavaRefreshTime) + ");\n"
+                "  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n"
+                "</script>\n";
 
     // detection mask check grid (right of screen)
       message += "<div style='float: right;'>Detection Mask<br>";
@@ -888,11 +896,13 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);     // capture an image from camera
 
   // insert image in to html
-    message += "<img  id='img' alt='Live Image' width='90%'>\n";       // content is set in javascript
+    message += "<img  id='img' alt='Camera Image' src='/img' onerror='QpageRefresh();' width='90%'>\n";       // content is set in javascript
 
-  // javascript to refresh the image after short delay (bug fix as it often rejects the first request)
+  // javascript to refresh the image after short delay if it fails to load (bug fix as it often rejects the first request)
     message +=  "<script type='text/javascript'>\n"
-                "  setTimeout(function(){ document.getElementById('img').src='/img'; }, " + JavaRefreshTime + ");\n"
+                "  function QpageRefresh() {\n"
+                "    setTimeout(function(){ document.getElementById('img').src='/img'; }, " + JavaRefreshTime + ");\n"
+                "  }\n"
                 "</script>\n";
     
   message += webfooter();                                             // add the standard footer
@@ -954,11 +964,13 @@ void handleImages(){
     file.close();
     
   // insert image in to html
-    message += "<BR><img id='img' alt='Camera Image' width='" + ImageWidthSetting + "%'>\n";      // content is set in javascript
+    message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' src='/img?pic=" + String(ImageToShow) + "' width='" + ImageWidthSetting + "%'>\n";      // content is set in javascript
 
-  // javascript to refresh the image after short delay (bug fix as it often rejects the request otherwise)
+  // javascript to refresh the image if it fails to load (bug fix as it often rejects the request otherwise)
     message +=  "<script type='text/javascript'>\n"
-                "  setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "' ; }, " + JavaRefreshTime + ");\n"
+                "  function QpageRefresh() {\n"
+                "    setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "'; }, " + JavaRefreshTime + ");\n"
+                "  }\n"
                 "</script>\n";
 
   message += webfooter();                      // add the standard footer
@@ -1125,7 +1137,7 @@ void handleBootLog() {
 
 
 // ----------------------------------------------------------------
-// -last stored image page requested     i.e. http://x.x.x.x/img
+//  last stored image page requested     i.e. http://x.x.x.x/img
 // ----------------------------------------------------------------
 // pic parameter on url selects which file to display
 
@@ -1298,13 +1310,13 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 
 void RestartCamera(framesize_t fsize, pixformat_t format) {
     bool ok;
+
     esp_camera_deinit();
       config.frame_size = fsize;
       config.pixel_format = format;
     ok = esp_camera_init(&config);
     if (ok == ESP_OK) {
       Serial.println("Camera mode switched");
-      TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant trigger)
     }
     else {
       // failed so try again
@@ -1313,6 +1325,10 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
         if (ok == ESP_OK) Serial.println("Camera restarted");
         else Serial.println("Camera failed to restart");
     }
+
+    cameraImageSettings();        // apply camera image settings
+    
+    TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
 }
 
 
@@ -1366,6 +1382,7 @@ void MotionDetected(uint16_t changes) {
   
     log_system_message("Camera detected motion: " + String(changes)); 
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
+
     capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)

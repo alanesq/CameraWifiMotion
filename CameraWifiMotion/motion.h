@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 17Feb20 
+ *  Motion detection from camera image - 19Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -15,7 +15,6 @@
  *  
  * For info on the camera module see: https://github.com/espressif/esp32-camera
  * 
- * Handy way to try out your C++ code:   https://coliru.stacked-crooked.com/
  * 
  **************************************************************************************************/
 
@@ -69,6 +68,7 @@
     #define H (HEIGHT / BLOCK_SIZE)
     uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
     const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
+    // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast
     
 // store most current motion detection reading for display on main page
     uint16_t latestChanges = 0;
@@ -90,12 +90,14 @@
                                                  {1,1,1} };
     
 // forward delarations
-    bool setup_camera(framesize_t);
+    bool setupCameraHardware(framesize_t);
     bool capture_still();
     float motion_detect();
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
     bool block_active(uint16_t x,uint16_t y);
+    bool cameraImageSettings();
+
 
 // camera configuration settings
     camera_config_t config;
@@ -105,10 +107,11 @@
 
     
 /**
- * Setup camera
+ * Setup camera hardware
  */
 
-bool setup_camera() {
+bool setupCameraHardware() {
+  
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
     config.pin_d0 = Y2_GPIO_NUM;
@@ -136,14 +139,64 @@ bool setup_camera() {
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    sensor_t *sensor = esp_camera_sensor_get();   
-    sensor->set_framesize(sensor, FRAME_SIZE_MOTION);      // set camera resolution
-    sensor->set_brightness(sensor, 2);                     // brightness (-2 to 2)
-    sensor->set_saturation(sensor, 0);                     // saturation (-2 to 2)
-    sensor->set_contrast(sensor, 0);                       // contrast (-2 to 2)
+    cameraImageSettings();                        // apply camera sensor settings
     
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
+
+
+//   ---------------------------------------------------------------------------------------------------------------------
+
+/**
+ * apply camera image settings
+ */
+
+bool cameraImageSettings() { 
+   
+    sensor_t *sensor = esp_camera_sensor_get();  
+
+    if (sensor == NULL) {
+      Serial.println("Problem with camera sensor settings");
+      return 0;
+    } 
+
+    sensor->set_brightness(sensor, cameraImageBrightness); // (-2 to 2)
+    sensor->set_saturation(sensor, 0);                     // (-2 to 2)
+    sensor->set_contrast(sensor, cameraImageContrast);     // (-2 to 2)
+    sensor->set_vflip(sensor, cameraImageInvert);          // Invert image (0 or 1)
+    sensor->set_sharpness(sensor,0);                               // (-2 to 2)
+    
+    return 1;
+}
+
+    
+// possible settings:    
+//   sensor->set_framesize(sensor,<FRAMESIZE>);  // 0-10 
+//   sensor->set_quality(sensor,14);             // 0-63
+//   sensor->set_brightness(sensor,0);           // -2 - 2
+//   sensor->set_contrast(sensor,0);             // -2 - 2
+//   sensor->set_saturation(sensor,0);           // -2 - 2
+//   sensor->set_sharpness(sensor,0);            // -2 - 2
+//   sensor->set_denoise(sensor,1);
+//   sensor->set_special_effect(sensor,0);       // 0-6
+//   sensor->set_wb_mode(sensor,0);              // 0-4
+//   sensor->set_whitebal(sensor,1);
+//   sensor->set_awb_gain(sensor,1);
+//   sensor->set_exposure_ctrl(sensor,1);
+//   sensor->set_aec2(sensor,1);
+//   sensor->set_ae_level(sensor,1);             // -2 - 2
+//   sensor->set_aec_value(sensor,600);          // 0 - 1200
+//   sensor->set_gain_ctrl(sensor,1);
+//   sensor->set_agc_gain(sensor,15);            // 0 - 30
+//   sensor->set_gainceiling(sensor,GAINCEILING_16X);   // 0 -6
+//   sensor->set_bpc(sensor,1);
+//   sensor->set_wpc(sensor,1);
+//   sensor->set_raw_gma(sensor,0);
+//   sensor->set_lenc(sensor,1);
+//   sensor->set_hmirror(sensor,0);
+//   sensor->set_vflip(sensor,0);
+//   sensor->set_dcw(sensor,0);
+//   sensor->set_colorbar(sensor,0);             // 0 or 1 ?
 
 
 //   ---------------------------------------------------------------------------------------------------------------------
