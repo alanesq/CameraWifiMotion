@@ -1,6 +1,6 @@
 /**************************************************************************************************
  * 
- *    Send emails from ESP32 via Gmail    
+ *    Send emails from ESP32 via Gmail    -   17Feb20
  * 
  *    include in main sketch if sending emails is required with command     #include "gmail.h"
  *    
@@ -10,7 +10,7 @@
  *  set the following option:     Allow less secure apps: ON       
  *                                see:  https://myaccount.google.com/lesssecureapps
  *
- *                                        Gmail - v2.0  - 10Feb20          
+ *                                            Gmail - v2.0            
  *  
  **************************************************************************************************
 
@@ -26,17 +26,17 @@
 // -------------------------- S e t t i n g s ---------------------
 
 
-    const String emailReceiver = "<email to send to>";         // address to send emails  
+  const String emailReceiver = "<email to send to>";         // address to send emails   
+  
+  const String _mailUser = "<email to send from>";
+  
+  const String _mailPassword = "<email password>";
+  
+  const String _SMTP = "smtp.gmail.com";
 
-    const String _mailUser = "<email to send from>";
+  const String _SenderName = stitle;
 
-    const String _mailPassword = "<email password>";
-
-    const String _SMTP = "smtp.gmail.com";
-
-    const String _SenderName = stitle;
-
-    bool SendImage = 1;                                                 // set to 1 if sending an image attachment with email
+  bool SendImage = 1;                                                 // set to 1 if sending an image attachment with email
   
 
   
@@ -69,7 +69,7 @@
 
 byte sendEmail(String emailTo, String emailSubject, String emailBody) {
 
-  Serial.print(F("\nSending email: "));
+  Serial.print("\nSending email: ");
   Serial.println(emailTo + "," + emailSubject + "," + emailBody);
 
   //Set the Email host, port, account and password
@@ -137,7 +137,7 @@ byte sendEmail(String emailTo, String emailSubject, String emailBody) {
   smtpData.empty();
 
   
-  Serial.println(F("------ end of email send -----"));
+  Serial.println("------ end of email send -----");
   return !tresult;    // 0 = ok
 
 }
