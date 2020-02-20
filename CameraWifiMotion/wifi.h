@@ -41,7 +41,6 @@
   String formatDateNumber(int);
 
 
-
 // ----------------------------------------------------------------
 //                              -Startup
 // ----------------------------------------------------------------
@@ -122,7 +121,9 @@ void startWifiManager() {
   if (Router_SSID == "") {   
     Serial.println("No stored access point credentials, starting access point"); 
     ESP_wifiManager.setConfigPortalTimeout(600);       // Config portal timeout  
-    if (ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) Serial.println("Portal config sucessful");
+    if (ESP_wifiManager.startConfigPortal((const char *) portalName.c_str(), portalPassword.c_str())) {
+      Serial.println("Portal config sucessful");
+    }
     else Serial.println("Portal config failed");    
   }
 
@@ -162,12 +163,12 @@ void startWifiManager() {
         wifiok = 0;     // flag wifi not connected
         Serial.println("failed to connect to wifi / access point timed out so rebooting to try again...");
         delay(500);
-        ESP.restart();                                           // reboot and try again
-        delay(5000);                                             // restart will fail without this delay
+        ESP.restart();                                   // reboot and try again
+        delay(5000);                                     // restart will fail without this delay
       }
       else {
         Serial.println("Wifi connected");
-        wifiok = 1;     // flag wifi now ok
+        wifiok = 1;                                      // flag wifi now ok
       }
     }  
 

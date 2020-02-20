@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "19Feb20";                     // version of this sketch
+  const String sversion = "20Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -45,9 +45,9 @@
 
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
-  const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
+  const uint16_t datarefresh = 6000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
-  String JavaRefreshTime = "800";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
+  String JavaRefreshTime = "600";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
     
   const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
@@ -188,7 +188,7 @@ void setup(void) {
     server.on("/img", handleImg);            // latest captured image
     server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
     server.on("/imagedata", handleImagedata);// Show raw image data
-    server.on("/download", handleDownload);  // download settings file from Spiffs
+    // server.on("/download", handleDownload);  // download settings file from Spiffs
     server.onNotFound(handleNotFound);       // invalid page requested
 
   // start web server
@@ -626,7 +626,7 @@ void handleRoot() {
         }
       }
 
-    // Mask grid check array
+    // Generate mask grid check box array
       if (server.hasArg("submit")) {                           // if submit button was pressed
         mask_active = 0;  
         bool maskChanged = 0;                                  // flag if the mask has changed
@@ -728,7 +728,8 @@ void handleRoot() {
     message += "<P>";                                               // start of section
 
   // insert an iFrame containing changing data in to the page
-    message += "<BR><iframe id='dataframe' height=165; width=600; frameborder='0';></iframe>\n";
+    uint16_t frameHeight = 160;
+    message += "<BR><iframe id='dataframe' height=" + String(frameHeight) + "; width=600; frameborder='0';></iframe>\n";
 
   // javascript to refresh the iFrame every few seconds
   //      also refreshes after short delay (bug fix as it often rejects the first request)
@@ -750,7 +751,7 @@ void handleRoot() {
       message += "<BR>" + String(mask_active) + " active";
       message += "<BR>(" + String(mask_active * blocksPerMaskUnit) + " blocks)";
       message += "</div>\n";
-      
+
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
       message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
@@ -841,11 +842,11 @@ void handleData(){
         message += ", " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
         latestChanges = 0;                                                       // reset stored values once displayed
     }
-    
+  
   // email when motion detected
-    message += "<BR>Send an Email when motion detected: "; 
-    message += emailWhenTriggered ? red + "enabled" + endcolour : "disabled";
-    
+    if (emailWhenTriggered) message += red + "<BR>Email will be sent when detection is triggered" + endcolour;
+    else message += "<BR>Email sending is disabled";
+        
   // Illumination
     message += "<BR>Illumination LED is ";    
     if (digitalRead(Illumination_led) == ledON) message += red + "On" + endcolour;
@@ -875,9 +876,8 @@ void handleData(){
   
   server.send(200, "text/html", message);   // send reply as plain text
   message = "";      // clear string
-
-  
 }
+
 
 
 // ----------------------------------------------------------------
@@ -896,12 +896,12 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);     // capture an image from camera
 
   // insert image in to html
-    message += "<img  id='img' alt='Camera Image' src='/img' onerror='QpageRefresh();' width='90%'>\n";       // content is set in javascript
+    message += "<img  id='img' alt='Camera Image' src='/img?pic=0' onerror='QpageRefresh();' width='90%'>\n";       // content is set in javascript
 
   // javascript to refresh the image after short delay if it fails to load (bug fix as it often rejects the first request)
     message +=  "<script type='text/javascript'>\n"
                 "  function QpageRefresh() {\n"
-                "    setTimeout(function(){ document.getElementById('img').src='/img'; }, " + JavaRefreshTime + ");\n"
+                "    setTimeout(function(){ document.getElementById('img').src='/img?pic=0'; }, " + JavaRefreshTime + ");\n"
                 "  }\n"
                 "</script>\n";
     
@@ -932,8 +932,8 @@ void handleImages(){
         Serial.println("Button " + Bvalue + " was pressed");
         ImageToShow = val;     // select which image to display when /img called
       }
-      
-    // if a image width is specified in the URL    (i.e.  '...?width=')
+          
+      // if a image width is specified in the URL    (i.e.  '...?width=')
       if (server.hasArg("width")) {
         String Bvalue = server.arg("width");   // read value
         uint16_t val = Bvalue.toInt();
@@ -948,7 +948,7 @@ void handleImages(){
   
   // create image selection buttons
     for(int i=1; i <= MaxSpiffsImages; i++) {
-        message += "<input style='height: 30px; ";
+        message += "<input style='height: 25px; ";
         if (i == ImageToShow) message += "background-color: #0f8;";
         message += "' name='button' value='" + String(i) + "' type='submit'>\n";
     }
@@ -962,9 +962,12 @@ void handleImages(){
       message += "<BR>" + line +"\n";
     }
     file.close();
+
+  // button to show small version of image 
+    message += "<BR><a target='new'  href='/img?pic=10" + String(ImageToShow) + "'>Display low resolution pre capture image</a>\n"; 
     
-  // insert image in to html
-    message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' src='/img?pic=" + String(ImageToShow) + "' width='" + ImageWidthSetting + "%'>\n";      // content is set in javascript
+  // insert image in to html 
+    message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";   
 
   // javascript to refresh the image if it fails to load (bug fix as it often rejects the request otherwise)
     message +=  "<script type='text/javascript'>\n"
@@ -1004,20 +1007,20 @@ void handlePing(){
 // download the settings file from Spiffs
 // Note - for future development, how to upload a file - https://tttapa.github.io/ESP8266/Chap12%20-%20Uploading%20to%20Server.html
 
-void handleDownload() {
-
-    log_system_message("Download settings web page requested");    
-
-    String TFileName = "settings.txt";
-    File download = SPIFFS.open("/" + TFileName, "r");
-    if (download) {
-      server.sendHeader("Content-Type", "text/text");
-      server.sendHeader("Content-Disposition", "attachment; filename="+TFileName);
-      server.sendHeader("Connection", "close");
-      server.streamFile(download, "application/octet-stream");
-      download.close();
-    }
-}
+//void handleDownload() {
+//
+//    log_system_message("Download settings web page requested");    
+//
+//    String TFileName = "settings.txt";
+//    File download = SPIFFS.open("/" + TFileName, "r");
+//    if (download) {
+//      server.sendHeader("Content-Type", "text/text");
+//      server.sendHeader("Content-Disposition", "attachment; filename="+TFileName);
+//      server.sendHeader("Connection", "close");
+//      server.streamFile(download, "application/octet-stream");
+//      download.close();
+//    }
+//}
 
 
 // ----------------------------------------------------------------
@@ -1140,22 +1143,33 @@ void handleBootLog() {
 //  last stored image page requested     i.e. http://x.x.x.x/img
 // ----------------------------------------------------------------
 // pic parameter on url selects which file to display
+//   if this is (MaxSpiffsImages + 1) this means display of live greyscale image is required
 
 void handleImg(){
     
-    uint16_t ImageToShow = SpiffsFileCounter;     // set image to display as current image
+    uint16_t ImageToShow = MaxSpiffsImages + 1;     // set image to display live greyscale image as default
         
     // if a image to show is specified in url
       if (server.hasArg("pic")) {
         String Bvalue = server.arg("pic");
         ImageToShow = Bvalue.toInt();
-        if (ImageToShow < 1 || ImageToShow > MaxSpiffsImages) ImageToShow=SpiffsFileCounter;
-      }
+        // if (ImageToShow < 0 || ImageToShow > (MaxSpiffsImages + 1)) ImageToShow = MaxSpiffsImages + 1;
+      } 
+      if (ImageToShow == 0) ImageToShow = SpiffsFileCounter;   // set to most recent image
 
-    log_system_message("display stored image requested: " + String(ImageToShow));
+    String TFileName = "/" + String(ImageToShow) + ".jpg";
+    
+    if (ImageToShow > 100) {               // show small image    e.g. 101 = '1s.jpg' 
+        ImageToShow = ImageToShow -100;
+        TFileName = "/" + String(ImageToShow) + "s.jpg";
+    }
+      
+    if (ImageToShow == (MaxSpiffsImages + 1)) {           // live greyscale image requested
+      saveGreyscaleFrame("grey");                         // capture live greyscale image
+      TFileName = "/grey.jpg";
+    } else log_system_message("display stored image requested: " + String(ImageToShow));
 
     // send image file
-        String TFileName = "/" + String(ImageToShow) + ".jpg";
         File f = SPIFFS.open(TFileName, "r");                         // read file from spiffs
             if (!f) Serial.println("Error reading " + TFileName);
             else {
@@ -1167,7 +1181,7 @@ void handleImg(){
 
 
 // ----------------------------------------------------------------
-//                       -spiffs procedures
+//        capture jpg image and save to Spiffs (and sd card)
 // ----------------------------------------------------------------
 // capture live image and save in spiffs (also on sd-card if present)
 
@@ -1182,12 +1196,14 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
     SaveSettingsSpiffs();     // save settings in Spiffs
     
+  // first quickly grab a small jpg image and save to spiffs 
+    saveGreyscaleFrame(String(SpiffsFileCounter) + "s");
+    
 
-  // ------------------- capture an image -------------------
+  // ------------------- capture a large image ----------------
     
   RestartCamera(FRAME_SIZE_PHOTO, PIXFORMAT_JPEG);      // restart camera in jpg mode to take a photo (uses greyscale mode for motion detection)
 
-  camera_fb_t * fb = NULL; // pointer
   ok = 0; // Boolean to indicate if the picture has been taken correctly
   byte TryCount = 0;    // attempt counter to limit retries
 
@@ -1199,7 +1215,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
    
     Serial.println("Taking a photo... attempt #" + String(TryCount));
-    fb = esp_camera_fb_get();
+    camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
     if (!fb) {
       Serial.println("Camera capture failed - rebooting camera");
       RebootCamera(PIXFORMAT_JPEG);
@@ -1404,9 +1420,43 @@ void MotionDetected(uint16_t changes) {
 
   TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
-
 }
 
+
+// ----------------------------------------------------------------
+//           Save greyscale frame as jpg in spiffs
+// ----------------------------------------------------------------
+// filesName = name of jpg to save as in spiffs
+
+void saveGreyscaleFrame(String filesName) {
+
+  // grab greyscale frame
+    uint8_t * _jpg_buf;
+    size_t _jpg_buf_len;
+    camera_fb_t * fb = NULL; // pointer
+    fb = esp_camera_fb_get();
+
+  // convert greyscale to jpg  
+    bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
+    esp_camera_fb_return(fb);
+    if (!jpeg_converted){
+        Serial.println("grey to jpg image conversion failed");
+        return;
+    }
+  
+  // save image to spiffs
+    String IFileName = "/" + filesName +".jpg";            // file names to store in Spiffs
+    SPIFFS.remove(IFileName);                              // delete old image file if it exists
+    File file = SPIFFS.open(IFileName, FILE_WRITE);
+    if (!file) {
+      Serial.println("Failed to create spiffs file");
+      return;
+    }
+    else {
+      if (!file.write(_jpg_buf, _jpg_buf_len)) log_system_message("Error: writing grey image to Spiffs");
+    }
+    file.close();
+}
 
 
 // ----------------------------------------------------------------

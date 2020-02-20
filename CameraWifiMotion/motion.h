@@ -233,7 +233,8 @@ bool capture_still() {
   
       TempAveragePix += pixel;    // add all pixels together for calculation of image average brightness 
     }
-
+    esp_camera_fb_return(frame_buffer);    // return frame so memory can be released
+ 
     AveragePix = TempAveragePix / (WIDTH * HEIGHT);     // convert to average
    
     // average values for all pixels in each block 

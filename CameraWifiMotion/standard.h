@@ -33,7 +33,6 @@
 String system_message[LogNumber + 1];                    // system log messages
 
 
-
 // ----------------------------------------------------------------
 //                      -log a system message  
 // ----------------------------------------------------------------
@@ -57,12 +56,8 @@ void log_system_message(String smes) {
 // ----------------------------------------------------------------
 //                         -header (html) 
 // ----------------------------------------------------------------
-
 // HTML at the top of each web page
-//
-//    refresh = how often to auto refresh the page in seconds  (not usually used as jscript a better option)
-//    more info on html here - https://randomnerdtutorials.com/esp8266-web-server/
-
+//    additional style settings can be included
 
 String webheader(String style = "") {
 
@@ -86,7 +81,7 @@ String webheader(String style = "") {
              "<li><a href='/'>Home</a></li>\n"                       /* home menu button */
              "<li><a href='/log'>Log</a></li>\n"                     /* log menu button */
              // "<li><a href='/bootlog'>BootLog</a></li>\n"          /* boot log menu button */
-             "<li><a href='/live'>Live Image</a></li>\n"             /* live menu button */
+             "<li><a href='/live'>Capture Image</a></li>\n"             /* live menu button */
              "<li><a href='/images'>Stored Images</a></li>\n"        /* last menu button */
              "<li><a href='/imagedata'>Raw Data</a></li>\n"          /* raw data menu button */
              "<h1>" + red + stitle + endcolour + "</h1>\n"           /* display the project title in red */
@@ -122,7 +117,8 @@ String webfooter() {
                     " | Memory:" + String(ESP.getFreeHeap()) + 
                     " | Wifi: " + String(WiFi.RSSI()) + "dBm" 
                     " | " + NTPtext + 
-                    " | Spiffs:" + (SPIFFS.totalBytes() - SPIFFS.usedBytes()) +  
+                    " | Spiffs:" + String( (SPIFFS.totalBytes() - SPIFFS.usedBytes()) ) +  
+                    // " | MAC: " + String( WiFi.macAddress() )  + 
                 endcolour + "</small>\n" 
              "</div>\n" 
                
