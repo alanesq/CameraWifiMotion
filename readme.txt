@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 19Feb2020
+                        CameraWifiMotion - alanesq@disroot.org - 13Feb2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
@@ -72,11 +72,12 @@ It also has the following URLs you can use:
                                 /default - sets all settings back to defaults
                                 /live - capture and display a live image from the camera
                                 /images - display the 10 images stored in Spiffs (Image width in percent can be specified in URL with http://x.x.x.x/images?width=90)
-                                /img - just display a plain jpg of the latest captured image
                                 /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
                                 /imagedata - show raw block data
                                 /ota - update firmware (requires password entered first)
+                                /img - just display a plain jpg 
+                                       defaults to the live greyscale image or stored images selected with /img?pic=x
                                 
 
 
