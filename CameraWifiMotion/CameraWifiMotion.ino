@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "20Feb20";                     // version of this sketch
+  const String sversion = "21Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -752,6 +752,9 @@ void handleRoot() {
       message += "<BR>(" + String(mask_active * blocksPerMaskUnit) + " blocks)";
       message += "</div>\n";
 
+    // link to show live image in popup window
+      message += blue + "<a id='link' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + "\n";
+    
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
       message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
@@ -963,9 +966,9 @@ void handleImages(){
     }
     file.close();
 
-  // button to show small version of image 
-    message += "<BR><a target='new'  href='/img?pic=10" + String(ImageToShow) + "'>Display low resolution pre capture image</a>\n"; 
-    
+  // button to show small version of image in popup window
+    message += blue + "<BR><a id='link' target='popup' onclick=\"window.open('/img?pic=10" + String(ImageToShow) + "' ,'popup','width=320,height=250'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
+
   // insert image in to html 
     message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";   
 

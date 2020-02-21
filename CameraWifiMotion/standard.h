@@ -73,6 +73,7 @@ String webheader(String style = "") {
              "li {float: left;}\n"
              "li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}\n"
              "li a:hover { background-color: rgb(100, 0, 0);}\n" 
+             "#link:hover { background-color: rgb(100, 100, 0);}\b"
              + style + "\n"
            "</style>\n"
          "</head>\n"
