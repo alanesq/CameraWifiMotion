@@ -96,7 +96,7 @@
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
     bool block_active(uint16_t x,uint16_t y);
-    bool cameraImageSettings();
+    bool cameraImageSettings(framesize_t);
 
 
 // camera configuration settings
@@ -139,7 +139,7 @@ bool setupCameraHardware() {
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    cameraImageSettings();                        // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_MOTION);       // apply camera sensor settings
     
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
@@ -148,55 +148,47 @@ bool setupCameraHardware() {
 //   ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * apply camera image settings
+ * apply camera sensor/image settings
  */
 
-bool cameraImageSettings() { 
+bool cameraImageSettings(framesize_t fsize) { 
    
     sensor_t *sensor = esp_camera_sensor_get();  
 
     if (sensor == NULL) {
-      Serial.println("Problem with camera sensor settings");
+      Serial.println("Problem with applying camera sensor settings");
       return 0;
     } 
 
+    sensor->set_framesize(sensor,fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
     sensor->set_brightness(sensor, cameraImageBrightness); // (-2 to 2)
-    sensor->set_saturation(sensor, 0);                     // (-2 to 2)
+    sensor->set_exposure_ctrl(sensor,cameraImageExposure); // (-2 to 2)
     sensor->set_contrast(sensor, cameraImageContrast);     // (-2 to 2)
     sensor->set_vflip(sensor, cameraImageInvert);          // Invert image (0 or 1)
-    sensor->set_sharpness(sensor,0);                               // (-2 to 2)
-    
+//    sensor->set_saturation(sensor, 0);                     // (-2 to 2)
+//    sensor->set_sharpness(sensor,0);                       // (-2 to 2)    
+//    sensor->set_quality(sensor, 10);                       // (0 - 63)
+//    sensor->set_gainceiling(sensor, GAINCEILING_16X);      // x2 to ?
+//    sensor->set_colorbar(sensor, 0);                       // (0 or 1)?
+//    sensor->set_whitebal(sensor, 0);
+//    sensor->set_hmirror(sensor, 0);                        // (0 or 1) flip horizontally
+//    sensor->set_ae_level(sensor, 0);
+//    sensor->set_special_effect(sensor, 0);
+//    sensor->set_wb_mode(sensor, 2);
+//    sensor->set_awb_gain(sensor, 1);
+//    sensor->set_bpc(sensor, 1);
+//    sensor->set_wpc(sensor, 1);
+//    sensor->set_raw_gma(sensor, 1);
+//    sensor->set_lenc(sensor, 0);
+//    sensor->set_agc_gain(sensor, 1);
+//    sensor->set_aec_value(sensor, 600);
+//    sensor->set_gain_ctrl(sensor, 0);
+//    sensor->set_exposure_ctrl(sensor, 0);
+//    sensor->set_aec2(sensor, 1);
+//    sensor->set_dcw(sensor, 0);
+
     return 1;
 }
-
-    
-// possible settings:    
-//   sensor->set_framesize(sensor,<FRAMESIZE>);  // 0-10 
-//   sensor->set_quality(sensor,14);             // 0-63
-//   sensor->set_brightness(sensor,0);           // -2 - 2
-//   sensor->set_contrast(sensor,0);             // -2 - 2
-//   sensor->set_saturation(sensor,0);           // -2 - 2
-//   sensor->set_sharpness(sensor,0);            // -2 - 2
-//   sensor->set_denoise(sensor,1);
-//   sensor->set_special_effect(sensor,0);       // 0-6
-//   sensor->set_wb_mode(sensor,0);              // 0-4
-//   sensor->set_whitebal(sensor,1);
-//   sensor->set_awb_gain(sensor,1);
-//   sensor->set_exposure_ctrl(sensor,1);
-//   sensor->set_aec2(sensor,1);
-//   sensor->set_ae_level(sensor,1);             // -2 - 2
-//   sensor->set_aec_value(sensor,600);          // 0 - 1200
-//   sensor->set_gain_ctrl(sensor,1);
-//   sensor->set_agc_gain(sensor,15);            // 0 - 30
-//   sensor->set_gainceiling(sensor,GAINCEILING_16X);   // 0 -6
-//   sensor->set_bpc(sensor,1);
-//   sensor->set_wpc(sensor,1);
-//   sensor->set_raw_gma(sensor,0);
-//   sensor->set_lenc(sensor,1);
-//   sensor->set_hmirror(sensor,0);
-//   sensor->set_vflip(sensor,0);
-//   sensor->set_dcw(sensor,0);
-//   sensor->set_colorbar(sensor,0);             // 0 or 1 ?
 
 
 //   ---------------------------------------------------------------------------------------------------------------------

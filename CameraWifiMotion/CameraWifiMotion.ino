@@ -7,7 +7,7 @@
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
  *             
- *             Note: The flash can not be used if using an SD Card as they both use pin 4
+ *             Note: The flash can not be controlled if using an SD Card as they both use pin 4
  *             
  *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             
@@ -59,9 +59,10 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-  int cameraImageBrightness = 2;                         // brightness setting on camera (in the range -2 to 2)
-  bool cameraImageInvert = 0;                            // flip image vertically (i.e. upside down)
-  int cameraImageContrast = 0;                           // contrast setting on camera (in the range -2 to 2)
+  int cameraImageBrightness = 2;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  int cameraImageExposure = 2;                           // range -2 to 2 for 
+  int cameraImageContrast = 0;  
+  bool cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
   
   
 // ---------------------------------------------------------------
@@ -604,6 +605,17 @@ void handleRoot() {
         }
       }
       
+//    // if bright was adjusted - brightness slider (cameraImageBrightness)
+//      if (server.hasArg("bright")) {
+//        String Tvalue = server.arg("bright");   // read value
+//        int val = Tvalue.toInt();
+//        if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
+//          log_system_message("Brightness changed to " + Tvalue ); 
+//          cameraImageBrightness = val;
+//          SaveSettingsSpiffs();     // save settings in Spiffs
+//        }
+//      }
+      
     // if nimagetl was entered - min-image_threshold
       if (server.hasArg("nimagetl")) {
         String Tvalue = server.arg("nimagetl");   // read value
@@ -753,7 +765,10 @@ void handleRoot() {
       message += "</div>\n";
 
     // link to show live image in popup window
-      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + "\n";
+      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
+    
+//    // brightness adjustment slider
+//      message += ", Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
     
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
@@ -1341,13 +1356,13 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
       // failed so try again
         delay(50);
         ok = esp_camera_init(&config);
-        if (ok == ESP_OK) Serial.println("Camera restarted");
+        if (ok == ESP_OK) Serial.println("Camera mode switched - 2nd attempt");
         else Serial.println("Camera failed to restart");
     }
 
-    cameraImageSettings();        // apply camera image settings
+    cameraImageSettings(fsize);     // apply camera sensor settings
     
-    TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
+    TRIGGERtimer = millis();        // reset last image captured timer (to prevent instant trigger)
 }
 
 
@@ -1427,7 +1442,7 @@ void MotionDetected(uint16_t changes) {
 
 
 // ----------------------------------------------------------------
-//           Save greyscale frame as jpg in spiffs
+//           Save greyscale frame as jpg in spiffs/sd card
 // ----------------------------------------------------------------
 // filesName = name of jpg to save as in spiffs
 
@@ -1447,18 +1462,28 @@ void saveGreyscaleFrame(String filesName) {
         return;
     }
   
+  String IFileName = "/" + filesName +".jpg";            // file names to store image
+
   // save image to spiffs
-    String IFileName = "/" + filesName +".jpg";            // file names to store in Spiffs
     SPIFFS.remove(IFileName);                              // delete old image file if it exists
     File file = SPIFFS.open(IFileName, FILE_WRITE);
-    if (!file) {
-      Serial.println("Failed to create spiffs file");
-      return;
-    }
-    else {
-      if (!file.write(_jpg_buf, _jpg_buf_len)) log_system_message("Error: writing grey image to Spiffs");
-    }
+    if (!file) Serial.println("Error: creating spiffs file (grey)");
+    else if (!file.write(_jpg_buf, _jpg_buf_len)) log_system_message("Error: writing image to Spiffs (grey)");
     file.close();
+
+  // save image to sd card
+    if (SD_Present) {
+      fs::FS &fs = SD_MMC; 
+      file = fs.open(IFileName, FILE_WRITE);
+      if (!file) log_system_message("Error: writing image to sd-card (grey)");
+      else {
+          file.write(fb->buf, fb->len);  
+          file.close();
+      }
+    }    
+
+  esp_camera_fb_return(fb);    // return frame so memory can be released
+
 }
 
 
