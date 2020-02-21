@@ -9,7 +9,7 @@
  *             
  *             Note: The flash can not be used if using an SD Card as they both use pin 4
  *             
- *             GPIO16 is used as an input pin for external sensors etc. (just reports status change in log at the moment)
+ *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED), chances are there is a problem with the 
@@ -61,7 +61,7 @@
 
   int cameraImageBrightness = 2;                         // brightness setting on camera (in the range -2 to 2)
   bool cameraImageInvert = 0;                            // flip image vertically (i.e. upside down)
-  bool cameraImageContrast = 0;                          // contrast setting on camera (in the range -2 to 2)
+  int cameraImageContrast = 0;                           // contrast setting on camera (in the range -2 to 2)
   
   
 // ---------------------------------------------------------------
@@ -723,7 +723,7 @@ void handleRoot() {
 
   // build the HTML code 
   
-    String message = webheader();                                   // add the standard html header
+    String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");                                   // add the standard html header
     message += "<FORM action='/' method='post'>\n";                 // used by the buttons (action = the page send it to)
     message += "<P>";                                               // start of section
 
@@ -753,7 +753,7 @@ void handleRoot() {
       message += "</div>\n";
 
     // link to show live image in popup window
-      message += blue + "<a id='link' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + "\n";
+      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + "\n";
     
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
@@ -944,7 +944,7 @@ void handleImages(){
         else log_system_message("Error: Invalid image width specified in URL: " + Bvalue);
       }
       
-  String message = webheader();                                      // add the standard html header
+  String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");                                      // add the standard html header
   message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page send it to)
 
   message += "<H1>Stored Images</H1>\n";
@@ -967,7 +967,7 @@ void handleImages(){
     file.close();
 
   // button to show small version of image in popup window
-    message += blue + "<BR><a id='link' target='popup' onclick=\"window.open('/img?pic=10" + String(ImageToShow) + "' ,'popup','width=320,height=250'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
+    message += blue + "<BR><a id='stdLink' target='popup' onclick=\"window.open('/img?pic=10" + String(ImageToShow) + "' ,'popup','width=320,height=250'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
 
   // insert image in to html 
     message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";   
