@@ -9,7 +9,8 @@ NOTE: I have recently re-written the wifi.h to use the more recent libraries, sp
 so if you have used an older version of this sketch you may need to update the libraries you have installed.
 
 The sketch can use OTA (Over the air updates) this can be enabled/disabled in the main settings of the sketch.
-If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled.
+If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled, 
+if you do not do this it will just get to a few percent upload and stop.
 In an attempt to give some form of security I have set up the sketch so that when OTA is enabled you can not access it
 until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".
 You can check it has worked by looking in the log and once this has been done you can then access "http://<ip address of esp>/ota". 
