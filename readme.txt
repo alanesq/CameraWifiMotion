@@ -1,5 +1,5 @@
-                        CameraWifiMotion - alanesq@disroot.org - 13Feb2020
-                        ==================================================
+                        CameraWifiMotion - alanesq@disroot.org - 22 Feb 2020
+                        ====================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
 The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
@@ -16,7 +16,7 @@ You can check it has worked by looking in the log and once this has been done yo
 You can change this password in the main settings (OTAPassword).
 
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
-people are finding this project of interest/use etc.
+people are finding this project of interest/use etc. it being my first one ;-)
 
                    -------------------------------------------------------------------------------------
 
@@ -77,7 +77,8 @@ It also has the following URLs you can use:
                                 /imagedata - show raw block data
                                 /ota - update firmware (requires password entered first)
                                 /img - just display a plain jpg 
-                                       defaults to the live greyscale image or stored images selected with /img?pic=x
+                                       defaults to the live greyscale image 
+                                       you can select stored images with /img?pic=x   where x is in the range 1 to 10 (add 100 to x to display the greyscale images)
                                 
 
 
@@ -110,7 +111,8 @@ Using the flash can often trigger such problems if there is any problem with the
 
 The camera on these modules is not very good in dark conditions but I have found that if you take the lens of the camera 
 (I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
-and the chip) and this improves it a good deal.  This will make some colours display wrong.
+and the chip) and this improves it a bit but this will make it look odd in normal conditions.
+I tried fitting a larger lens to the camera but this surprisingly did not seem to help.   picture: http://www.alanesq.eu5.net/extlinkins/esp32-big-lens.htm
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
