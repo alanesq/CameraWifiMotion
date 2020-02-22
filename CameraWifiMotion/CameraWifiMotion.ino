@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "21Feb20";                     // version of this sketch
+  const String sversion = "22Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -59,10 +59,11 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-  int8_t cameraImageBrightness = 2;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
-  int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
-  int8_t cameraImageContrast = 0;  
-  uint8_t cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
+  int8_t cameraImageBrightness = 2;                      // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down) 1 or 0  
+  // int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
+  // int8_t cameraImageContrast = 0;  
+  
   
   
 // ---------------------------------------------------------------
