@@ -59,10 +59,10 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-  int cameraImageBrightness = 2;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
-  int cameraImageExposure = 2;                           // range -2 to 2 for 
-  int cameraImageContrast = 0;  
-  bool cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
+  int8_t cameraImageBrightness = 2;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
+  int8_t cameraImageContrast = 0;  
+  uint8_t cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
   
   
 // ---------------------------------------------------------------
@@ -605,16 +605,16 @@ void handleRoot() {
         }
       }
       
-//    // if bright was adjusted - brightness slider (cameraImageBrightness)
-//      if (server.hasArg("bright")) {
-//        String Tvalue = server.arg("bright");   // read value
-//        int val = Tvalue.toInt();
-//        if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
-//          log_system_message("Brightness changed to " + Tvalue ); 
-//          cameraImageBrightness = val;
-//          SaveSettingsSpiffs();     // save settings in Spiffs
-//        }
-//      }
+    // if bright was adjusted - brightness slider (cameraImageBrightness)
+      if (server.hasArg("bright")) {
+        String Tvalue = server.arg("bright");   // read value
+        int val = Tvalue.toInt();
+        if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
+          log_system_message("Brightness changed to " + Tvalue ); 
+          cameraImageBrightness = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
       
     // if nimagetl was entered - min-image_threshold
       if (server.hasArg("nimagetl")) {
@@ -767,8 +767,8 @@ void handleRoot() {
     // link to show live image in popup window
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
     
-//    // brightness adjustment slider
-//      message += ", Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
+    // brightness adjustment slider
+      message += ", Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
     
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
@@ -1233,11 +1233,13 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
    
     Serial.println("Taking a photo... attempt #" + String(TryCount));
+    cameraImageSettings();                            // apply camera sensor settings
     camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
     if (!fb) {
       Serial.println("Camera capture failed - rebooting camera");
       RebootCamera(PIXFORMAT_JPEG);
-      fb = esp_camera_fb_get();       // try again to capture frame
+      cameraImageSettings();                          // apply camera sensor settings
+      fb = esp_camera_fb_get();                       // try again to capture frame
       if (!fb) {
         Serial.println("Capture image failed");
         return;
@@ -1360,7 +1362,7 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
         else Serial.println("Camera failed to restart");
     }
 
-    cameraImageSettings(fsize);     // apply camera sensor settings
+    // cameraImageSettings();     // apply camera sensor settings
     
     TRIGGERtimer = millis();        // reset last image captured timer (to prevent instant trigger)
 }
@@ -1451,7 +1453,8 @@ void saveGreyscaleFrame(String filesName) {
   // grab greyscale frame
     uint8_t * _jpg_buf;
     size_t _jpg_buf_len;
-    camera_fb_t * fb = NULL; // pointer
+    camera_fb_t * fb = NULL;    // pointer
+    cameraImageSettings();      // apply camera sensor settings
     fb = esp_camera_fb_get();
 
   // convert greyscale to jpg  

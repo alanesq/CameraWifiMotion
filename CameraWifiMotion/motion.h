@@ -96,7 +96,7 @@
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
     bool block_active(uint16_t x,uint16_t y);
-    bool cameraImageSettings(framesize_t);
+    bool cameraImageSettings();
 
 
 // camera configuration settings
@@ -139,7 +139,7 @@ bool setupCameraHardware() {
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    cameraImageSettings(FRAME_SIZE_MOTION);       // apply camera sensor settings
+    cameraImageSettings();       // apply camera sensor settings
     
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
@@ -151,42 +151,69 @@ bool setupCameraHardware() {
  * apply camera sensor/image settings
  */
 
-bool cameraImageSettings(framesize_t fsize) { 
+bool cameraImageSettings() { 
    
-    sensor_t *sensor = esp_camera_sensor_get();  
+    sensor_t *s = esp_camera_sensor_get();  
 
-    if (sensor == NULL) {
-      Serial.println("Problem with applying camera sensor settings");
+    if (s == NULL) {
+      Serial.println("Error: problem applying camera sensor settings");
       return 0;
     } 
 
-    sensor->set_framesize(sensor,fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
-    sensor->set_brightness(sensor, cameraImageBrightness); // (-2 to 2)
-    sensor->set_exposure_ctrl(sensor,cameraImageExposure); // (-2 to 2)
-    sensor->set_contrast(sensor, cameraImageContrast);     // (-2 to 2)
-    sensor->set_vflip(sensor, cameraImageInvert);          // Invert image (0 or 1)
-//    sensor->set_saturation(sensor, 0);                     // (-2 to 2)
-//    sensor->set_sharpness(sensor,0);                       // (-2 to 2)    
-//    sensor->set_quality(sensor, 10);                       // (0 - 63)
-//    sensor->set_gainceiling(sensor, GAINCEILING_16X);      // x2 to ?
-//    sensor->set_colorbar(sensor, 0);                       // (0 or 1)?
-//    sensor->set_whitebal(sensor, 0);
-//    sensor->set_hmirror(sensor, 0);                        // (0 or 1) flip horizontally
-//    sensor->set_ae_level(sensor, 0);
-//    sensor->set_special_effect(sensor, 0);
-//    sensor->set_wb_mode(sensor, 2);
-//    sensor->set_awb_gain(sensor, 1);
-//    sensor->set_bpc(sensor, 1);
-//    sensor->set_wpc(sensor, 1);
-//    sensor->set_raw_gma(sensor, 1);
-//    sensor->set_lenc(sensor, 0);
-//    sensor->set_agc_gain(sensor, 1);
-//    sensor->set_aec_value(sensor, 600);
-//    sensor->set_gain_ctrl(sensor, 0);
-//    sensor->set_exposure_ctrl(sensor, 0);
-//    sensor->set_aec2(sensor, 1);
-//    sensor->set_dcw(sensor, 0);
+//    s->set_framesize(s, FRAME_SIZE_PHOTO);         // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
+    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
+//    s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
+//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
+//    s->set_saturation(s, 0);                      // (-2 to 2)
+//    s->set_sharpness(s, 0);                       // (-2 to 2)    
+//    s->set_quality(s, 10);                        // (0 - 63)
+//    s->set_gainceiling(s, GAINCEILING_64X);       // x2 to ?
+//    s->set_colorbar(s, 0);                        // (0 or 1)?
+//    s->set_whitebal(s, 0);
+//    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+//    s->set_ae_level(s, 0);
+//    s->set_special_effect(s, 0);
+//    s->set_wb_mode(s, 2);
+//    s->set_awb_gain(s, 1);
+//    s->set_bpc(s, 1);
+//    s->set_wpc(s, 1);
+//    s->set_raw_gma(s, 1);
+//    s->set_lenc(s, 0);
+//    s->set_agc_gain(s, 1);
+//    s->set_aec_value(s, 600);
+//    s->set_gain_ctrl(s, 0);
+//    s->set_exposure_ctrl(s, 0);
+//    s->set_aec2(s, 1);
+//    s->set_dcw(s, 0);
 
+//    framesize_t framesize;//0 - 10
+//    uint8_t quality;//0 - 63
+//    int8_t brightness;//-2 - 2
+//    int8_t contrast;//-2 - 2
+//    int8_t saturation;//-2 - 2
+//    int8_t sharpness;//-2 - 2
+//    uint8_t denoise;
+//    uint8_t special_effect;//0 - 6
+//    uint8_t wb_mode;//0 - 4
+//    uint8_t awb;
+//    uint8_t awb_gain;
+//    uint8_t aec;
+//    uint8_t aec2;
+//    int8_t ae_level;//-2 - 2
+//    uint16_t aec_value;//0 - 1200
+//    uint8_t agc;
+//    uint8_t agc_gain;//0 - 30
+//    uint8_t gainceiling;//0 - 6
+//    uint8_t bpc;
+//    uint8_t wpc;
+//    uint8_t raw_gma;
+//    uint8_t lenc;
+//    uint8_t hmirror;
+//    uint8_t vflip;
+//    uint8_t dcw;
+//    uint8_t colorbar;
+    
     return 1;
 }
 
@@ -206,7 +233,8 @@ bool capture_still() {
 
     uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
     uint16_t temp_frame[H][W] = { 0 }; 
-    
+
+    cameraImageSettings();                                    // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
     if (!frame_buffer) return false;
