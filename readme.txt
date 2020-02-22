@@ -114,6 +114,9 @@ The camera on these modules is not very good in dark conditions but I have found
 (I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
 and the chip) and this improves it a bit but this will make it look odd in normal conditions.
 I tried fitting a larger lens to the camera but this surprisingly did not seem to help.   picture: http://www.alanesq.eu5.net/extlinkins/esp32-big-lens.htm
+I think the camera can work a bit better in the dark than it does but I am having trouble setting the parameters,
+I am looking in to this.  I have managed to add brightness adjustment now but if I try to add more options it seems
+to stop working - see https://esp32.com/viewtopic.php?f=19&t=14376
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
