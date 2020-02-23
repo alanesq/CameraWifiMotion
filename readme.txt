@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 22 Feb 2020
+                        CameraWifiMotion - alanesq@disroot.org - 23 Feb 2020
                         ====================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
@@ -27,9 +27,7 @@ There is a zip file containing the libraries used.  The main ones you will need 
 
 
 The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
-generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
-the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
-if you set the highest (although I think the device struggles with the higher resolution images?).
+generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 10 images and I think it can struggle with the amount of data.
 
 It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -120,7 +118,4 @@ to stop working - see https://esp32.com/viewtopic.php?f=19&t=14376
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
-The SD Card uses the same i/o pin as the LED so if you use an sd card the LED can not be controlled but it will still
-flash when the sd card is accessed.  I don't know why they did this?
-The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
-to the LED.
+The SD card now works with the flash as I am using "1 wire" to communicate with it, this is slower but does not require to use the pin the LED uses.
