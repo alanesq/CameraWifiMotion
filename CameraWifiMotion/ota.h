@@ -38,7 +38,7 @@ void otaSetup() {
    
     server.on("/update", HTTP_POST, []() {
       server.sendHeader("Connection", "close");
-      server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+      server.send(200, "text/plain", (Update.hasError()) ? "Update Failed!" : "Update complete, device is rebooting...");
       ESP.restart();
     }, []() {
       HTTPUpload& upload = server.upload();

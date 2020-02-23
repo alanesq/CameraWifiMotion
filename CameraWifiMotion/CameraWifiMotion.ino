@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "22Feb20";                     // version of this sketch
+  const String sversion = "23Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -59,11 +59,11 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-  int8_t cameraImageBrightness = 2;                      // Camera sensor settings (see cameraImageSettings in motion.h for more)
-  uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down) 1 or 0  
-  // int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
-  // int8_t cameraImageContrast = 0;  
-  
+  int8_t cameraImageBrightness = 0;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  uint8_t cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
+//  int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
+//  int8_t cameraImageContrast = 0;  
+
   
   
 // ---------------------------------------------------------------
@@ -144,7 +144,9 @@ void setup(void) {
 
   // start sd card
       SD_Present = 0;
-      if (!SD_MMC.begin()) {                        // if loading sd card fails     ("/sdcard", true = 1 wire?)
+      if (!SD_MMC.begin("/sdcard", true)) {                        // if loading sd card fails     
+        //  ("/sdcard", true) = 1 wire - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
+      pinMode(2, INPUT_PULLUP);
           log_system_message("SD Card not found");   
       } else {
         uint8_t cardType = SD_MMC.cardType();
@@ -156,12 +158,15 @@ void setup(void) {
           SD_Present = 1;                           // flag working sd card found
         }
       }
+     
+//fs::FS &fs = SD_MMC; 
+//File file = fs.open("/test.txt", FILE_WRITE);
+//file.println("hi");
+//file.close();
     
   // configure the LED
-    if (!SD_Present) {
       pinMode(Illumination_led, OUTPUT); 
       digitalWrite(Illumination_led, ledOFF); 
-    }
     
   BlinkLed(1);           // flash the led once
 
@@ -218,14 +223,12 @@ void setup(void) {
 
 // blink the led 
 void BlinkLed(byte Bcount) {
-  if (!SD_Present) {
     for (int i = 0; i < Bcount; i++) { 
       digitalWrite(Illumination_led, ledON);
       delay(50);
       digitalWrite(Illumination_led, ledOFF);
       delay(300);
     }
-  }
 }
 
 
@@ -279,8 +282,8 @@ void loop(void){
       MaintTiming = millis();                      // reset timer
       time_t t=now();                              // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
       // check status of illumination led
-        if (ReqLEDStatus && !SD_Present) digitalWrite(Illumination_led, ledON); 
-        else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
+        if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
+        else digitalWrite(Illumination_led, ledOFF);
     }
     
   delay(50);
@@ -380,6 +383,11 @@ void LoadSettingsSpiffs() {
       if (tnum > MaxSpiffsImages) log_system_message("invalid SpiffsFileCounter in settings");
       else SpiffsFileCounter = tnum;
 
+    // line 14 - cameraImageBrightness
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < -2 || tnum > 2) log_system_message("invalid brightness in settings");
+      else cameraImageBrightness = tnum;
+      
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -438,6 +446,7 @@ void SaveSettingsSpiffs() {
         file.println(String(EmailLimitTime));
         file.println(String(UseFlash));
         file.println(String(SpiffsFileCounter));
+        file.println(String(cameraImageBrightness));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -487,6 +496,7 @@ void handleDefault() {
       EmailLimitTime = 600;
       DetectionEnabled = 1;
       UseFlash = 0;
+      cameraImageBrightness = 0;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++) 
@@ -769,7 +779,7 @@ void handleRoot() {
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
     
     // brightness adjustment slider
-      message += ", Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
+      message += "<BR>Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
     
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
@@ -805,10 +815,10 @@ void handleRoot() {
       message += "<BR><BR><input type='submit' name='submit'><BR><BR>\n";
 
     // Toggle illuminator LED button
-      if (!SD_Present) message += "<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n";
+      message += "<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n";
 
     // Toggle 'use flash' button
-      if (!SD_Present) message += "<input style='height: 30px;' name='flash' title='Toggle use of flash when capturing image On/Off' value='Flash' type='submit'> \n";
+      message += "<input style='height: 30px;' name='flash' title='Toggle use of flash when capturing image On/Off' value='Flash' type='submit'> \n";
 
     // Toggle motion detection
       message += "<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n";
@@ -820,7 +830,7 @@ void handleRoot() {
       message += "<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n";
     
 //    // Clear images on SD Card
-//      if (SD_Present) message += "<input style='height: 30px;' name='wipeSD' value='Wipe SDCard' title='Delete all images on SD Card' type='submit'> \n";
+//      message += "<input style='height: 30px;' name='wipeSD' value='Wipe SDCard' title='Delete all images on SD Card' type='submit'> \n";
 
     message += "</span></P>\n";    // end of section    
     message += webfooter();        // add the standard footer
@@ -870,19 +880,17 @@ void handleData(){
     message += "<BR>Illumination LED is ";    
     if (digitalRead(Illumination_led) == ledON) message += red + "On" + endcolour;
     else message += "Off";
-    if (!SD_Present) {    // if no sd card in use show status of use flash 
-      message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
-    }
+    message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
 
   // show current time
     message += "<BR>Time: " + currentTime() + "\n";      // show current time
 
   // show if a sd card is present
-    if (SD_Present) {
-        uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
-        message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB (no flash control)";
-    }
-
+  if (SD_Present) {
+    uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
+    message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
+  }
+  
   // OTA enabled status
     if (OTAEnabled) message += red + "<BR>OTA UPDATES ENABLED!" + endcolour;
 
@@ -1215,7 +1223,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
     SaveSettingsSpiffs();     // save settings in Spiffs
     
-  // first quickly grab a small jpg image and save to spiffs 
+  // first quickly grab a small jpg image and save to spiffs / sdcard
     saveGreyscaleFrame(String(SpiffsFileCounter) + "s");
     
 
@@ -1231,7 +1239,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     TryCount ++;
       
     // use flash if required
-      if (!SD_Present && UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
+      if (UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
    
     Serial.println("Taking a photo... attempt #" + String(TryCount));
     cameraImageSettings();                            // apply camera sensor settings
@@ -1248,8 +1256,8 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     }
 
     // restore flash status after using it as a flash
-      if (ReqLEDStatus && !SD_Present) digitalWrite(Illumination_led, ledON);   
-      else if (!SD_Present) digitalWrite(Illumination_led, ledOFF);
+      if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
+      else digitalWrite(Illumination_led, ledOFF);
        
 
     // ------------------- save image to Spiffs -------------------
@@ -1260,10 +1268,7 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
 
     SPIFFS.remove(IFileName);                          // delete old image file if it exists
     File file = SPIFFS.open(IFileName, FILE_WRITE);
-    if (!file) {
-      Serial.println("Failed to open file in writing mode");
-      return;
-    }
+    if (!file) log_system_message("Failed to create file in Spiffs");
     else {
       if (file.write(fb->buf, fb->len)) {              // payload (image), payload length
         Serial.print("The picture has been saved in ");
@@ -1276,7 +1281,6 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
         WipeSpiffs();     // format spiffs 
         file = SPIFFS.open(IFileName, FILE_WRITE);
         if (!file.write(fb->buf, fb->len)) log_system_message("Error: Still unable to write image to Spiffs");
-        return;
       }
     }
     file.close();
@@ -1284,13 +1288,9 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     // save text file to spiffs with time info. 
       SPIFFS.remove(TFileName);   // delete old file with same name if present
       file = SPIFFS.open(TFileName, "w");
-      if (!file) {
-        log_system_message("Error: Failed to create date file in spiffs");
-        return;
-      }
+      if (!file) log_system_message("Error: Failed to create date file in spiffs");
       else file.println(currentTime());
       file.close();
-
 
     // ------------------- save image to SD Card -------------------
     
@@ -1304,7 +1304,8 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
         file = fs.open(SDfilename, FILE_WRITE);
         if (!file) log_system_message("Error: Failed to create file on sd-card: " + SDfilename);
         else {
-            file.write(fb->buf, fb->len);  
+            if (file.write(fb->buf, fb->len)) Serial.println("Saved image to sd card");
+            else log_system_message("Error: failed to save image to sd card");
             file.close();
         }
     }    
@@ -1471,17 +1472,21 @@ void saveGreyscaleFrame(String filesName) {
   // save image to spiffs
     SPIFFS.remove(IFileName);                              // delete old image file if it exists
     File file = SPIFFS.open(IFileName, FILE_WRITE);
-    if (!file) Serial.println("Error: creating spiffs file (grey)");
-    else if (!file.write(_jpg_buf, _jpg_buf_len)) log_system_message("Error: writing image to Spiffs (grey)");
+    if (!file) log_system_message("Error: creating grey file on Spiffs");
+    else {
+      if (!file.write(_jpg_buf, _jpg_buf_len)) log_system_message("Error: writing grey image to Spiffs");
+    }
     file.close();
 
   // save image to sd card
     if (SD_Present) {
       fs::FS &fs = SD_MMC; 
+      IFileName = "/" + currentTime() + "-S.jpg";     // file name on sd card
       file = fs.open(IFileName, FILE_WRITE);
-      if (!file) log_system_message("Error: writing image to sd-card (grey)");
+      if (!file) log_system_message("Error: creating grey image on sd-card");
       else {
-          file.write(fb->buf, fb->len);  
+          if (file.write(_jpg_buf, _jpg_buf_len)) Serial.println("Saved grey image to sd card");
+          else log_system_message("Error: writing grey image to sd card"); 
           file.close();
       }
     }    

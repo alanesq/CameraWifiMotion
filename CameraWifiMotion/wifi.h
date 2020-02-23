@@ -203,7 +203,7 @@ String currentTime(){
    ttime += formatDateNumber(year(t));
    ttime += "_";
    ttime += formatDateNumber(hour(t));
-   ttime += ":";
+   ttime += "-";
    ttime += formatDateNumber(minute(t));
    ttime += "-";
    ttime += DoW[weekday(t)-1];

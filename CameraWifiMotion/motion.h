@@ -162,11 +162,11 @@ bool cameraImageSettings() {
 
     s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
     s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-  
+
 // Problem here!    If any more settings are enabled here it stops most/all of them working - I don't know why.
 //                  see: https://esp32.com/viewtopic.php?f=19&t=14376
-//                  for dark conditions the brightness should ideally be 2, contrast -2 and set_gainceiling adjusted.  
-  
+//                  for dark conditions the brightness should ideally be 2, contrast -2 and set_gainceiling adjusted.
+    
 //    s->set_framesize(s, FRAME_SIZE_PHOTO);         // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
 //    s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
 //    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
