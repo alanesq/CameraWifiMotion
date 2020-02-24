@@ -96,7 +96,7 @@
     void update_frame();
     void print_frame(uint16_t frame[H][W]);
     bool block_active(uint16_t x,uint16_t y);
-    bool cameraImageSettings();
+    bool cameraImageSettings(framesize_t);
 
 
 // camera configuration settings
@@ -139,7 +139,7 @@ bool setupCameraHardware() {
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
 
-    cameraImageSettings();       // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_MOTION);       // apply camera sensor settings
     
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
@@ -151,7 +151,7 @@ bool setupCameraHardware() {
  * apply camera sensor/image settings
  */
 
-bool cameraImageSettings() { 
+bool cameraImageSettings(framesize_t fsize) { 
    
     sensor_t *s = esp_camera_sensor_get();  
 
@@ -160,39 +160,39 @@ bool cameraImageSettings() {
       return 0;
     } 
 
+    // Image resolution / type  (may not be required?)
+      s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
+      if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+      if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
+    
     s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
     s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-
-// Problem here!    If any more settings are enabled here it stops most/all of them working - I don't know why.
-//                  see: https://esp32.com/viewtopic.php?f=19&t=14376
-//                  for dark conditions the brightness should ideally be 2, contrast -2 and set_gainceiling adjusted.
-    
-//    s->set_framesize(s, FRAME_SIZE_PHOTO);         // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
+//    s->set_gainceiling(s, GAINCEILING_128X);        // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
 //    s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
 //    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
 //    s->set_saturation(s, 0);                      // (-2 to 2)
 //    s->set_sharpness(s, 0);                       // (-2 to 2)    
 //    s->set_quality(s, 10);                        // (0 - 63)
-//    s->set_gainceiling(s, GAINCEILING_64X);       // x2 to ?
-//    s->set_colorbar(s, 0);                        // (0 or 1)?
+//    s->set_colorbar(s, 0);                        // (0 or 1) - testcard
 //    s->set_whitebal(s, 0);
 //    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
 //    s->set_ae_level(s, 0);
-//    s->set_special_effect(s, 0);
+////    s->set_special_effect(s, 0);
 //    s->set_wb_mode(s, 2);
 //    s->set_awb_gain(s, 1);
 //    s->set_bpc(s, 1);
 //    s->set_wpc(s, 1);
 //    s->set_raw_gma(s, 1);
-//    s->set_lenc(s, 0);
+////    s->set_lenc(s, 0);
 //    s->set_agc_gain(s, 1);
 //    s->set_aec_value(s, 600);
-//    s->set_gain_ctrl(s, 0);
-//    s->set_exposure_ctrl(s, 0);
+////    s->set_gain_ctrl(s, 0);
+////    s->set_exposure_ctrl(s, 0);
 //    s->set_aec2(s, 1);
-//    s->set_dcw(s, 0);
+////    s->set_dcw(s, 0);
 
-//    framesize_t framesize;//0 - 10
+// Variable types
+//    framesize_t framesize;
 //    uint8_t quality;//0 - 63
 //    int8_t brightness;//-2 - 2
 //    int8_t contrast;//-2 - 2
@@ -239,7 +239,7 @@ bool capture_still() {
     uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
     uint16_t temp_frame[H][W] = { 0 }; 
 
-    cameraImageSettings();                                    // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_MOTION);                                    // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
     if (!frame_buffer) return false;

@@ -36,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "23Feb20";                     // version of this sketch
+  const String sversion = "24Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -59,11 +59,10 @@
   
   const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
 
-  int8_t cameraImageBrightness = 0;                         // Camera sensor settings (see cameraImageSettings in motion.h for more)
-  uint8_t cameraImageInvert = 0;                            // flip image vertically (i.e. upside down) 1 or 0
-//  int8_t cameraImageExposure = 2;                           // range -2 to 2 for 
-//  int8_t cameraImageContrast = 0;  
-
+  int8_t cameraImageBrightness = 0;                      // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down) 1 or 0
+//  int8_t cameraImageExposure = 0;                        // range -2 to 2 
+//  int8_t cameraImageContrast = 0;                        // range -2 to 2 
   
   
 // ---------------------------------------------------------------
@@ -385,8 +384,8 @@ void LoadSettingsSpiffs() {
 
     // line 14 - cameraImageBrightness
       ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum < -2 || tnum > 2) log_system_message("invalid brightness in settings");
-      else cameraImageBrightness = tnum;
+      if (tnum > 4) log_system_message("invalid brightness in settings");
+      else cameraImageBrightness = tnum - 2;
       
     // Detection mask grid
       bool gerr = 0;
@@ -446,7 +445,7 @@ void SaveSettingsSpiffs() {
         file.println(String(EmailLimitTime));
         file.println(String(UseFlash));
         file.println(String(SpiffsFileCounter));
-        file.println(String(cameraImageBrightness));
+        file.println(String(cameraImageBrightness + 2));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -910,32 +909,18 @@ void handleData(){
 // ----------------------------------------------------------------
 //           -Display live image     i.e. http://x.x.x.x/live
 // ----------------------------------------------------------------
+// captures an image and redirects to image view page
 
 void handleLive(){
 
   log_system_message("Live image requested");      
 
+  capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
-  String message = webheader();                                      // add the standard html header
+  handleImages();
 
-  message += "<BR><H1>Live Image - " + currentTime() +"</H1><BR>\n";
-
-  capturePhotoSaveSpiffs(UseFlash);     // capture an image from camera
-
-  // insert image in to html
-    message += "<img  id='img' alt='Camera Image' src='/img?pic=0' onerror='QpageRefresh();' width='90%'>\n";       // content is set in javascript
-
-  // javascript to refresh the image after short delay if it fails to load (bug fix as it often rejects the first request)
-    message +=  "<script type='text/javascript'>\n"
-                "  function QpageRefresh() {\n"
-                "    setTimeout(function(){ document.getElementById('img').src='/img?pic=0'; }, " + JavaRefreshTime + ");\n"
-                "  }\n"
-                "</script>\n";
-    
-  message += webfooter();                                             // add the standard footer
-  
-  server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear string  
+//  server.sendHeader("/images", "/",true);    //Redirect to image viewing page 
+//  server.send(302, "text/plane","");
 }
 
 
@@ -1191,7 +1176,7 @@ void handleImg(){
         TFileName = "/" + String(ImageToShow) + "s.jpg";
     }
       
-    if (ImageToShow == (MaxSpiffsImages + 1)) {           // live greyscale image requested
+    if (ImageToShow == (MaxSpiffsImages + 1)) {           // live greyscale image requested ("grey");                         // capture live greyscale image
       saveGreyscaleFrame("grey");                         // capture live greyscale image
       TFileName = "/grey.jpg";
     } else log_system_message("display stored image requested: " + String(ImageToShow));
@@ -1242,12 +1227,12 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
       if (UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
    
     Serial.println("Taking a photo... attempt #" + String(TryCount));
-    cameraImageSettings();                            // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_PHOTO);                            // apply camera sensor settings
     camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
     if (!fb) {
       Serial.println("Camera capture failed - rebooting camera");
       RebootCamera(PIXFORMAT_JPEG);
-      cameraImageSettings();                          // apply camera sensor settings
+      cameraImageSettings(FRAME_SIZE_PHOTO);                          // apply camera sensor settings
       fb = esp_camera_fb_get();                       // try again to capture frame
       if (!fb) {
         Serial.println("Capture image failed");
@@ -1348,7 +1333,6 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 
 void RestartCamera(framesize_t fsize, pixformat_t format) {
     bool ok;
-
     esp_camera_deinit();
       config.frame_size = fsize;
       config.pixel_format = format;
@@ -1363,9 +1347,6 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
         if (ok == ESP_OK) Serial.println("Camera mode switched - 2nd attempt");
         else Serial.println("Camera failed to restart");
     }
-
-    // cameraImageSettings();     // apply camera sensor settings
-    
     TRIGGERtimer = millis();        // reset last image captured timer (to prevent instant trigger)
 }
 
@@ -1456,7 +1437,7 @@ void saveGreyscaleFrame(String filesName) {
     uint8_t * _jpg_buf;
     size_t _jpg_buf_len;
     camera_fb_t * fb = NULL;    // pointer
-    cameraImageSettings();      // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
     fb = esp_camera_fb_get();
 
   // convert greyscale to jpg  
