@@ -70,14 +70,17 @@ It also has the following URLs you can use:
                                 /reboot - restarts the esp32 camera module
                                 /default - sets all settings back to defaults
                                 /live - capture and display a live image from the camera
-                                /images - display the 10 images stored in Spiffs (Image width in percent can be specified in URL with http://x.x.x.x/images?width=90)
-                                /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
+                                /images - display the 10 images stored in Spiffs (Image width in percent can be specified 
+                                    in URL with http://x.x.x.x/images?width=90)
+                                /bootlog - log of times the device has been switched on / rebooted (handy for checking 
+                                    it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
                                 /imagedata - show raw block data
                                 /ota - update firmware (requires password entered first)
                                 /img - just display a plain jpg 
                                        defaults to the live greyscale image 
-                                       you can select stored images with /img?pic=x   where x is in the range 1 to 10 (add 100 to x to display the greyscale images)
+                                       you can select stored images with /img?pic=x   where x is in the range 1 to 10 
+                                       (add 100 to x to display the greyscale images)
                                 
 
 
@@ -113,9 +116,17 @@ The camera on these modules is not very good in dark conditions but I have found
 and the chip) and this improves it a bit but this will make it look odd in normal conditions.
 I tried fitting a larger lens to the camera but this surprisingly did not seem to help.   picture: http://www.alanesq.eu5.net/extlinkins/esp32-big-lens.htm
 I think the camera can work a bit better in the dark than it does but I am having trouble setting the parameters,
-I am looking in to this.  I have managed to add brightness adjustment now but if I try to add more options it seems
-to stop working - see https://esp32.com/viewtopic.php?f=19&t=14376
+I am looking in to this.  I have managed to add brightness adjustment now but I am not convinced even this is fully working,
+if I try to add more options it seems to stop working all together.  I am looking in to this - see https://esp32.com/viewtopic.php?f=19&t=14376
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
 The SD card now works with the flash as I am using "1 wire" to communicate with it, this is slower but does not require to use the pin the LED uses.
+
+When motion detecting it runs at around 4 frames per second.
+
+GPIO:
+    I have configured gpio16 as input and if the status of this pin changes it is reported in the log.  The idea being
+    that this can be used to external sensors although it is not implemented to do anything other than report the
+    change at the moment.
+    GPIO15 and GPIO16 are also free to be used for other purposes (as the sd card is in "1 bit" mode).
