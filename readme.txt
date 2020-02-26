@@ -1,5 +1,5 @@
-                        CameraWifiMotion - alanesq@disroot.org - 23 Feb 2020
-                        ====================================================
+                        CameraWifiMotion - alanesq@disroot.org - 26Feb2020
+                        ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
 The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
@@ -9,15 +9,14 @@ NOTE: I have recently re-written the wifi.h to use the more recent libraries, sp
 so if you have used an older version of this sketch you may need to update the libraries you have installed.
 
 The sketch can use OTA (Over the air updates) this can be enabled/disabled in the main settings of the sketch.
-If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled, 
-if you do not do this it will just get to a few percent upload and stop.
+If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled.
 In an attempt to give some form of security I have set up the sketch so that when OTA is enabled you can not access it
 until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".
 You can check it has worked by looking in the log and once this has been done you can then access "http://<ip address of esp>/ota". 
 You can change this password in the main settings (OTAPassword).
 
 BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
-people are finding this project of interest/use etc. it being my first one ;-)
+people are finding this project of interest/use etc.
 
                    -------------------------------------------------------------------------------------
 
@@ -27,7 +26,9 @@ There is a zip file containing the libraries used.  The main ones you will need 
 
 
 The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
-generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 10 images and I think it can struggle with the amount of data.
+generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
+the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
+if you set the highest (although I think the device struggles with the higher resolution images?).
 
 It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -70,17 +71,13 @@ It also has the following URLs you can use:
                                 /reboot - restarts the esp32 camera module
                                 /default - sets all settings back to defaults
                                 /live - capture and display a live image from the camera
-                                /images - display the 10 images stored in Spiffs (Image width in percent can be specified 
-                                    in URL with http://x.x.x.x/images?width=90)
-                                /bootlog - log of times the device has been switched on / rebooted (handy for checking 
-                                    it is stable)
+                                /images - display the 10 images stored in Spiffs (Image width in percent can be specified in URL with http://x.x.x.x/images?width=90)
+                                /bootlog - log of times the device has been switched on / rebooted (handy for checking it is stable)
                                 /data - this is the updating text on the main page but handy for a quick check of status
                                 /imagedata - show raw block data
                                 /ota - update firmware (requires password entered first)
                                 /img - just display a plain jpg 
-                                       defaults to the live greyscale image 
-                                       you can select stored images with /img?pic=x   where x is in the range 1 to 10 
-                                       (add 100 to x to display the greyscale images)
+                                       defaults to the live greyscale image or stored images selected with /img?pic=x
                                 
 
 
@@ -111,22 +108,22 @@ Also I find that a smoothing capacitor is required on the 3.3v side otherwise th
 lot of problems (specifically causing it to keep re-triggering and other random behaviour).
 Using the flash can often trigger such problems if there is any problem with the power supply.
 
-The camera on these modules is not very good in dark conditions but I have found that if you take the lens of the camera 
-(I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
-and the chip) and this improves it a bit but this will make it look odd in normal conditions.
-I tried fitting a larger lens to the camera but this surprisingly did not seem to help.   picture: http://www.alanesq.eu5.net/extlinkins/esp32-big-lens.htm
-I think the camera can work a bit better in the dark than it does but I am having trouble setting the parameters,
-I am looking in to this.  I have managed to add brightness adjustment now but I am not convinced even this is fully working,
-if I try to add more options it seems to stop working all together.  I am looking in to this - see https://esp32.com/viewtopic.php?f=19&t=14376
-
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
-The SD card now works with the flash as I am using "1 wire" to communicate with it, this is slower but does not require to use the pin the LED uses.
+The SD Card uses the same i/o pin as the LED so if you use an sd card the LED can not be controlled but it will still
+flash when the sd card is accessed.  I don't know why they did this?
+The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
+to the LED.
 
-When motion detecting it runs at around 4 frames per second.
+The camera on these modules is not very good in dark conditions but I have found that if you take the lens of the camera 
+(I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
+and the chip) and this improves it a bit but you then lose a lot of colour so debatable if it is worth doing.
 
-GPIO:
-    I have configured gpio16 as input and if the status of this pin changes it is reported in the log.  The idea being
-    that this can be used to external sensors although it is not implemented to do anything other than report the
-    change at the moment.
-    GPIO15 and GPIO16 are also free to be used for other purposes (as the sd card is in "1 bit" mode).
+This project will be much improved if the brightness etc. image adjustments can be altered but at present I am unable
+to implement this as any attempt to adjust them either does not work or results in an unstable image.  I have posted on a 
+couple of sites asking for help with this but as yet no solution has been offered, so watch this space.
+In the settings section of CameraMotionWifi.ini these settings can be enabled under "#define IMAGE_SETTINGS" if wish
+to experiment.  The settings are applied in "motion.h" under "cameraImageSettings()".
+If the "gainceiling" and "brightness" could be adjusted I think this would help a lot with low light level conditions.
+see:   https://github.com/espressif/esp32-camera/issues/123
+
