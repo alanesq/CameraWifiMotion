@@ -6,10 +6,11 @@
  *             
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
- *             
- *             Note: The flash can not be controlled if using an SD Card as they both use pin 4
- *             
+ *                          
  *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
+ *             GPIO13 also available for use
+ *             GPIO12 can be used but must be low at boot
+ *             GPIO1 / 03 Used for serial comms
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED), chances are there is a problem with the 
@@ -36,13 +37,15 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "24Feb20";                     // version of this sketch
+  const String sversion = "26Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
+  #define IMAGE_SETTINGS 0                               // Implement adjustment of image settings (not working at present)
+  
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 6000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
@@ -57,12 +60,13 @@
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
-  const uint16_t MaintCheckRate = 15;                    // how often to do the routine system checks (seconds)
+  const uint16_t MaintCheckRate = 15;                    // how often to do some routine system checks (seconds)
 
+  // Implement adjustment of image settings (not working at present)
   int8_t cameraImageBrightness = 0;                      // Camera sensor settings (see cameraImageSettings in motion.h for more)
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down) 1 or 0
-//  int8_t cameraImageExposure = 0;                        // range -2 to 2 
-//  int8_t cameraImageContrast = 0;                        // range -2 to 2 
+  int8_t cameraImageExposure = 0;                        // range -2 to 2 
+  int8_t cameraImageContrast = 0;                        // range -2 to 2 
   
   
 // ---------------------------------------------------------------
@@ -525,17 +529,18 @@ void handleRoot() {
   
   // Action any buttons presses etc.
 
-    // enable OTA if password supplied in url parameters   (?pass=xxx)
-      if (server.hasArg("pwd")) {
-          String Tvalue = server.arg("pwd");   // read value
-            if (Tvalue == OTAPassword) {
-            #if ENABLE_OTA
-              otaSetup();    // Over The Air updates (OTA)
-              log_system_message("OTA enabled");
-              OTAEnabled = 1;
-            #endif
-            }
-      }
+    #if ENABLE_OTA
+      // enable OTA if password supplied in url parameters   (?pass=xxx)
+        if (server.hasArg("pwd")) {
+            String Tvalue = server.arg("pwd");   // read value
+              if (Tvalue == OTAPassword) {
+                otaSetup();    // Over The Air updates (OTA)
+                log_system_message("OTA enabled");
+                OTAEnabled = 1;
+              }
+        }
+     #endif
+
      
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
@@ -615,17 +620,19 @@ void handleRoot() {
         }
       }
       
-    // if bright was adjusted - brightness slider (cameraImageBrightness)
-      if (server.hasArg("bright")) {
-        String Tvalue = server.arg("bright");   // read value
-        int val = Tvalue.toInt();
-        if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
-          log_system_message("Brightness changed to " + Tvalue ); 
-          cameraImageBrightness = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
+    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
+      // if bright was adjusted - brightness slider (cameraImageBrightness)
+        if (server.hasArg("bright")) {
+          String Tvalue = server.arg("bright");   // read value
+          int val = Tvalue.toInt();
+          if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
+            log_system_message("Brightness changed to " + Tvalue ); 
+            cameraImageBrightness = val;
+            SaveSettingsSpiffs();     // save settings in Spiffs
+          }
         }
-      }
-      
+    #endif
+          
     // if nimagetl was entered - min-image_threshold
       if (server.hasArg("nimagetl")) {
         String Tvalue = server.arg("nimagetl");   // read value
@@ -667,8 +674,9 @@ void handleRoot() {
           }
         }
         if (maskChanged) {
-          dayImage_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting to max possible
-          SaveSettingsSpiffs();                                  // save settings in Spiffs
+          dayImage_thresholdH = mask_active * blocksPerMaskUnit;      // reset max trigger setting to max possible
+          nightImage_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting to max possible
+          SaveSettingsSpiffs();                                       // save settings in Spiffs
           log_system_message("Detection mask updated"); 
         }
       }
@@ -777,17 +785,21 @@ void handleRoot() {
     // link to show live image in popup window
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
     
-    // brightness adjustment slider
-      message += "<BR>Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
-    
+    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
+      // brightness adjustment slider
+        message += "<BR>Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
+    #endif
+        
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
       message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
 
     // minimum seconds between email sends
-      message += "<BR>Minimum time between E-mails:";
-      message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
-
+      if (emailWhenTriggered) {
+        message += "<BR>Minimum time between E-mails:";
+        message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
+      }
+      
     // Day / night brightness cuttoff point
       message += "<BR><BR>Day/Night brightness switch point: "; 
       message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level below which night mode is enabled' min='0' max='255' value='" + String(dayNightBrightness) + "'>";

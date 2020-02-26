@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 19Feb20 
+ *  Motion detection from camera image - 26Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -160,19 +160,23 @@ bool cameraImageSettings(framesize_t fsize) {
       return 0;
     } 
 
-    // Image resolution / type  (may not be required?)
-      s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
-      if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
-      if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
+    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
+      // Image resolution / type  (may not be required?)
+        s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
+        if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+        if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
+      
+      s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
+      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
+      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+      s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
+      s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+      s->set_saturation(s, 0);                      // (-2 to 2)
+      s->set_sharpness(s, 0);                       // (-2 to 2)    
+      s->set_quality(s, 10);                        // (0 - 63)
+    #endif
     
-    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
-    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-//    s->set_gainceiling(s, GAINCEILING_128X);        // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
-//    s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
-//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
-//    s->set_saturation(s, 0);                      // (-2 to 2)
-//    s->set_sharpness(s, 0);                       // (-2 to 2)    
-//    s->set_quality(s, 10);                        // (0 - 63)
+//// aditional settings:
 //    s->set_colorbar(s, 0);                        // (0 or 1) - testcard
 //    s->set_whitebal(s, 0);
 //    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally

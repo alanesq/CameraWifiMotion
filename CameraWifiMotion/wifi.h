@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Connections - 18Feb20
+ *                                    Wifi / NTP Connections - 26Feb20
  *             
  *                               Set up wifi for esp32 plus NTP (network time)
  *                    
@@ -188,7 +188,7 @@ void startWifiManager() {
 // ----------------------------------------------------------------
 //               -Return current time and date as string
 // ----------------------------------------------------------------
-// supplies time in the format:   '23-04-2020_09:23-Mon'
+// supplies time in the format:   '23-04-2020_09-23-10_Mon'
 
 String currentTime(){
 
@@ -206,6 +206,8 @@ String currentTime(){
    ttime += "-";
    ttime += formatDateNumber(minute(t));
    ttime += "-";
+   ttime += formatDateNumber(second(t));
+   ttime += "_";
    ttime += DoW[weekday(t)-1];
 
    return ttime;
