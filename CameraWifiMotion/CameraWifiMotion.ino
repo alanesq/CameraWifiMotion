@@ -37,14 +37,14 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "26Feb20";                     // version of this sketch
+  const String sversion = "28Feb20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
-  #define IMAGE_SETTINGS 0                               // Implement adjustment of image settings (not working at present)
+  #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings (not working at present)
   
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
@@ -63,10 +63,11 @@
   const uint16_t MaintCheckRate = 15;                    // how often to do some routine system checks (seconds)
 
   // Implement adjustment of image settings (not working at present)
-  int8_t cameraImageBrightness = 0;                      // Camera sensor settings (see cameraImageSettings in motion.h for more)
+  int8_t cameraImageBrightness = 0;                     // Camera sensor settings (see cameraImageSettings in motion.h for more)
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down) 1 or 0
   int8_t cameraImageExposure = 0;                        // range -2 to 2 
   int8_t cameraImageContrast = 0;                        // range -2 to 2 
+  int8_t cameraImageGain = 5;                            // range 1 to 31
   
   
 // ---------------------------------------------------------------
@@ -388,9 +389,15 @@ void LoadSettingsSpiffs() {
 
     // line 14 - cameraImageBrightness
       ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum > 4) log_system_message("invalid brightness in settings");
-      else cameraImageBrightness = tnum - 2;
+      tnum = tnum - 2;
+      if (tnum < -2 || tnum > 2) log_system_message("invalid brightness in settings");
+      else cameraImageBrightness = tnum;
       
+    // line 15 - cameraImageGain
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum > 31) log_system_message("invalid gain in settings");
+      else cameraImageGain = tnum;
+
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -450,6 +457,7 @@ void SaveSettingsSpiffs() {
         file.println(String(UseFlash));
         file.println(String(SpiffsFileCounter));
         file.println(String(cameraImageBrightness + 2));
+        file.println(String(cameraImageGain));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -500,6 +508,7 @@ void handleDefault() {
       DetectionEnabled = 1;
       UseFlash = 0;
       cameraImageBrightness = 0;
+      cameraImageGain = 5;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++) 
@@ -620,17 +629,29 @@ void handleRoot() {
         }
       }
       
-    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
-      // if bright was adjusted - brightness slider (cameraImageBrightness)
+    #if IMAGE_SETTINGS              // Implement adjustment of image settings (not working at present)
+      // if image brightness was adjusted - brightness slider (cameraImageBrightness)
         if (server.hasArg("bright")) {
           String Tvalue = server.arg("bright");   // read value
           int val = Tvalue.toInt();
-          if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
-            log_system_message("Brightness changed to " + Tvalue ); 
+          if (val >= -2 && val <= 312& val != cameraImageBrightness) { 
+            log_system_message("Camera brightness changed to " + Tvalue ); 
             cameraImageBrightness = val;
             SaveSettingsSpiffs();     // save settings in Spiffs
           }
         }
+
+      // if image gain was adjusted - gain slider (cameraImageGain)
+        if (server.hasArg("gain")) {
+          String Tvalue = server.arg("gain");   // read value
+          int val = Tvalue.toInt();
+          if (val >= 1 && val <= 31 && val != cameraImageGain) { 
+            log_system_message("Camera gain changed to " + Tvalue ); 
+            cameraImageGain = val;
+            SaveSettingsSpiffs();     // save settings in Spiffs
+          }
+        }
+    
     #endif
           
     // if nimagetl was entered - min-image_threshold
@@ -786,8 +807,10 @@ void handleRoot() {
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
     
     #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
-      // brightness adjustment slider
-        message += "<BR>Brightness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";
+      // image brightness adjustment slider
+        message += "<BR>Image Brighness: " + String(cameraImageBrightness) + "<input name='bright' type='range' min='-2' max='2' value='" + String(cameraImageBrightness) + "'> \n";
+      // image gain adjustment slider
+        message += " | Image gain: " + String(cameraImageGain) + "<input name='gain' type='range' min='1' max='31' value='" + String(cameraImageGain) + "'>\n";
     #endif
         
     // minimum seconds between triggers
@@ -1209,7 +1232,7 @@ void handleImg(){
 // ----------------------------------------------------------------
 // capture live image and save in spiffs (also on sd-card if present)
 
-void capturePhotoSaveSpiffs(bool UseFlash) {
+bool capturePhotoSaveSpiffs(bool UseFlash) {
 
   if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while photo is captured (don't think this is required as only one core?)
 
@@ -1244,12 +1267,9 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     if (!fb) {
       Serial.println("Camera capture failed - rebooting camera");
       RebootCamera(PIXFORMAT_JPEG);
-      cameraImageSettings(FRAME_SIZE_PHOTO);                          // apply camera sensor settings
+      cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
       fb = esp_camera_fb_get();                       // try again to capture frame
-      if (!fb) {
-        Serial.println("Capture image failed");
-        return;
-      }
+      if (!fb) Serial.println("Capture image failed");
     }
 
     // restore flash status after using it as a flash
@@ -1316,12 +1336,16 @@ void capturePhotoSaveSpiffs(bool UseFlash) {
     
   } while ( !ok && TryCount < 3);             // if there was a problem taking photo try again 
 
-  if (TryCount == 3) log_system_message("Error: Unable to capture/store image");
-  
   RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    // restart camera back to greyscale mode for motion detection
 
   TRIGGERtimer = millis();                                  // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;          // restart paused motion detecting 
+  
+  if (TryCount == 3) {
+    log_system_message("Error: Unable to capture/store image");
+    return 0;
+  }
+  else return 1;     // all ok
 }
 
 
@@ -1364,6 +1388,7 @@ void RestartCamera(framesize_t fsize, pixformat_t format) {
 
 
 // reboot camera (used if camera is failing to respond)
+//      restart camera in motion mode, capture a test frame to check it is now responding ok
 void RebootCamera(pixformat_t format) {  
     log_system_message("ERROR: Problem with camera detected so rebooting it"); 
     // turn camera off then back on      
@@ -1371,9 +1396,9 @@ void RebootCamera(pixformat_t format) {
         delay(500);
         digitalWrite(PWDN_GPIO_NUM, LOW); 
         delay(500);
-    RestartCamera(FRAME_SIZE_MOTION, format); 
-    delay(1000);
-    // try camera again, if still problem reboot esp32
+    RestartCamera(FRAME_SIZE_MOTION, PIXFORMAT_GRAYSCALE);    // restart camera in motion mode
+    delay(500);
+    // try camera, if still problem reboot esp32
         if (!capture_still()) {
             Serial.println("unable to reboot camera so rebooting esp...");
             UpdateBootlogSpiffs("Camera fault - rebooting");                     // store in bootlog
@@ -1381,6 +1406,7 @@ void RebootCamera(pixformat_t format) {
             ESP.restart();   
             delay(5000);      // restart will fail without this delay
          }
+    if (format == PIXFORMAT_JPEG) RestartCamera(FRAME_SIZE_PHOTO, format);       // if jpg mode required restart camera again
 }
 
 
@@ -1414,7 +1440,7 @@ void MotionDetected(uint16_t changes) {
     log_system_message("Camera detected motion: " + String(changes)); 
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
 
-    capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
+    int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {
@@ -1425,6 +1451,7 @@ void MotionDetected(uint16_t changes) {
       
           // send an email
               String emessage = "Camera triggered at " + currentTime();
+              if (!capres) emessage += "\nNote: there was a problem detected when capturing an image";
               byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
               if (q==0) log_system_message("email sent ok" );
               else log_system_message("Error: sending email, error code=" + String(q) );

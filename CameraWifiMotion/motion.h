@@ -25,12 +25,12 @@
 
 
 // Settings
-  #define CAMERA_MODEL_AI_THINKER              // type of camera
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
   #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
   #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing
 
 // camera type (CAMERA_MODEL_AI_THINKER)
+  #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power down pin
   #define RESET_GPIO_NUM    -1      // -1 = not used
   #define XCLK_GPIO_NUM      0
@@ -131,13 +131,13 @@ bool setupCameraHardware() {
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-    config.pixel_format = PIXFORMAT_GRAYSCALE;    // PIXFORMAT_ + YUV422, GRAYSCALE, RGB565, JPEG
+    config.pixel_format = PIXFORMAT_GRAYSCALE;    // PIXFORMAT_ + YUV422, GRAYSCALE, RGB565, JPEG, RGB888?
     config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA, CIF, VGA, SVGA, XGA, SXGA, UXGA 
     config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
     
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
-    if (camerr != ESP_OK) Serial.printf("Camera init failed with error 0x%x", camerr);
+    if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
 
     cameraImageSettings(FRAME_SIZE_MOTION);       // apply camera sensor settings
     
@@ -160,40 +160,39 @@ bool cameraImageSettings(framesize_t fsize) {
       return 0;
     } 
 
-    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
+    #if IMAGE_SETTINGS           // Implement adjustment of image settings (not working at present)
       // Image resolution / type  (may not be required?)
         s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
         if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
         if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
-      
+
+      s->set_agc_gain(s, cameraImageGain);          // (1 - 31) - may require gain_ctrl set to 0 to operate?
+      s->set_gain_ctrl(s, 0);                       // Auto White Balance gain control? (0 or 1)
       s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
-      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
-      s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
-      s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
-      s->set_saturation(s, 0);                      // (-2 to 2)
-      s->set_sharpness(s, 0);                       // (-2 to 2)    
-      s->set_quality(s, 10);                        // (0 - 63)
+//      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
+//      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+//      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)  (0 - 6?)
+//      s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
+//      s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+//      s->set_saturation(s, 0);                      // (-2 to 2)
+//      s->set_sharpness(s, 0);                       // (-2 to 2)    
+//      s->set_quality(s, 10);                        // (0 - 63)
+//      s->set_colorbar(s, 0);                        // (0 or 1) - testcard
+//      s->set_special_effect(s, 0);
+//      s->set_whitebal(s, 0);                        // white balance
+//      s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
+//      s->set_awb_gain(s, 1);                        // Auto White Balance? 
+//      s->set_exposure_ctrl(s, 0);
+//      s->set_ae_level(s, 0);                        // (-2 to 2)
+//      s->set_bpc(s, 0);                             // black pixel correction
+//      s->set_wpc(s, 0);                             // white pixel correction
+//      s->set_raw_gma(s, 0);                         // (1 or 0)?
+//      s->set_lenc(s, 1);                            // lens correction? (1 or 0)
+//      s->set_aec_value(s, 600);                     // automatic exposure correction?  (0-1200)
+//      s->set_aec2(s, 1);                            // AEC sensor?
+//      s->set_dcw(s, 1);                             // downsize enable? (1 or 0)?
     #endif
     
-//// aditional settings:
-//    s->set_colorbar(s, 0);                        // (0 or 1) - testcard
-//    s->set_whitebal(s, 0);
-//    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
-//    s->set_ae_level(s, 0);
-////    s->set_special_effect(s, 0);
-//    s->set_wb_mode(s, 2);
-//    s->set_awb_gain(s, 1);
-//    s->set_bpc(s, 1);
-//    s->set_wpc(s, 1);
-//    s->set_raw_gma(s, 1);
-////    s->set_lenc(s, 0);
-//    s->set_agc_gain(s, 1);
-//    s->set_aec_value(s, 600);
-////    s->set_gain_ctrl(s, 0);
-////    s->set_exposure_ctrl(s, 0);
-//    s->set_aec2(s, 1);
-////    s->set_dcw(s, 0);
 
 // Variable types
 //    framesize_t framesize;
