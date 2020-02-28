@@ -39,7 +39,7 @@ It uses WifiManager so first time the ESP starts it will create an access point 
 The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
 It works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
-number for each block between 0 and 255 (i.e. average brightness of the block).
+number for each block between 0 and 255 (i.e. average of the block).
 These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by more 
 then the "block" setting then this block is declared changed.
 If enough blocks have changed (percentage of active image detection area, the "image" setting) then motion is detected.
@@ -119,11 +119,5 @@ The camera on these modules is not very good in dark conditions but I have found
 (I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
 and the chip) and this improves it a bit but you then lose a lot of colour so debatable if it is worth doing.
 
-This project will be much improved if the brightness etc. image adjustments can be altered but at present I am unable
-to implement this as any attempt to adjust them either does not work or results in an unstable image.  I have posted on a 
-couple of sites asking for help with this but as yet no solution has been offered, so watch this space.
-In the settings section of CameraMotionWifi.ini these settings can be enabled under "#define IMAGE_SETTINGS" if wish
-to experiment.  The settings are applied in "motion.h" under "cameraImageSettings()".
-If the "gainceiling" and "brightness" could be adjusted I think this would help a lot with low light level conditions.
-see:   https://github.com/espressif/esp32-camera/issues/123
+
 
