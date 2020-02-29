@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 26Feb20 
+ *  Motion detection from camera image - 29Feb20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -156,71 +156,48 @@ bool cameraImageSettings(framesize_t fsize) {
     sensor_t *s = esp_camera_sensor_get();  
 
     if (s == NULL) {
-      Serial.println("Error: problem applying camera sensor settings");
+      Serial.println("Error: problem getting camera sensor settings");
       return 0;
     } 
 
     #if IMAGE_SETTINGS           // Implement adjustment of image settings (not working at present)
-      // Image resolution / type  (may not be required?)
-        s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
-        if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
-        if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
 
-      s->set_agc_gain(s, cameraImageGain);          // (1 - 31) - may require gain_ctrl set to 0 to operate?
-      s->set_gain_ctrl(s, 0);                       // Auto White Balance gain control? (0 or 1)
-      s->set_brightness(s, cameraImageBrightness);  // (-2 to 2)
-//      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-//      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
-//      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)  (0 - 6?)
-//      s->set_exposure_ctrl(s, cameraImageExposure); // (-2 to 2)
-//      s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
-//      s->set_saturation(s, 0);                      // (-2 to 2)
-//      s->set_sharpness(s, 0);                       // (-2 to 2)    
+    // Image resolution / type  (may not be required?)
+      s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
+      if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
+      if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
+
+      // note: if you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any noticable effect
+      s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
+      s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
+      s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+      s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
+      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
+//      s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
+//      s->set_awb_gain(s, 0);                        // Auto White Balance? 
+//      s->set_lenc(s, 0);                            // lens correction? (1 or 0)
+//      s->set_raw_gma(s, 1);                         // (1 or 0)?
 //      s->set_quality(s, 10);                        // (0 - 63)
+//      s->set_whitebal(s, 1);                        // white balance
+//      s->set_wb_mode(s, 1);                         // white balance mode (0 to 4)
+//      s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
+//      s->set_aec_value(s, 0);                       // automatic exposure correction?  (0-1200)
+//      s->set_saturation(s, 0);                      // (-2 to 2)
+//      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+//      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+//      s->set_contrast(s, 0);                        // (-2 to 2)
+//      s->set_sharpness(s, 0);                       // (-2 to 2)   
 //      s->set_colorbar(s, 0);                        // (0 or 1) - testcard
 //      s->set_special_effect(s, 0);
-//      s->set_whitebal(s, 0);                        // white balance
-//      s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
-//      s->set_awb_gain(s, 1);                        // Auto White Balance? 
-//      s->set_exposure_ctrl(s, 0);
-//      s->set_ae_level(s, 0);                        // (-2 to 2)
+//      s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
 //      s->set_bpc(s, 0);                             // black pixel correction
 //      s->set_wpc(s, 0);                             // white pixel correction
-//      s->set_raw_gma(s, 0);                         // (1 or 0)?
-//      s->set_lenc(s, 1);                            // lens correction? (1 or 0)
-//      s->set_aec_value(s, 600);                     // automatic exposure correction?  (0-1200)
-//      s->set_aec2(s, 1);                            // AEC sensor?
 //      s->set_dcw(s, 1);                             // downsize enable? (1 or 0)?
     #endif
-    
 
-// Variable types
-//    framesize_t framesize;
-//    uint8_t quality;//0 - 63
-//    int8_t brightness;//-2 - 2
-//    int8_t contrast;//-2 - 2
-//    int8_t saturation;//-2 - 2
-//    int8_t sharpness;//-2 - 2
-//    uint8_t denoise;
-//    uint8_t special_effect;//0 - 6
-//    uint8_t wb_mode;//0 - 4
-//    uint8_t awb;
-//    uint8_t awb_gain;
-//    uint8_t aec;
-//    uint8_t aec2;
-//    int8_t ae_level;//-2 - 2
-//    uint16_t aec_value;//0 - 1200
-//    uint8_t agc;
-//    uint8_t agc_gain;//0 - 30
-//    uint8_t gainceiling;//0 - 6
-//    uint8_t bpc;
-//    uint8_t wpc;
-//    uint8_t raw_gma;
-//    uint8_t lenc;
-//    uint8_t hmirror;
-//    uint8_t vflip;
-//    uint8_t dcw;
-//    uint8_t colorbar;
+    // capture a frame to ensure settings apply
+      camera_fb_t *frame_buffer = esp_camera_fb_get();    // capture frame from camera
+      esp_camera_fb_return(frame_buffer);                 // return frame so memory can be released
     
     return 1;
 }
@@ -242,7 +219,7 @@ bool capture_still() {
     uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
     uint16_t temp_frame[H][W] = { 0 }; 
 
-    cameraImageSettings(FRAME_SIZE_MOTION);                                    // apply camera sensor settings
+    cameraImageSettings(FRAME_SIZE_MOTION);                   // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
     if (!frame_buffer) return false;
