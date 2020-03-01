@@ -45,7 +45,7 @@
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings (not working at present)
-  
+
   int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 6000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
@@ -60,12 +60,14 @@
 
   const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
   
-  const uint16_t MaintCheckRate = 15;                    // how often to do some routine system checks (seconds)
+  const uint16_t MaintCheckRate = 10;                    // how often to do some routine system checks (seconds)
 
-  // Implement adjustment of image settings
-  uint16_t cameraImageExposure = 600;                   // Camera exposure, 0 - 1200
-  uint8_t cameraImageGain = 0;                          // Image gain, 0 to 30
-  uint8_t cameraImageInvert = 0;                        // flip image vertically (i.e. upside down), 1 or 0
+  // Camera image settings
+    float cameraImageExposure = 600;                       // Camera exposure, 0 - 1200
+    float exposureAdjustmentSteps = 0.5;                   // exposure step size of auto adjustment
+    float cameraImageGain = 0;                             // Image gain, 0 to 30
+    float gainAdjustmentSteps = 0.0;                       // gain step size of auto adjustment
+    uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
   
   
 // ---------------------------------------------------------------
@@ -247,14 +249,7 @@ void loop(void){
     if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
     uint16_t changes = motion_detect();                                                 // find amount of change in current image frame compared to the last one     
     update_frame();                                                                     // Copy current frame to previous
-    // which thresholds to use
-      uint16_t tLow = dayImage_thresholdL;
-      uint16_t tHigh = dayImage_thresholdH;
-      if (dayNightBrightness > 0 && AveragePix < dayNightBrightness) {                  // switch to nighttime settings
-        tLow = nightImage_thresholdL;
-        tHigh = nightImage_thresholdH;        
-      }
-    if ( (changes >= tLow) && (changes <= tHigh) ) {                                    // if motion detected 
+    if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {                                    // if motion detected 
          if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between triggers
             TRIGGERtimer = millis();                                                    // update last trigger time
             MotionDetected(changes);                                                    // run motion detected procedure
@@ -286,6 +281,16 @@ void loop(void){
       // check status of illumination led
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
+      // auto adjust image settings
+        if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
+        if (AveragePix > targetBrightness && targetBrightness != 0) {
+          cameraImageExposure -= exposureAdjustmentSteps;
+          cameraImageGain -= gainAdjustmentSteps;
+        }
+        if (AveragePix < targetBrightness && targetBrightness != 0) {
+          cameraImageExposure += exposureAdjustmentSteps;
+          cameraImageGain += gainAdjustmentSteps;
+        }        
     }
     
   delay(50);
@@ -316,81 +321,66 @@ void LoadSettingsSpiffs() {
   
     ReadLineSpiffs(&file, &line, &tnum);      // ignore first line as it is just a title 
 
-    // line 1 - dayBlock_threshold
+    // line 1 - Block_threshold
       ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum < 1 || tnum > 255) log_system_message("invalid dayBlock_threshold in settings");
-      else dayBlock_threshold = tnum;
+      if (tnum < 1 || tnum > 255) log_system_message("invalid Block_threshold in settings");
+      else Block_threshold = tnum;
       
-    // line 2 - min dayImage_thresholdL
+    // line 2 - min Image_thresholdL
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 0 || tnum > 255) log_system_message("invalid min_day_image_threshold in settings");
-      else dayImage_thresholdL = tnum;
+      else Image_thresholdL = tnum;
 
-    // line 3 - min dayImage_thresholdH
+    // line 3 - min Image_thresholdH
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 0 || tnum > 255) log_system_message("invalid max_day_image_threshold in settings");
-      else dayImage_thresholdH = tnum;
+      else Image_thresholdH = tnum;
             
-    // line 4 - nightBlock_threshold
-      ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum < 1 || tnum > 255) log_system_message("invalid nightBlock_threshold in settings");
-      else nightBlock_threshold = tnum;
-      
-    // line 5 - min nightImage_thresholdL
-      ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum < 0 || tnum > 255) log_system_message("invalid night_day_image_threshold in settings");
-      else nightImage_thresholdL = tnum;
-
-    // line 6 - min nightImage_thresholdH
-      ReadLineSpiffs(&file, &line, &tnum);
-      if (tnum < 0 || tnum > 255) log_system_message("invalid night_day_image_threshold in settings");
-      else nightImage_thresholdH = tnum;
-
-    // line 7 - day/night brightness cuttoff point
+    // line 4 - target brightness level
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 0 || tnum > 255) log_system_message("invalid night/night brightness cuttoff in settings");
-      else dayNightBrightness = tnum;
+      else targetBrightness = tnum;
 
-    // line 8 - emailWhenTriggered
+    // line 5 - emailWhenTriggered
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum == 0) emailWhenTriggered = 0;
       else if (tnum == 1) emailWhenTriggered = 1;
       else log_system_message("Invalid emailWhenTriggered in settings: " + line);
       
-    // line 9 - TriggerLimitTime
+    // line 6 - TriggerLimitTime
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 1 || tnum > 3600) log_system_message("invalid TriggerLimitTime in settings");
       else TriggerLimitTime = tnum;
 
-    // line 10 - DetectionEnabled
+    // line 7 - DetectionEnabled
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum == 2) tnum = 1;     // if it was paused restart it
       if (tnum == 0) DetectionEnabled = 0;
       else if (tnum == 1) DetectionEnabled = 1;
       else log_system_message("Invalid DetectionEnabled in settings: " + line);
 
-    // line 11 - EmailLimitTime
+    // line 8 - EmailLimitTime
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 60 || tnum > 10000) log_system_message("invalid EmailLimitTime in settings");
       else EmailLimitTime = tnum;
 
-    // line 12 - UseFlash
+    // line 9 - UseFlash
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum == 0) UseFlash = 0;
       else if (tnum == 1) UseFlash = 1;
       else log_system_message("Invalid UseFlash in settings: " + line);
       
-    // line 13 - SpiffsFileCounter
+    // line 10 - SpiffsFileCounter
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum > MaxSpiffsImages) log_system_message("invalid SpiffsFileCounter in settings");
       else SpiffsFileCounter = tnum;
 
-    // line 14 - cameraImageExposure
+    // line 11 - cameraImageExposure
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 0 || tnum > 1200) log_system_message("invalid exposure in settings");
       else cameraImageExposure = tnum;
       
-    // line 15 - cameraImageGain
+    // line 12 - cameraImageGain
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum > 31) log_system_message("invalid gain in settings");
       else cameraImageGain = tnum;
@@ -440,13 +430,10 @@ void SaveSettingsSpiffs() {
 
     // save settings in to file
         file.println("CameraWifiMotion settings file " + currentTime());   // title
-        file.println(String(dayBlock_threshold));
-        file.println(String(dayImage_thresholdL));
-        file.println(String(dayImage_thresholdH));      
-        file.println(String(nightBlock_threshold));
-        file.println(String(nightImage_thresholdL));
-        file.println(String(nightImage_thresholdH));
-        file.println(String(dayNightBrightness));
+        file.println(String(Block_threshold));
+        file.println(String(Image_thresholdL));
+        file.println(String(Image_thresholdH));      
+        file.println(String(targetBrightness));
         file.println(String(emailWhenTriggered));
         file.println(String(TriggerLimitTime));
         file.println(String(DetectionEnabled));
@@ -493,13 +480,10 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      dayNightBrightness = 50;
-      dayBlock_threshold = 18;
-      dayImage_thresholdL= 15;
-      dayImage_thresholdH= 192;
-      nightBlock_threshold = 3;
-      nightImage_thresholdL= 10;
-      nightImage_thresholdH= 192;
+      targetBrightness = 50;
+      Block_threshold = 18;
+      Image_thresholdL= 15;
+      Image_thresholdH= 192;
       TriggerLimitTime = 20;
       EmailLimitTime = 600;
       DetectionEnabled = 1;
@@ -571,24 +555,24 @@ void handleRoot() {
 //        fs.format();     // not a valid command
 //      }
 
-    // if daynight was entered - dayNightBrightness
+    // if target brightness was entered - targetBrightness
       if (server.hasArg("daynight")) {
         String Tvalue = server.arg("daynight");   // read value
         int val = Tvalue.toInt();
-        if (val >= 0 && val < 256 && val != dayNightBrightness) { 
-          log_system_message("dayNight cuttoff changed to " + Tvalue ); 
-          dayNightBrightness = val;
+        if (val >= 0 && val < 256 && val != targetBrightness) { 
+          log_system_message("Target brightness changed to " + Tvalue ); 
+          targetBrightness = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
       
-      // if dblockt was entered - dayBlock_threshold
+      // if dblockt was entered - Block_threshold
       if (server.hasArg("dblockt")) {
         String Tvalue = server.arg("dblockt");   // read value
         int val = Tvalue.toInt();
-        if (val > 0 && val < 256 && val != dayBlock_threshold) { 
-          log_system_message("dayBlock_threshold changed to " + Tvalue ); 
-          dayBlock_threshold = val;
+        if (val > 0 && val < 256 && val != Block_threshold) { 
+          log_system_message("Block_threshold changed to " + Tvalue ); 
+          Block_threshold = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
@@ -597,9 +581,9 @@ void handleRoot() {
       if (server.hasArg("dimagetl")) {
         String Tvalue = server.arg("dimagetl");   // read value
         int val = Tvalue.toInt();
-        if (val >= 0 && val < 192 && val != dayImage_thresholdL) { 
+        if (val >= 0 && val < 192 && val != Image_thresholdL) { 
           log_system_message("Min_day_image_threshold changed to " + Tvalue ); 
-          dayImage_thresholdL = val;
+          Image_thresholdL = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
@@ -608,24 +592,13 @@ void handleRoot() {
       if (server.hasArg("dimageth")) {
         String Tvalue = server.arg("dimageth");   // read value
         int val = Tvalue.toInt();
-        if (val > 0 && val <= 192 && val != dayImage_thresholdH) { 
+        if (val > 0 && val <= 192 && val != Image_thresholdH) { 
           log_system_message("Max_day_image_threshold changed to " + Tvalue ); 
-          dayImage_thresholdH = val;
+          Image_thresholdH = val;
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
-      
-    // if nlockt was entered - dayBlock_threshold
-      if (server.hasArg("nblockt")) {
-        String Tvalue = server.arg("nblockt");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val < 256 && val != nightBlock_threshold) { 
-          log_system_message("nightBlock_threshold changed to " + Tvalue ); 
-          nightBlock_threshold = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-      
+            
     #if IMAGE_SETTINGS       
       // if exposure was adjusted - exposure slider (cameraImageExposure)
         if (server.hasArg("exp")) {
@@ -653,28 +626,6 @@ void handleRoot() {
     
     #endif
           
-    // if nimagetl was entered - min-image_threshold
-      if (server.hasArg("nimagetl")) {
-        String Tvalue = server.arg("nimagetl");   // read value
-        int val = Tvalue.toInt();
-        if (val >= 0 && val < 192 && val != nightImage_thresholdL) { 
-          log_system_message("Min_night_image_threshold changed to " + Tvalue ); 
-          nightImage_thresholdL = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-
-    // if nimageth was entered - min-image_threshold
-      if (server.hasArg("nimageth")) {
-        String Tvalue = server.arg("nimageth");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val <= 192 && val != nightImage_thresholdH) { 
-          log_system_message("Max_night_image_threshold changed to " + Tvalue ); 
-          nightImage_thresholdH = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-
     // Generate mask grid check box array
       if (server.hasArg("submit")) {                           // if submit button was pressed
         mask_active = 0;  
@@ -694,8 +645,7 @@ void handleRoot() {
           }
         }
         if (maskChanged) {
-          dayImage_thresholdH = mask_active * blocksPerMaskUnit;      // reset max trigger setting to max possible
-          nightImage_thresholdH = mask_active * blocksPerMaskUnit;    // reset max trigger setting to max possible
+          Image_thresholdH = mask_active * blocksPerMaskUnit;      // reset max trigger setting to max possible
           SaveSettingsSpiffs();                                       // save settings in Spiffs
           log_system_message("Detection mask updated"); 
         }
@@ -805,11 +755,11 @@ void handleRoot() {
     // link to show live image in popup window
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
     
-    #if IMAGE_SETTINGS                                       // Implement adjustment of image settings (not working at present)
+    #if IMAGE_SETTINGS                  // Implement adjustment of image settings (not working at present)
       // image exposure adjustment slider
-        message += "<BR>Image exposure: " + String(cameraImageExposure) + "<input style='width: 30%' name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
+        message += "<BR>Exposure: <input name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
       // image gain adjustment slider
-        message += "<BR>Image gain: " + String(cameraImageGain) + "<input style='width: 30%' name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
+        message += " - Gain: <input name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
     #endif
         
     // minimum seconds between triggers
@@ -822,28 +772,18 @@ void handleRoot() {
         message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
       }
       
-    // Day / night brightness cuttoff point
-      message += "<BR><BR>Day/Night brightness switch point: "; 
-      message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level below which night mode is enabled' min='0' max='255' value='" + String(dayNightBrightness) + "'>";
-      message += " (0 = day/night have same settings)<BR>\n";
+    // Target brightness brightness cuttoff point
+      message += "<BR>Auto image adjustment, target brightness: "; 
+      message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
+      message += "(0 = disabled)\n";
 
-    // detection parameters (day)
-      if (dayImage_thresholdH > (mask_active * blocksPerMaskUnit)) dayImage_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-      if (dayNightBrightness != 0) message += "<BR>Day: ";
-      message += "Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(dayBlock_threshold) + "'>, \n";
-      message += "Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(dayImage_thresholdL) + "'> \n"; 
-      message += " and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(dayImage_thresholdH) + "'> blocks changed";
+    // detection parameters 
+      if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
+      message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(Block_threshold) + "'>, \n";
+      message += "Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdL) + "'> \n"; 
+      message += " and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdH) + "'> blocks changed";
       message += " out of " + String(mask_active * blocksPerMaskUnit); 
                
-    // detection parameters (night)
-      if (dayNightBrightness != 0) {
-        if (nightImage_thresholdH > (mask_active * blocksPerMaskUnit)) nightImage_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-        message += "<BR>Night: Detection threshold: <input type='number' style='width: 40px' name='nblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(nightBlock_threshold) + "'>, \n";
-        message += "Trigger when between<input type='number' style='width: 40px' name='nimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(nightImage_thresholdL) + "'> \n"; 
-        message += " and <input type='number' style='width: 40px' name='nimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(nightImage_thresholdH) + "'> blocks changed";
-        message += " out of " + String(mask_active * blocksPerMaskUnit); 
-      }
-      
     // input submit button  
       message += "<BR><BR><input type='submit' name='submit'><BR><BR>\n";
 
@@ -895,14 +835,8 @@ void handleData(){
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
-        message += "<BR>Readings: Brightness:" + String(AveragePix);
-        // day/night mode
-          if (dayNightBrightness > 0) {
-            if (AveragePix < dayNightBrightness) message += " (Night)";
-            else message += " (Day)";
-          }
-        message += ", " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
-        latestChanges = 0;                                                       // reset stored values once displayed
+        message += "<BR>Current detection level: " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
+        latestChanges = 0;           // reset stored values once displayed
     }
   
   // email when motion detected
@@ -915,14 +849,19 @@ void handleData(){
     else message += "Off";
     message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
 
-  // show current time
-    message += "<BR>Time: " + currentTime() + "\n";      // show current time
+  // show current time and current day/night mode
+    message += "<BR>Time: " + currentTime() +"\n";   
 
   // show if a sd card is present
   if (SD_Present) {
     uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
     message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
   }
+
+  // show image adjustments
+    message += "<BR>Image brightness: " + String(AveragePix);
+    message += ", Gain: " + String((int)cameraImageGain);
+    message += ", Exposure: " + String((int)cameraImageExposure) + "\n";
   
   // OTA enabled status
     if (OTAEnabled) message += red + "<BR>OTA UPDATES ENABLED!" + endcolour;

@@ -53,13 +53,10 @@
 
   
 // detection parameters (these are set by user and stored in Spiffs)
-    uint16_t dayNightBrightness = 100;       // Brightness level which determins if it is in day or night mode
-    uint16_t dayBlock_threshold = 10;        // average pixel variation in block required to count as changed - range 0 to 255
-    uint16_t dayImage_thresholdL = 15;       // min changed blocks in image required to count as motion detected in percent
-    uint16_t dayImage_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
-    uint16_t nightBlock_threshold = 10;      // average pixel variation in block required to count as changed - range 0 to 255
-    uint16_t nightImage_thresholdL = 15;     // min changed blocks in image required to count as motion detected in percent
-    uint16_t nightImage_thresholdH = 100;    // max changed blocks in image required to count as motion detected in percent
+    uint16_t targetBrightness = 100;      // Brightness level which is aimed to maintain by adjustment of camera settings
+    uint16_t Block_threshold = 10;        // average pixel variation in block required to count as changed - range 0 to 255
+    uint16_t Image_thresholdL = 15;       // min changed blocks in image required to count as motion detected in percent
+    uint16_t Image_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
 
 // misc     
     #define WIDTH 320                 // motion sensing frame size
@@ -281,7 +278,7 @@ float motion_detect() {
             uint16_t prev = prev_frame[y][x];
             uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
             // float pChange = abs(current - prev) / prev;   // original code 
-            if (pChange >= dayBlock_threshold) {                // if change in block is enough to qualify as changed
+            if (pChange >= Block_threshold) {                // if change in block is enough to qualify as changed
                 if (block_active(x,y)) changes += 1;         // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
