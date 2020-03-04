@@ -10,7 +10,7 @@
  *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             GPIO13 also available for use
  *             GPIO12 can be used but must be low at boot
- *             GPIO1 / 03 Used for serial comms
+ *             GPIO1 / 03 Used for serial
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED), chances are there is a problem with the 
@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "29Feb20";                     // version of this sketch
+  const String sversion = "04Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -58,21 +58,18 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet implemented
+  const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet fully implemented
   
-  const uint16_t MaintCheckRate = 10;                    // how often to do some routine system checks (seconds)
-
-  // Camera image settings
-    float cameraImageExposure = 600;                       // Camera exposure, 0 - 1200
-    float exposureAdjustmentSteps = 0.5;                   // exposure step size of auto adjustment
-    float cameraImageGain = 0;                             // Image gain, 0 to 30
-    float gainAdjustmentSteps = 0.0;                       // gain step size of auto adjustment
-    uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
+  const uint16_t MaintCheckRate = 5;                     // how often to do some routine system checks (seconds)
+ 
+  uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
   
   
 // ---------------------------------------------------------------
 
 
+  float cameraImageExposure;                 // Camera exposure, 0 - 1200
+  float cameraImageGain = 0;                 // Image gain, 0 to 30
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
   uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
@@ -273,7 +270,7 @@ void loop(void){
       }
     }
 
-  // periodically run some checks
+  // periodical tasks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
       WIFIcheck();                                 // check if wifi connection is ok
       MaintTiming = millis();                      // reset timer
@@ -281,18 +278,21 @@ void loop(void){
       // check status of illumination led
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
+      if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
+      
       // auto adjust image settings
-        if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
-        if (AveragePix > targetBrightness && targetBrightness != 0) {
-          cameraImageExposure -= exposureAdjustmentSteps;
-          cameraImageGain -= gainAdjustmentSteps;
+        if (targetBrightness > 0) { 
+          float exposureAdjustmentSteps = (cameraImageExposure / 25) + 0.2;    // adjust by higher amount when at higher level
+          float hyster = 20.0;                                                 // Hysteresis on brightness level
+          if (AveragePix > (targetBrightness + hyster)) cameraImageExposure -= exposureAdjustmentSteps;
+          if (AveragePix < (targetBrightness - hyster)) cameraImageExposure += exposureAdjustmentSteps;
+          if (cameraImageExposure < 0) cameraImageExposure = 0;
+          if (cameraImageExposure > 1200) cameraImageExposure = 1200;
+          cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
+          capture_still();                             // update stored image with the changed settings
+          update_frame();
         }
-        if (AveragePix < targetBrightness && targetBrightness != 0) {
-          cameraImageExposure += exposureAdjustmentSteps;
-          cameraImageGain += gainAdjustmentSteps;
-        }        
     }
-    
   delay(50);
 } 
        
@@ -600,29 +600,33 @@ void handleRoot() {
       }
             
     #if IMAGE_SETTINGS       
-      // if exposure was adjusted - exposure slider (cameraImageExposure)
+      // if exposure was adjusted (cameraImageExposure)
         if (server.hasArg("exp")) {
           String Tvalue = server.arg("exp");   // read value
-          int val = Tvalue.toInt();
-          if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
-            log_system_message("Camera exposure changed to " + Tvalue ); 
-            cameraImageExposure = val;
-            SaveSettingsSpiffs();         // save settings in Spiffs
-            TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
+              log_system_message("Camera exposure changed to " + Tvalue ); 
+              cameraImageExposure = val;
+              SaveSettingsSpiffs();         // save settings in Spiffs
+              TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
+            }
           }
         }
 
       // if image gain was adjusted - gain slider (cameraImageGain)
         if (server.hasArg("gain")) {
           String Tvalue = server.arg("gain");   // read value
-          int val = Tvalue.toInt();
-          if (val >= 0 && val <= 31 && val != cameraImageGain) { 
-            log_system_message("Camera gain changed to " + Tvalue ); 
-            cameraImageGain = val;
-            SaveSettingsSpiffs();        // save settings in Spiffs
-            TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
-          }
-        }
+            if (Tvalue != NULL) {
+              int val = Tvalue.toInt();
+              if (val >= 0 && val <= 31 && val != cameraImageGain) { 
+                log_system_message("Camera gain changed to " + Tvalue ); 
+                cameraImageGain = val;
+                SaveSettingsSpiffs();        // save settings in Spiffs
+                TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
+              }
+            }
+         }
     
     #endif
           
@@ -757,11 +761,20 @@ void handleRoot() {
     
     #if IMAGE_SETTINGS                  // Implement adjustment of image settings (not working at present)
       // image exposure adjustment slider
-        message += "<BR>Exposure: <input name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
+        // message += "<BR>Exposure: <input name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
+        message += "<BR>Exposure: <input type='number' style='width: 60px' name='exp' min='0' max='1200' value=''>\n";
       // image gain adjustment slider
-        message += " - Gain: <input name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
-    #endif
+        // message += " - Gain: <input name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
+        message += " Gain: <input type='number' style='width: 60px' name='gain' min='0' max='30' value=''>\n";       
         
+    // Target brightness brightness cuttoff point
+      message += "<BR>Auto image adjustment, target brightness: "; 
+      message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
+      message += "(0 = disabled)\n";
+    #else
+      targetBrightness = 0;      
+    #endif
+
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
       message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
@@ -772,11 +785,6 @@ void handleRoot() {
         message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
       }
       
-    // Target brightness brightness cuttoff point
-      message += "<BR>Auto image adjustment, target brightness: "; 
-      message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
-      message += "(0 = disabled)\n";
-
     // detection parameters 
       if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
       message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(Block_threshold) + "'>, \n";
