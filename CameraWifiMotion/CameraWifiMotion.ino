@@ -13,8 +13,8 @@
  *             GPIO1 / 03 Used for serial
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
- *                          response times especially when using the LED), chances are there is a problem with the 
- *                          power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
+ *                          response times especially when using the LED, random restarting) chances are there is a problem 
+ *                          the power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
  *                          capacitor.
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "04Mar20";                     // version of this sketch
+  const String sversion = "06Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -63,7 +63,11 @@
   const uint16_t MaintCheckRate = 5;                     // how often to do some routine system checks (seconds)
  
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
-  
+
+  uint16_t gainOnTrigger = 20;                           // brightness level below which gain is increased
+  uint16_t gainOffTrigger = 100;                         // brightness level above which gain is set to zero
+  uint16_t gainDarkLevel = 15;                           // Gain set when image is dark (when auto adjust is enabled)
+
   
 // ---------------------------------------------------------------
 
@@ -270,7 +274,7 @@ void loop(void){
       }
     }
 
-  // periodical tasks
+  // periodic system tasks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
       WIFIcheck();                                 // check if wifi connection is ok
       MaintTiming = millis();                      // reset timer
@@ -279,23 +283,29 @@ void loop(void){
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
       if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
-      
-      // auto adjust image settings
-        if (targetBrightness > 0) { 
+      if (targetBrightness > 0) AutoAdjustImage();   // auto adjust image settings
+    }
+  delay(50);
+} // loop
+
+
+
+// Auto image adjustment (runs every few seconds, called from loop)
+void AutoAdjustImage() {
           float exposureAdjustmentSteps = (cameraImageExposure / 25) + 0.2;    // adjust by higher amount when at higher level
           float hyster = 20.0;                                                 // Hysteresis on brightness level
           if (AveragePix > (targetBrightness + hyster)) cameraImageExposure -= exposureAdjustmentSteps;
           if (AveragePix < (targetBrightness - hyster)) cameraImageExposure += exposureAdjustmentSteps;
           if (cameraImageExposure < 0) cameraImageExposure = 0;
           if (cameraImageExposure > 1200) cameraImageExposure = 1200;
+          // include some gain in dark conditions
+            if (AveragePix < gainOnTrigger && cameraImageGain < gainDarkLevel) cameraImageGain = gainDarkLevel;
+            if (AveragePix > gainOffTrigger) cameraImageGain = 0;
           cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
-          capture_still();                             // update stored image with the changed settings
-          update_frame();
-        }
-    }
-  delay(50);
-} 
-       
+          capture_still();                             // update stored image with the changed image settings to prevent trigger
+          update_frame(); 
+}
+
 
 // ----------------------------------------------------------------
 //              Load settings from text file in Spiffs
@@ -718,7 +728,6 @@ void handleRoot() {
           } else {
             DetectionEnabled = 0;
             log_system_message("Motion detection disabled");  
-            AveragePix = 0;                                         // clear average brightness reading as frames no longer being captured
           }
           SaveSettingsSpiffs();                                     // save settings in Spiffs
       }
