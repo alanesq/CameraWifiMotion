@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 29Feb20 
+ *  Motion detection from camera image - 01Mar20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -170,15 +170,15 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
       s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
       s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-//      s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
+//      s->set_whitebal(s, 0);                        // white balance
+//      s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
+//      s->set_brightness(s, 0);                      // (-2 to 2) - set brightness
 //      s->set_awb_gain(s, 0);                        // Auto White Balance? 
 //      s->set_lenc(s, 0);                            // lens correction? (1 or 0)
-//      s->set_raw_gma(s, 1);                         // (1 or 0)?
+//      s->set_raw_gma(s, 0);                         // (1 or 0)?
 //      s->set_quality(s, 10);                        // (0 - 63)
-//      s->set_whitebal(s, 1);                        // white balance
-//      s->set_wb_mode(s, 1);                         // white balance mode (0 to 4)
+//      s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
 //      s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
-//      s->set_aec_value(s, 0);                       // automatic exposure correction?  (0-1200)
 //      s->set_saturation(s, 0);                      // (-2 to 2)
 //      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
 //      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
@@ -186,7 +186,6 @@ bool cameraImageSettings(framesize_t fsize) {
 //      s->set_sharpness(s, 0);                       // (-2 to 2)   
 //      s->set_colorbar(s, 0);                        // (0 or 1) - testcard
 //      s->set_special_effect(s, 0);
-//      s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
 //      s->set_bpc(s, 0);                             // black pixel correction
 //      s->set_wpc(s, 0);                             // white pixel correction
 //      s->set_dcw(s, 1);                             // downsize enable? (1 or 0)?
@@ -214,7 +213,7 @@ bool capture_still() {
     Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image 
 
     uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
-    uint16_t temp_frame[H][W] = { 0 }; 
+    uint32_t temp_frame[H][W] = { 0 }; 
 
     cameraImageSettings(FRAME_SIZE_MOTION);                   // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
@@ -243,7 +242,7 @@ bool capture_still() {
       bool frameChanged = 0;                            // flag if any change since last frame 
       for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
-            uint16_t currentBlock = temp_frame[y][x] / (BLOCK_SIZE * BLOCK_SIZE);
+            uint16_t currentBlock = temp_frame[y][x] / (BLOCK_SIZE * BLOCK_SIZE);    // average pixel value in block
             if (current_frame[y][x] != currentBlock) frameChanged = 1;
             current_frame[y][x] = currentBlock;
         }
