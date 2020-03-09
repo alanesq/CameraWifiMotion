@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "06Mar20";                     // version of this sketch
+  const String sversion = "09Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -46,7 +46,7 @@
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings (not working at present)
 
-  int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
+  int MaxSpiffsImages = 12;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 6000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
@@ -766,7 +766,7 @@ void handleRoot() {
       message += "</div>\n";
 
     // link to show live image in popup window
-      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=250'); return false; \">SHOW CURRENT IMAGE</a>" + endcolour + " \n";
+      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " \n";
     
     #if IMAGE_SETTINGS                  // Implement adjustment of image settings (not working at present)
       // image exposure adjustment slider
@@ -858,7 +858,7 @@ void handleData(){
   
   // email when motion detected
     if (emailWhenTriggered) message += red + "<BR>Email will be sent when detection is triggered" + endcolour;
-    else message += "<BR>Email sending is disabled";
+    else message += "<BR>Email notifications are disabled";
         
   // Illumination
     message += "<BR>Illumination LED is ";    
@@ -867,7 +867,7 @@ void handleData(){
     message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
 
   // show current time and current day/night mode
-    message += "<BR>Time: " + currentTime() +"\n";   
+    message += "<BR>Current time: " + currentTime() +"\n";   
 
   // show if a sd card is present
   if (SD_Present) {
@@ -966,7 +966,7 @@ void handleImages(){
     file.close();
 
   // button to show small version of image in popup window
-    message += blue + "<BR><a id='stdLink' target='popup' onclick=\"window.open('/img?pic=10" + String(ImageToShow) + "' ,'popup','width=320,height=250'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
+    message += blue + "<BR><a id='stdLink' target='popup' onclick=\"window.open('/img?pic=" + String(ImageToShow + 100) + "' ,'popup','width=320,height=240'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
 
   // insert image in to html 
     message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";   
@@ -1403,7 +1403,7 @@ void MotionDetected(uint16_t changes) {
     int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
     // send email if long enough since last motion detection (or if this is the first one)
-    if (emailWhenTriggered) {
+    if (emailWhenTriggered) {       // && cameraImageGain == 0
         unsigned long currentMillis = millis();        // get current time  
         if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
 
