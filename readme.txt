@@ -85,6 +85,20 @@ If using a gmail account for emails your account needs to be set to "Allow less 
  
 -----------------
 
+Adjusting the settings:
+
+if you check the "difference" section on the  "raw data" page, if all is well you should just be seeing 0s and 1s , meaning each image it captures is pretty much identical to the last one.  The two sections below being the current and last image captured which it compares to detect movement.
+The "Detection threshold" setting on the main page sets at what value it will declare one of these blocks has changed.
+
+On the main page watch where it says "0 changed blocks out of 128"
+ideally it should never change from 0 unless something is moving but tends to pick up the odd one as light levels change etc.  
+
+The trigger between settings are reffering to the number displayed in "Current detection level".  If you watch this as something is moving in the image you will get an idea of what sort of value to be looking out for.
+
+
+-----------------
+
+
 Notes:
 
 If you ever need to erase the stored wifi settings or if the esp32 goes in to a power loop where you are unable to get
@@ -109,5 +123,4 @@ The SD Card uses the same i/o pin as the LED so if you use an sd card the LED ca
 flash when the sd card is accessed.  I don't know why they did this?
 The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
 to the LED.
-
 
