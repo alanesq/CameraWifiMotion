@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 26Feb2020
+                        CameraWifiMotion - alanesq@disroot.org - 09Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
@@ -120,9 +120,3 @@ lot of problems (specifically causing it to keep re-triggering and other random 
 Using the flash can often trigger such problems if there is any problem with the power supply.
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
-
-The SD Card uses the same i/o pin as the LED so if you use an sd card the LED can not be controlled but it will still
-flash when the sd card is accessed.  I don't know why they did this?
-The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
-to the LED.
-
