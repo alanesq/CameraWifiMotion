@@ -87,7 +87,9 @@ If using a gmail account for emails your account needs to be set to "Allow less 
 
 Adjusting the settings:
 
-if you check the "difference" section on the  "raw data" page, if all is well you should just be seeing 0s and 1s , meaning each image it captures is pretty much identical to the last one.  The two sections below being the current and last image captured which it compares to detect movement.
+if you check the "difference" section on the  "raw data" page, if all is well you should just be seeing 0s and 1s , meaning each image it captures is pretty much identical to the last one (this will be much higher at night as the camera gain is
+increased which also increases interference).  The two sections below being the current and last image captured which it
+compares to detect movement.
 The "Detection threshold" setting on the main page sets at what value it will declare one of these blocks has changed.
 
 On the main page watch where it says "0 changed blocks out of 128"
