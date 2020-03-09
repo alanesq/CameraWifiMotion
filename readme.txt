@@ -1,22 +1,19 @@
                         CameraWifiMotion - alanesq@disroot.org - 26Feb2020
                         ==================================================
 
-This is a Arduino IDE sketch to use one of the cheap (eBay) ESP32 camera boards as a motion detecting security camera
-The idea is that the camera looks for movement in the image and when detected it captures an image storing it in
-internal memory or on to an sd card and also emails it if required.
+This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
+The idea is that the camera checks the image from the camera around 4 times a second and compares it to the last image it captured looking for any changes, when significant changes are detected it captures an image storing it in
+internal memory (and on to an sd card if one is fitted) and also email the image to you if required.
 
-NOTE: I have recently re-written the wifi.h to use the more recent libraries, specifically https://github.com/khoih-prog/ESP_WiFiManager
-so if you have used an older version of this sketch you may need to update the libraries you have installed.
+These cheap cameras are surprisingly good apart from poor performance in low light conditions, if anyone knows how to improve this please let me know. 
 
 The sketch can use OTA (Over the air updates) this can be enabled/disabled in the main settings of the sketch.
-If you use OTA do not use the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled.
+If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
+
 In an attempt to give some form of security I have set up the sketch so that when OTA is enabled you can not access it
 until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".
 You can check it has worked by looking in the log and once this has been done you can then access "http://<ip address of esp>/ota". 
 You can change this password in the main settings (OTAPassword).
-
-BTW - Please let me know if you are using this (my email = alanesq@disroot.org), as I would be interested to know if 
-people are finding this project of interest/use etc.
 
                    -------------------------------------------------------------------------------------
 
@@ -25,7 +22,7 @@ There is a zip file containing the libraries used.  The main ones you will need 
   ESP32_mail_client, ESP_wifimanager and Time.
 
 
-The last 10 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
+The last 12 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
 the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
 if you set the highest (although I think the device struggles with the higher resolution images?).
@@ -34,7 +31,7 @@ It uses WifiManager so first time the ESP starts it will create an access point 
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
              see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
              Once you have entered your wifi password it will restart and you can then connect to it in your browser
-             at the address:     http://ESPcam1.local     (if your browser / config. supports it)
+             at the address:     http://ESPcam1.local     (if your browser / config supports it)
 
 The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
 It works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
@@ -78,14 +75,12 @@ It also has the following URLs you can use:
                                 /ota - update firmware (requires password entered first)
                                 /img - just display a plain jpg 
                                        defaults to the live greyscale image or stored images selected with /img?pic=x
-                                
+                                       for smaller pre capture images add 100 to x.
 
 
-I have it using my gmail account to send the emails
-    Your gmail account needs to be set to "Allow less secure apps: ON"   see:  https://myaccount.google.com/lesssecureapps
-    you then need to edit gmail_esp32.h with your details
-
- 
+If using a gmail account for emails your account needs to be set to "Allow less secure apps: ON"   
+  see:  https://myaccount.google.com/lesssecureapps
+  you then need to edit gmail_esp32.h with your details
 
  
 -----------------
@@ -114,10 +109,5 @@ The SD Card uses the same i/o pin as the LED so if you use an sd card the LED ca
 flash when the sd card is accessed.  I don't know why they did this?
 The only way to stop the LED flashing when the SD card is accesses is using a soldering iron remove the transistor next
 to the LED.
-
-The camera on these modules is not very good in dark conditions but I have found that if you take the lens of the camera 
-(I heated it with a warm air gun to soften the glue first) you can remove the infra red filter (a small disk between the lens
-and the chip) and this improves it a bit but you then lose a lot of colour so debatable if it is worth doing.
-
 
 
