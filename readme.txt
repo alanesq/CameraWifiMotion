@@ -12,10 +12,10 @@ In an attempt to give some form of security to OTA I have set up the sketch so t
 
                    -------------------------------------------------------------------------------------
 
-If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
+If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on your gmail account.
+
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
-
 
 The last 11 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 11 images (also it may become unstable as it seems to struggle with the amount of data being processed in my experience). 
