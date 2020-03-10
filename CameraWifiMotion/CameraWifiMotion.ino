@@ -10,7 +10,7 @@
  *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             GPIO13 also available for use
  *             GPIO12 can be used but must be low at boot
- *             GPIO1 / 03 Used for serial
+ *             GPIO1 / 03 Used for serial port
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times especially when using the LED, random restarting) chances are there is a problem 
@@ -37,18 +37,18 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "09Mar20";                     // version of this sketch
+  const String sversion = "10Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
-  #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings (not working at present)
+  #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  int MaxSpiffsImages = 12;                              // number of images to store in camera (Spiffs)
+  int MaxSpiffsImages = 11;                              // number of images to store in camera (Spiffs)
   
-  const uint16_t datarefresh = 6000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
+  const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
   String JavaRefreshTime = "600";                        // time delay when loading url in web pages (Javascript) to prevent failed requests
     

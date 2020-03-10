@@ -113,11 +113,11 @@ String webfooter() {
              /* Status display at bottom of screen */
              "<div style='text-align: center;background-color:rgb(128, 64, 0)'>\n" 
                 "<small>" + red + 
-                    stitle + " " + sversion + 
-                    " | Memory:" + String(ESP.getFreeHeap()) + 
+                    "<a href='https://github.com/alanesq/CameraWifiMotion'>" + stitle + "</a> " + sversion + 
+                    " | Memory:" + String(ESP.getFreeHeap() / 1000) + "K" + 
                     " | Wifi: " + String(WiFi.RSSI()) + "dBm" 
                     " | " + NTPtext + 
-                    " | Spiffs:" + String( (SPIFFS.totalBytes() - SPIFFS.usedBytes()) ) +  
+                    " | Spiffs:" + String( (SPIFFS.totalBytes() - SPIFFS.usedBytes()) / 1000 ) + "K" +
                     // " | MAC: " + String( WiFi.macAddress() )  + 
                 endcolour + "</small>\n" 
              "</div>\n" 
