@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 01Mar20 
+ *  Motion detection from camera image - 09Mar20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -157,41 +157,41 @@ bool cameraImageSettings(framesize_t fsize) {
       return 0;
     } 
 
-    #if IMAGE_SETTINGS           // Implement adjustment of image settings (not working at present)
+    #if IMAGE_SETTINGS           // Implement adjustment of image settings 
 
     // Image resolution / type  (may not be required?)
       s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
       if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
       if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
 
-      // note: if you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any noticable effect
+      // note: if you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
       s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
       s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
       s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
       s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
-      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
-//      s->set_whitebal(s, 0);                        // white balance
-//      s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
-//      s->set_brightness(s, 0);                      // (-2 to 2) - set brightness
-//      s->set_awb_gain(s, 0);                        // Auto White Balance? 
-//      s->set_lenc(s, 0);                            // lens correction? (1 or 0)
-//      s->set_raw_gma(s, 0);                         // (1 or 0)?
-//      s->set_quality(s, 10);                        // (0 - 63)
-//      s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
-//      s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
-//      s->set_saturation(s, 0);                      // (-2 to 2)
-//      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
-//      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
-//      s->set_contrast(s, 0);                        // (-2 to 2)
-//      s->set_sharpness(s, 0);                       // (-2 to 2)   
-//      s->set_colorbar(s, 0);                        // (0 or 1) - testcard
-//      s->set_special_effect(s, 0);
-//      s->set_bpc(s, 0);                             // black pixel correction
-//      s->set_wpc(s, 0);                             // white pixel correction
-//      s->set_dcw(s, 1);                             // downsize enable? (1 or 0)?
+      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
+      s->set_quality(s, 10);                        // (0 - 63)
+      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+      s->set_brightness(s, 0);                      // (-2 to 2) - set brightness
+      s->set_lenc(s, 1);                            // lens correction? (1 or 0)
+      s->set_saturation(s, 0);                      // (-2 to 2)
+      s->set_contrast(s, 0);                        // (-2 to 2)
+      s->set_sharpness(s, 0);                       // (-2 to 2)  
+      s->set_whitebal(s, 0);                        // white balance 
+      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+      s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
+      s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
+      // s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+      // s->set_awb_gain(s, 0);                        // Auto White Balance? 
+      // s->set_raw_gma(s, 0);                         // (1 or 0)?
+      // s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
+      // s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
+      // s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
+      s->set_bpc(s, 0);                             // black pixel correction
+      s->set_wpc(s, 0);                             // white pixel correction
     #endif
 
-    // capture a frame to ensure settings apply
+    // capture a frame to ensure settings apply asap (not sure if this is really needed)
       camera_fb_t *frame_buffer = esp_camera_fb_get();    // capture frame from camera
       esp_camera_fb_return(frame_buffer);                 // return frame so memory can be released
     

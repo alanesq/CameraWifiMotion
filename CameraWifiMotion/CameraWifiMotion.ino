@@ -64,15 +64,13 @@
  
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
 
-  uint16_t gainOnTrigger = 20;                           // brightness level below which gain is increased
-  uint16_t gainOffTrigger = 100;                         // brightness level above which gain is set to zero
-  uint16_t gainDarkLevel = 15;                           // Gain set when image is dark (when auto adjust is enabled)
-
+  // to adjust camera sensor settings see cameraImageSettings() in motion.h
+  
   
 // ---------------------------------------------------------------
 
 
-  float cameraImageExposure;                 // Camera exposure, 0 - 1200
+  float cameraImageExposure = 1200;          // Camera exposure, 0 - 1200
   float cameraImageGain = 0;                 // Image gain, 0 to 30
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
   uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
@@ -293,14 +291,23 @@ void loop(void){
 // Auto image adjustment (runs every few seconds, called from loop)
 void AutoAdjustImage() {
           float exposureAdjustmentSteps = (cameraImageExposure / 25) + 0.2;    // adjust by higher amount when at higher level
+          float gainAdjustmentSteps = 0.5;    
           float hyster = 20.0;                                                 // Hysteresis on brightness level
-          if (AveragePix > (targetBrightness + hyster)) cameraImageExposure -= exposureAdjustmentSteps;
-          if (AveragePix < (targetBrightness - hyster)) cameraImageExposure += exposureAdjustmentSteps;
-          if (cameraImageExposure < 0) cameraImageExposure = 0;
-          if (cameraImageExposure > 1200) cameraImageExposure = 1200;
-          // include some gain in dark conditions
-            if (AveragePix < gainOnTrigger && cameraImageGain < gainDarkLevel) cameraImageGain = gainDarkLevel;
-            if (AveragePix > gainOffTrigger) cameraImageGain = 0;
+          if (AveragePix > (targetBrightness + hyster)) {
+            // too bright
+            if (cameraImageGain > 0) cameraImageGain -= gainAdjustmentSteps;
+            else cameraImageExposure -= exposureAdjustmentSteps;
+          }
+          if (AveragePix < (targetBrightness - hyster)) {
+            // too dark
+            if (cameraImageExposure >= 1200) cameraImageGain += gainAdjustmentSteps;
+            else cameraImageExposure += exposureAdjustmentSteps;
+          }
+          // check for over scale
+            if (cameraImageExposure < 0) cameraImageExposure = 0;
+            if (cameraImageExposure > 1200) cameraImageExposure = 1200;
+            if (cameraImageGain < 0) cameraImageGain = 0;
+            if (cameraImageGain > 30) cameraImageGain = 30;
           cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
           capture_still();                             // update stored image with the changed image settings to prevent trigger
           update_frame(); 
@@ -490,15 +497,15 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      targetBrightness = 50;
-      Block_threshold = 18;
-      Image_thresholdL= 15;
+      targetBrightness = 100;
+      Block_threshold = 22;
+      Image_thresholdL= 12;
       Image_thresholdH= 192;
       TriggerLimitTime = 20;
       EmailLimitTime = 600;
       DetectionEnabled = 1;
       UseFlash = 0;
-      cameraImageExposure = 600;
+      cameraImageExposure = 20;
       cameraImageGain = 0;
 
       // Detection mask grid
@@ -1492,13 +1499,13 @@ void handleTest(){
 
 
 
-//        capturePhotoSaveSpiffs(1);
-//        
-//        // send email
-//          String emessage = "Test email";
-//          byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
-//          if (q==0) log_system_message("email sent ok" );
-//          else log_system_message("Error: sending email code=" + String(q) );
+        capturePhotoSaveSpiffs(0);
+        
+        // send email
+          String emessage = "Test email";
+          byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
+          if (q==0) log_system_message("email sent ok" );
+          else log_system_message("Error: sending email code=" + String(q) );
 
 
 
