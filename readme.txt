@@ -1,19 +1,14 @@
-                        CameraWifiMotion - alanesq@disroot.org - 09Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 10Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
-The idea is that the camera checks the image from the camera around 4 times a second and compares it to the last image it captured looking for any changes, when significant changes are detected it captures an image storing it in
-internal memory (and on to an sd card if one is fitted) and also email the image to you if required.
+It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  If significant change is detected it captures a higher res image and stores it in internal memory (also to SD card if one is installed) and can also email the image if required.
 
 These cheap cameras are surprisingly good apart from poor performance in low light conditions, if anyone knows how to improve this please let me know. 
 
-The sketch can use OTA (Over the air updates) this can be enabled/disabled in the main settings of the sketch.
+The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
-
-In an attempt to give some form of security I have set up the sketch so that when OTA is enabled you can not access it
-until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".
-You can check it has worked by looking in the log and once this has been done you can then access "http://<ip address of esp>/ota". 
-You can change this password in the main settings (OTAPassword).
+In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access it until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".  You can change this password in the main settings (OTAPassword).
 
                    -------------------------------------------------------------------------------------
 
@@ -22,10 +17,8 @@ There is a zip file containing the libraries used.  The main ones you will need 
   ESP32_mail_client, ESP_wifimanager and Time.
 
 
-The last 12 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
-generates. If you install a sd card it will store all captured images on it along with a text file with the date and time 
-the image was captured.  It has the ability to capture images at a higher resolution but will not be able to store 10 images 
-if you set the highest (although I think the device struggles with the higher resolution images?).
+The last 11 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
+generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 11 images (also it may become unstable as it seems to struggle with the amount of data being processed in my experience). 
 
 It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
