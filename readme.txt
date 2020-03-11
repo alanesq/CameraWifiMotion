@@ -1,10 +1,12 @@
-                        CameraWifiMotion - alanesq@disroot.org - 10Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 11Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
 It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  If significant change is detected it captures a higher res image and stores it in internal memory (also to SD card if one is installed) and can also email the image if required.
 
-These cheap cameras are surprisingly good apart from poor performance in low light conditions, if anyone knows how to improve this please let me know. 
+These cheap cameras are surprisingly good apart from poor performance in low light conditions, I have it set up as best I can but if you want to use these
+cameras at night you really need to fit a better lens - see https://www.youtube.com/watch?v=T0P37aEneto
+Fitting a suitable lens makes a massive difference at night.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
@@ -12,10 +14,10 @@ In an attempt to give some form of security to OTA I have set up the sketch so t
 
                    -------------------------------------------------------------------------------------
 
-If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on your gmail account.
-
+If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
+
 
 The last 11 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 11 images (also it may become unstable as it seems to struggle with the amount of data being processed in my experience). 
