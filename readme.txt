@@ -4,9 +4,9 @@
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
 It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  If significant change is detected it captures a higher res image and stores it in internal memory (also to SD card if one is installed) and can also email the image if required.
 
-These cheap cameras are surprisingly good apart from poor performance in low light conditions, I have it set up as best I can but if you want to use these
+These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have it set up as best I can but if you want to use these
 cameras at night you really need to fit a better lens - see https://www.youtube.com/watch?v=T0P37aEneto
-Fitting a suitable lens makes a massive difference at night.
+Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to amazingly good.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
