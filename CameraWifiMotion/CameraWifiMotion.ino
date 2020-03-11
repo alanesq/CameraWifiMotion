@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "10Mar20";                     // version of this sketch
+  const String sversion = "11Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -245,14 +245,17 @@ void loop(void){
 
   // camera motion detection 
   if (DetectionEnabled == 1) {    
-    if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                            // capture image, if problem reboot camera and try again
-    uint16_t changes = motion_detect();                                                 // find amount of change in current image frame compared to the last one     
-    update_frame();                                                                     // Copy current frame to previous
-    if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {                                    // if motion detected 
-         if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {  // limit time between triggers
-            TRIGGERtimer = millis();                                                    // update last trigger time
-            MotionDetected(changes);                                                    // run motion detected procedure
-         } else Serial.println("Too soon to re-trigger");
+    if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                                // capture image, if problem reboot camera and try again
+      uint16_t changes = motion_detect();                                                   // find amount of change in current image frame compared to the last one     
+      update_frame();                                                                       // Copy current frame to previous
+      if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {               // if enough change to count as motion detected 
+        if (tCounter >= tCounterTrigger) {                                                  // only trigger if movement detected in more than one consequitive frames
+           tCounter = 0;
+           if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {    // limit time between triggers
+              TRIGGERtimer = millis();                                                      // update last trigger time
+              MotionDetected(changes);                                                      // run motion detected procedure
+           } else Serial.println("Too soon to re-trigger");
+        } else Serial.println("Not enough consecutive detections");
      }
   } 
 
@@ -264,7 +267,7 @@ void loop(void){
       if (tstatus != SensorStatus) {
         if (tstatus == 1) {
           SensorStatus = 1;
-          log_system_message("Sensor input pin has gone high");
+          log_system_message("Sensor input pin has gone high");              
         } else {
           SensorStatus = 0;
           log_system_message("Sensor input pin has gone low");        
@@ -402,6 +405,11 @@ void LoadSettingsSpiffs() {
       if (tnum > 31) log_system_message("invalid gain in settings");
       else cameraImageGain = tnum;
 
+    // line 13 - tCounterTrigger
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum > 31) log_system_message("invalid consecutive detections in settings");
+      else tCounterTrigger = tnum;
+      
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -459,6 +467,7 @@ void SaveSettingsSpiffs() {
         file.println(String(SpiffsFileCounter));
         file.println(String(cameraImageExposure));
         file.println(String(cameraImageGain));
+        file.println(String(tCounterTrigger));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -497,16 +506,17 @@ void handleDefault() {
 
     // default settings
       emailWhenTriggered = 0;
-      targetBrightness = 100;
-      Block_threshold = 22;
-      Image_thresholdL= 12;
+      targetBrightness = 130;
+      Block_threshold = 17;
+      Image_thresholdL= 15;
       Image_thresholdH= 192;
       TriggerLimitTime = 20;
       EmailLimitTime = 600;
       DetectionEnabled = 1;
       UseFlash = 0;
-      cameraImageExposure = 20;
+      cameraImageExposure = 30;
       cameraImageGain = 0;
+      tCounterTrigger = 1;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++) 
@@ -693,6 +703,17 @@ void handleRoot() {
           SaveSettingsSpiffs();     // save settings in Spiffs
         }
       }
+
+//       // if consecutive detections required - tCounterTrigger
+      if (server.hasArg("consec")) {
+        String Tvalue = server.arg("consec");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val <= 100 && val != tCounterTrigger) { 
+          log_system_message("Consecutive detections required changed to " + Tvalue); 
+          tCounterTrigger = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
   
     // if button "toggle illuminator LED" was pressed  
       if (server.hasArg("illuminator")) {
@@ -778,10 +799,10 @@ void handleRoot() {
     #if IMAGE_SETTINGS                  // Implement adjustment of image settings (not working at present)
       // image exposure adjustment slider
         // message += "<BR>Exposure: <input name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
-        message += "<BR>Exposure: <input type='number' style='width: 60px' name='exp' min='0' max='1200' value=''>\n";
+        message += "<BR>Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n";
       // image gain adjustment slider
         // message += " - Gain: <input name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
-        message += " Gain: <input type='number' style='width: 60px' name='gain' min='0' max='30' value=''>\n";       
+        message += " Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n";       
         
     // Target brightness brightness cuttoff point
       message += "<BR>Auto image adjustment, target brightness: "; 
@@ -793,14 +814,18 @@ void handleRoot() {
 
     // minimum seconds between triggers
       message += "<BR>Minimum time between triggers:";
-      message += "<input type='number' style='width: 60px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
+      message += "<input type='number' style='width: 50px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
 
+    // consecutive detections required
+      message += ", Consecutive detections required to trigger:";
+      message += "<input type='number' style='width: 40px' name='consec' title='The number of changed images detected in a row required to trigger motion detected' min='1' max='100' value='" + String(tCounterTrigger) + "'>\n";
+      
     // minimum seconds between email sends
       if (emailWhenTriggered) {
         message += "<BR>Minimum time between E-mails:";
         message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
       }
-      
+
     // detection parameters 
       if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
       message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(Block_threshold) + "'>, \n";

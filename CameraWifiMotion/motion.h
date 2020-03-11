@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 09Mar20 
+ *  Motion detection from camera image - 11Mar20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -53,7 +53,7 @@
 
   
 // detection parameters (these are set by user and stored in Spiffs)
-    uint16_t targetBrightness = 100;      // Brightness level which is aimed to maintain by adjustment of camera settings
+    uint16_t targetBrightness = 120;      // Brightness level which is aimed to maintain by adjustment of camera settings
     uint16_t Block_threshold = 10;        // average pixel variation in block required to count as changed - range 0 to 255
     uint16_t Image_thresholdL = 15;       // min changed blocks in image required to count as motion detected in percent
     uint16_t Image_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
@@ -63,6 +63,8 @@
     #define HEIGHT 240
     #define W (WIDTH / BLOCK_SIZE)
     #define H (HEIGHT / BLOCK_SIZE)
+    uint16_t tCounter = 0;            // count number of consecutive triggers (i.e. how many times in a row movement has been detected)
+    uint16_t tCounterTrigger = 2;     // number of consequitive triggers required to count as movement detected
     uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
     const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
     // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast
@@ -290,7 +292,11 @@ float motion_detect() {
     }
 
     if (changes > latestChanges) latestChanges = changes;           // store highest reading for display on main page (it is zeroed when displayed)
-      
+
+    // Consecutive triggers counter (i.e. how many times in a row movement has been detected)
+      if (changes >= Image_thresholdL && changes <= Image_thresholdH) tCounter ++;
+      else tCounter = 0;
+
 #if DEBUG_MOTION
     Serial.print("Changed ");
     Serial.print(changes);
