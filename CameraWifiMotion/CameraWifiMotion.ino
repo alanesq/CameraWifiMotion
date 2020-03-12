@@ -43,7 +43,7 @@
 
   #define EMAIL_ENABLED 1                                // if emailing is enabled
 
-  #define FTP_ENABLED 1 0                                // if ftp uploads are enabled
+  #define FTP_ENABLED 1                                  // if ftp uploads are enabled
 
   #define ENABLE_OTA 1                                   // if Over The Air updates (OTA) are enabled
   
@@ -83,6 +83,7 @@
   String TriggerTime = "Not yet triggered";  // Time of last motion trigger
   uint32_t MaintTiming = millis();           // used for timing maintenance tasks
   bool emailWhenTriggered = 0;               // flag if to send emails when motion detection triggers
+  bool ftpImages = 0;                        // if to FTP images up to server
   bool ReqLEDStatus = 0;                     // desired status of the illuminator led (i.e. should it be on or off when not being used as a flash)
   const bool ledON = HIGH;                   // Status LED control 
   const bool ledOFF = LOW;
@@ -425,6 +426,12 @@ void LoadSettingsSpiffs() {
       if (tnum > 31) log_system_message("invalid consecutive detections in settings");
       else tCounterTrigger = tnum;
       
+    // line 14 - ftpImages
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum == 0) ftpImages = 0;
+      else if (tnum == 1) ftpImages = 1;
+      else log_system_message("Invalid FTP in settings: " + line);
+            
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -483,6 +490,7 @@ void SaveSettingsSpiffs() {
         file.println(String(cameraImageExposure));
         file.println(String(cameraImageGain));
         file.println(String(tCounterTrigger));
+        file.println(String(ftpImages));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -532,6 +540,7 @@ void handleDefault() {
       cameraImageExposure = 30;
       cameraImageGain = 0;
       tCounterTrigger = 1;
+      ftpImages = 0;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++) 
@@ -587,6 +596,18 @@ void handleRoot() {
         SaveSettingsSpiffs();     // save settings in Spiffs
       }
       
+    // FTP was clicked -  FTP images when triggered 
+      if (server.hasArg("ftp")) {
+        if (!ftpImages) {
+              log_system_message("FTP when motion detected enabled");
+              ftpImages = 1;
+        } else {
+          log_system_message("FTP when motion detected disabled"); 
+          ftpImages = 0;
+        }
+        SaveSettingsSpiffs();     // save settings in Spiffs
+      }
+
    // if wipeS was entered  - clear Spiffs
       if (server.hasArg("wipeS")) WipeSpiffs();        // format Spiffs 
 
@@ -867,6 +888,11 @@ void handleRoot() {
       message += "<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n";
 #endif
 
+#if FTP_ENABLED
+    // toggle FTP
+      message += "<input style='height: 30px;' name='ftp' value='ftp' title='FTP images when motion detected enable/disable' type='submit'> \n";
+#endif
+
     // Clear images in spiffs
       message += "<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n";
     
@@ -896,10 +922,7 @@ void handleData(){
    
           
   // Motion detection
-    message += "<BR>Motion detection is ";
-    if (DetectionEnabled == 1) message +=  "enabled, last triggered: " + TriggerTime + "\n";
-    else if (DetectionEnabled == 2) message += red + "disabled" + endcolour + "\n";
-    else message += red + "disabled" + endcolour + "\n";
+    message += "<BR>Motion detection last triggered: " + TriggerTime + "\n";
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
@@ -915,18 +938,24 @@ void handleData(){
     message += ", Gain: " + String((int)cameraImageGain);
     message += ", Exposure: " + String((int)cameraImageExposure) + "\n";
 
-  message += "<BR>";
+  message += "<BR><BR>";
+
+  // Motion detection
+    if (DetectionEnabled == 1) message += " {Detection enabled} ";
+    else message += " {" + red + "Detection disabled" + endcolour + "} ";
  
   // Illumination LED
     if (digitalRead(Illumination_led) == ledON) message +=  " {" + red + "Illumination LED is On" + endcolour + "} ";
     if (UseFlash) message += " {Flash enabled} ";
           
   // OTA status
-    if (OTAEnabled) message += " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
+    #if ENABLE_OTA
+      if (OTAEnabled) message += " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
+    #endif
 
   // FTP status
     #if FTP_ENABLED
-      message += " {FTP enabled} ";
+      if (ftpImages) message += " {FTP enabled} ";
     #endif
 
   // email status
@@ -1343,7 +1372,7 @@ bool capturePhotoSaveSpiffs(bool UseFlash) {
 
 
     #if FTP_ENABLED
-      uploadImageByFTP(fb->buf, fb->len, currentTime() + "-L");
+      if (ftpImages) uploadImageByFTP(fb->buf, fb->len, currentTime() + "-L");
     #endif
 
     
@@ -1540,7 +1569,7 @@ void saveGreyscaleFrame(String filesName) {
 
   // ftp to server
     #if FTP_ENABLED
-      uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime() + "-S");
+      if (ftpImages) uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime() + "-S");
     #endif
 
   esp_camera_fb_return(fb);    // return frame so memory can be released
