@@ -4,7 +4,7 @@
  *             
  *             Serves a web page whilst detecting motion on a camera (uses ESP32Cam module)
  *             
- *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h
+ *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
  *                          
  *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
@@ -37,11 +37,16 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "11Mar20";                     // version of this sketch
+  const String sversion = "12Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
-  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
+  #define EMAIL_ENABLED 1                                // if emailing is enabled
+
+  #define FTP_ENABLED 1 0                                // if ftp uploads are enabled
+
+  #define ENABLE_OTA 1                                   // if Over The Air updates (OTA) are enabled
+  
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
@@ -102,16 +107,26 @@
   #define SD_CS 5                            // sd chip select pin
   bool SD_Present;                           // flag if an sd card was found (0 = no)
 
+
 #include "wifi.h"                            // Load the Wifi / NTP stuff
 
 #include "standard.h"                        // Standard procedures
 
-#include "gmail_esp32.h"                     // send email via smtp
+#if EMAIL_ENABLED
+  #include "gmail_esp32.h"                   // send email via smtp
+#endif
 
 #include "motion.h"                          // motion detection / camera
 
 #if ENABLE_OTA
   #include "ota.h"                           // Over The Air updates (OTA)
+#endif
+
+// forward declarations
+  void RestartCamera(pixformat_t);
+
+#if FTP_ENABLED
+  #include "ftp.h"                           // upload images via FTP
 #endif
 
   
@@ -819,12 +834,14 @@ void handleRoot() {
     // consecutive detections required
       message += ", Consecutive detections required to trigger:";
       message += "<input type='number' style='width: 40px' name='consec' title='The number of changed images detected in a row required to trigger motion detected' min='1' max='100' value='" + String(tCounterTrigger) + "'>\n";
-      
+
+#if EMAIL_ENABLED
     // minimum seconds between email sends
       if (emailWhenTriggered) {
         message += "<BR>Minimum time between E-mails:";
         message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
       }
+#endif
 
     // detection parameters 
       if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
@@ -845,8 +862,10 @@ void handleRoot() {
     // Toggle motion detection
       message += "<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n";
 
+#if EMAIL_ENABLED
     // Toggle email when motion detection
       message += "<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n";
+#endif
 
     // Clear images in spiffs
       message += "<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n";
@@ -887,33 +906,39 @@ void handleData(){
         message += "<BR>Current detection level: " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
         latestChanges = 0;           // reset stored values once displayed
     }
-  
-  // email when motion detected
-    if (emailWhenTriggered) message += red + "<BR>Email will be sent when detection is triggered" + endcolour;
-    else message += "<BR>Email notifications are disabled";
-        
-  // Illumination
-    message += "<BR>Illumination LED is ";    
-    if (digitalRead(Illumination_led) == ledON) message += red + "On" + endcolour;
-    else message += "Off";
-    message += UseFlash ? " - Flash enabled\n" :  " - Flash disabled\n";
-
+         
   // show current time and current day/night mode
     message += "<BR>Current time: " + currentTime() +"\n";   
-
-  // show if a sd card is present
-  if (SD_Present) {
-    uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
-    message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
-  }
 
   // show image adjustments
     message += "<BR>Image brightness: " + String(AveragePix);
     message += ", Gain: " + String((int)cameraImageGain);
     message += ", Exposure: " + String((int)cameraImageExposure) + "\n";
-  
-  // OTA enabled status
-    if (OTAEnabled) message += red + "<BR>OTA UPDATES ENABLED!" + endcolour;
+
+  message += "<BR>";
+ 
+  // Illumination LED
+    if (digitalRead(Illumination_led) == ledON) message +=  " {" + red + "Illumination LED is On" + endcolour + "} ";
+    if (UseFlash) message += " {Flash enabled} ";
+          
+  // OTA status
+    if (OTAEnabled) message += " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
+
+  // FTP status
+    #if FTP_ENABLED
+      message += " {FTP enabled} ";
+    #endif
+
+  // email status
+    #if EMAIL_ENABLED
+        if (emailWhenTriggered) message += " {" + red + "Email sending enabled" + endcolour + "} ";
+    #endif
+
+  // show if a sd card is present
+    if (SD_Present) {
+      uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
+      message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
+    }
 
 //  // show io pin status
 //    message += "<BR>External sensor pin is: ";
@@ -1217,7 +1242,7 @@ void handleImg(){
 // ----------------------------------------------------------------
 //        capture jpg image and save to Spiffs (and sd card)
 // ----------------------------------------------------------------
-// capture live image and save in spiffs (also on sd-card if present)
+// capture live image and save in spiffs (also save to sd-card if present and ftp if enabled)
 
 bool capturePhotoSaveSpiffs(bool UseFlash) {
 
@@ -1313,6 +1338,14 @@ bool capturePhotoSaveSpiffs(bool UseFlash) {
             file.close();
         }
     }    
+    
+    // ---------------------- ftp to server ---------------------
+
+
+    #if FTP_ENABLED
+      uploadImageByFTP(fb->buf, fb->len, currentTime() + "-L");
+    #endif
+
     
     // ------------------------------------------------------------
 
@@ -1434,6 +1467,7 @@ void MotionDetected(uint16_t changes) {
 
     int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
+#if EMAIL_ENABLED
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {       // && cameraImageGain == 0
         unsigned long currentMillis = millis();        // get current time  
@@ -1451,6 +1485,7 @@ void MotionDetected(uint16_t changes) {
          }
          else log_system_message("Too soon to send another email");
     }
+#endif
 
   TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
@@ -1501,7 +1536,12 @@ void saveGreyscaleFrame(String filesName) {
           else log_system_message("Error: writing grey image to sd card"); 
           file.close();
       }
-    }    
+    }   
+
+  // ftp to server
+    #if FTP_ENABLED
+      uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime() + "-S");
+    #endif
 
   esp_camera_fb_return(fb);    // return frame so memory can be released
 
@@ -1523,14 +1563,15 @@ void handleTest(){
   // ---------------------------- test section here ------------------------------
 
 
-
-        capturePhotoSaveSpiffs(0);
-        
-        // send email
-          String emessage = "Test email";
-          byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
-          if (q==0) log_system_message("email sent ok" );
-          else log_system_message("Error: sending email code=" + String(q) );
+  // test email
+    #if EMAIL_ENABLED     
+      capturePhotoSaveSpiffs(0);
+      // send email
+        String emessage = "Test email";
+        byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
+        if (q==0) log_system_message("email sent ok" );
+        else log_system_message("Error: sending email code=" + String(q) );
+    #endif
 
 
 
