@@ -1,16 +1,19 @@
-                        CameraWifiMotion - alanesq@disroot.org - 11Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 12Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
 It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  If significant change is detected it captures a higher res image and stores it in internal memory (also to SD card if one is installed) and can also email the image if required.
 
-These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have it set up as best I can but if you want to use these
-cameras at night you really need to fit a better lens - see https://www.youtube.com/watch?v=T0P37aEneto
+These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
+in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
+better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to amazingly good.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
 In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access it until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".  You can change this password in the main settings (OTAPassword).
+
+Note: This sketch now also has the ability to FTP images if required
 
                    -------------------------------------------------------------------------------------
 
