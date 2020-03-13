@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 12Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 13Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
@@ -8,6 +8,7 @@ These cheap cameras are surprisingly good apart from very poor performance in lo
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
 better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to amazingly good.
+Also, I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be rectified by installing an external wifi antenna (note: you have to move the jumper resistor to enable the external antenna socket).
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
