@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "12Mar20";                     // version of this sketch
+  const String sversion = "14Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
 
@@ -257,30 +257,31 @@ void BlinkLed(byte Bcount) {
 
 void loop(void){
 
-  server.handleClient();                           // service any web requests 
+  server.handleClient();                                                                    // service any web requests 
 
   // camera motion detection 
-  if (DetectionEnabled == 1) {    
-    if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                                // capture image, if problem reboot camera and try again
-      uint16_t changes = motion_detect();                                                   // find amount of change in current image frame compared to the last one     
-      update_frame();                                                                       // Copy current frame to previous
-      if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {               // if enough change to count as motion detected 
-        if (tCounter >= tCounterTrigger) {                                                  // only trigger if movement detected in more than one consequitive frames
-           tCounter = 0;
-           if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {    // limit time between triggers
-              TRIGGERtimer = millis();                                                      // update last trigger time
-              MotionDetected(changes);                                                      // run motion detected procedure
-           } else Serial.println("Too soon to re-trigger");
-        } else Serial.println("Not enough consecutive detections");
-     }
-  } 
+    if (DetectionEnabled == 1) {    
+      if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                                // capture image, if problem reboot camera and try again
+        uint16_t changes = motion_detect();                                                   // find amount of change in current image frame compared to the last one     
+        update_frame();                                                                       // Copy current frame to previous
+        if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {               // if enough change to count as motion detected 
+          if (tCounter >= tCounterTrigger) {                                                  // only trigger if movement detected in more than one consequitive frames
+             tCounter = 0;
+             if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {    // limit time between triggers
+                TRIGGERtimer = millis();                                                      // update last trigger time
+                MotionDetected(changes);                                                      // run motion detected procedure
+             } else Serial.println("Too soon to re-trigger");
+          } else Serial.println("Not enough consecutive detections");
+       }
+    } 
 
-  // report when sensor i/o pin status changes (debounce input)
+  // report when sensor i/o pin status changes 
     bool tstatus = digitalRead(gioPin);
     if (tstatus != SensorStatus) {
       delay(20);                             
-      tstatus = digitalRead(gioPin);
+      tstatus = digitalRead(gioPin);        // debounce input
       if (tstatus != SensorStatus) {
+        // input pin status has changed
         if (tstatus == 1) {
           SensorStatus = 1;
           log_system_message("Sensor input pin has gone high");              
@@ -293,21 +294,22 @@ void loop(void){
 
   // periodic system tasks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
-      WIFIcheck();                                 // check if wifi connection is ok
-      MaintTiming = millis();                      // reset timer
-      time_t t=now();                              // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
-      // check status of illumination led
+      WIFIcheck();                                   // check if wifi connection is ok
+      MaintTiming = millis();                        // reset system tasks timer
+      time_t t=now();                                // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
+      // check status of illumination led is correct
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
       if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
-      if (targetBrightness > 0) AutoAdjustImage();   // auto adjust image settings
+      if (targetBrightness > 0) AutoAdjustImage();   // auto adjust image sensor settings
     }
-  delay(50);
+  delay(30);
 } // loop
 
 
 
-// Auto image adjustment (runs every few seconds, called from loop)
+// Auto image adjustment 
+//   runs every few seconds, called from loop
 void AutoAdjustImage() {
           float exposureAdjustmentSteps = (cameraImageExposure / 25) + 0.2;    // adjust by higher amount when at higher level
           float gainAdjustmentSteps = 0.5;    
@@ -463,7 +465,7 @@ void ReadLineSpiffs(File* file, String* line, uint16_t* tnum) {
 
 
 // ----------------------------------------------------------------
-//              Save settings to text file in Spiffs
+//              Save settings to a text file in Spiffs
 // ----------------------------------------------------------------
 
 void SaveSettingsSpiffs() {
@@ -506,6 +508,7 @@ void SaveSettingsSpiffs() {
 // ----------------------------------------------------------------
 //                     Update boot log - Spiffs
 // ----------------------------------------------------------------
+// keeps a log of esp32 startups along with reasons why it was restarted
 
 void UpdateBootlogSpiffs(String Info) {
   
@@ -524,6 +527,7 @@ void UpdateBootlogSpiffs(String Info) {
 // ----------------------------------------------------------------
 //                reset back to default settings
 // ----------------------------------------------------------------
+// sets all settings to a standard default
 
 void handleDefault() {
 
@@ -567,234 +571,7 @@ void handleRoot() {
 
   log_system_message("root webpage requested");     
 
-  
-  // Action any buttons presses etc.
-
-    #if ENABLE_OTA
-      // enable OTA if password supplied in url parameters   (?pass=xxx)
-        if (server.hasArg("pwd")) {
-            String Tvalue = server.arg("pwd");   // read value
-              if (Tvalue == OTAPassword) {
-                otaSetup();    // Over The Air updates (OTA)
-                log_system_message("OTA enabled");
-                OTAEnabled = 1;
-              }
-        }
-     #endif
-
-     
-    // email was clicked -  if an email is sent when triggered 
-      if (server.hasArg("email")) {
-        if (!emailWhenTriggered) {
-              log_system_message("Email when motion detected enabled");
-              EMAILtimer = 0;
-              emailWhenTriggered = 1;
-        } else {
-          log_system_message("Email when motion detected disabled"); 
-          emailWhenTriggered = 0;
-        }
-        SaveSettingsSpiffs();     // save settings in Spiffs
-      }
-      
-    // FTP was clicked -  FTP images when triggered 
-      if (server.hasArg("ftp")) {
-        if (!ftpImages) {
-              log_system_message("FTP when motion detected enabled");
-              ftpImages = 1;
-        } else {
-          log_system_message("FTP when motion detected disabled"); 
-          ftpImages = 0;
-        }
-        SaveSettingsSpiffs();     // save settings in Spiffs
-      }
-
-   // if wipeS was entered  - clear Spiffs
-      if (server.hasArg("wipeS")) WipeSpiffs();        // format Spiffs 
-
-//    // if wipeSD was entered  - clear all stored images on SD Card
-//      if (server.hasArg("wipeSD")) {
-//        log_system_message("Clearing all stored images (SD Card)"); 
-//        fs::FS &fs = SD_MMC;
-//        fs.format();     // not a valid command
-//      }
-
-    // if target brightness was entered - targetBrightness
-      if (server.hasArg("daynight")) {
-        String Tvalue = server.arg("daynight");   // read value
-        int val = Tvalue.toInt();
-        if (val >= 0 && val < 256 && val != targetBrightness) { 
-          log_system_message("Target brightness changed to " + Tvalue ); 
-          targetBrightness = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-      
-      // if dblockt was entered - Block_threshold
-      if (server.hasArg("dblockt")) {
-        String Tvalue = server.arg("dblockt");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val < 256 && val != Block_threshold) { 
-          log_system_message("Block_threshold changed to " + Tvalue ); 
-          Block_threshold = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-      
-    // if dimagetl was entered - min-image_threshold
-      if (server.hasArg("dimagetl")) {
-        String Tvalue = server.arg("dimagetl");   // read value
-        int val = Tvalue.toInt();
-        if (val >= 0 && val < 192 && val != Image_thresholdL) { 
-          log_system_message("Min_day_image_threshold changed to " + Tvalue ); 
-          Image_thresholdL = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-
-    // if dimageth was entered - min-image_threshold
-      if (server.hasArg("dimageth")) {
-        String Tvalue = server.arg("dimageth");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val <= 192 && val != Image_thresholdH) { 
-          log_system_message("Max_day_image_threshold changed to " + Tvalue ); 
-          Image_thresholdH = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-            
-    #if IMAGE_SETTINGS       
-      // if exposure was adjusted (cameraImageExposure)
-        if (server.hasArg("exp")) {
-          String Tvalue = server.arg("exp");   // read value
-          if (Tvalue != NULL) {
-            int val = Tvalue.toInt();
-            if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
-              log_system_message("Camera exposure changed to " + Tvalue ); 
-              cameraImageExposure = val;
-              SaveSettingsSpiffs();         // save settings in Spiffs
-              TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
-            }
-          }
-        }
-
-      // if image gain was adjusted - gain slider (cameraImageGain)
-        if (server.hasArg("gain")) {
-          String Tvalue = server.arg("gain");   // read value
-            if (Tvalue != NULL) {
-              int val = Tvalue.toInt();
-              if (val >= 0 && val <= 31 && val != cameraImageGain) { 
-                log_system_message("Camera gain changed to " + Tvalue ); 
-                cameraImageGain = val;
-                SaveSettingsSpiffs();        // save settings in Spiffs
-                TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
-              }
-            }
-         }
-    
-    #endif
-          
-    // Generate mask grid check box array
-      if (server.hasArg("submit")) {                           // if submit button was pressed
-        mask_active = 0;  
-        bool maskChanged = 0;                                  // flag if the mask has changed
-        for (int y = 0; y < mask_rows; y++) {
-          for (int x = 0; x < mask_columns; x++) {
-            if (server.hasArg(String(x) + String(y))) { 
-              // set to active
-              if (mask_frame[x][y] == 0) maskChanged = 1;      
-              mask_frame[x][y] = 1;
-              mask_active ++;
-            } else {
-              // set to disabled
-              if (mask_frame[x][y] == 1) maskChanged = 1;    
-              mask_frame[x][y] = 0;
-            }
-          }
-        }
-        if (maskChanged) {
-          Image_thresholdH = mask_active * blocksPerMaskUnit;      // reset max trigger setting to max possible
-          SaveSettingsSpiffs();                                       // save settings in Spiffs
-          log_system_message("Detection mask updated"); 
-        }
-      }
-      
-    // if emailtime was entered - min time between email sends
-      if (server.hasArg("emailtime")) {
-        String Tvalue = server.arg("emailtime");   // read value
-        int val = Tvalue.toInt();
-        if (val > 59 && val < 10000 && val != EmailLimitTime) { 
-          log_system_message("EmailLimitTime changed to " + Tvalue + " seconds"); 
-          EmailLimitTime = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-      
-      // if triggertime was entered - min time between triggers
-      if (server.hasArg("triggertime")) {
-        String Tvalue = server.arg("triggertime");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val < 3600 && val != TriggerLimitTime) { 
-          log_system_message("Triggertime changed to " + Tvalue + " seconds"); 
-          TriggerLimitTime = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-
-//       // if consecutive detections required - tCounterTrigger
-      if (server.hasArg("consec")) {
-        String Tvalue = server.arg("consec");   // read value
-        int val = Tvalue.toInt();
-        if (val > 0 && val <= 100 && val != tCounterTrigger) { 
-          log_system_message("Consecutive detections required changed to " + Tvalue); 
-          tCounterTrigger = val;
-          SaveSettingsSpiffs();     // save settings in Spiffs
-        }
-      }
-  
-    // if button "toggle illuminator LED" was pressed  
-      if (server.hasArg("illuminator")) {
-        // button was pressed 
-          if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting (to stop light triggering it)
-          if (!ReqLEDStatus) {
-            ReqLEDStatus = 1;
-            digitalWrite(Illumination_led, ledON);  
-            log_system_message("Illuminator LED turned on");    
-          } else {
-            ReqLEDStatus = 0;
-            digitalWrite(Illumination_led, ledOFF);  
-            log_system_message("Illuminator LED turned off"); 
-          }
-          TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant trigger)
-          if (DetectionEnabled == 2) DetectionEnabled = 1;        // re enable detection if it was paused
-      }
-      
-    // if button "flash" was pressed  - toggle flash enabled
-      if (server.hasArg("flash")) {
-        // button was pressed 
-        if (UseFlash == 0) {
-            UseFlash = 1;
-            log_system_message("Flash enabled");    
-          } else {
-            UseFlash = 0;
-            log_system_message("Flash disabled");    
-          }
-          SaveSettingsSpiffs();     // save settings in Spiffs
-      }
-      
-    // if button "toggle motion detection" was pressed  
-      if (server.hasArg("detection")) {
-        // button was pressed 
-          if (DetectionEnabled == 0) {
-            TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant 
-            DetectionEnabled = 1;
-            log_system_message("Motion detection enabled"); 
-            TriggerTime = "Not since detection enabled";
-          } else {
-            DetectionEnabled = 0;
-            log_system_message("Motion detection disabled");  
-          }
-          SaveSettingsSpiffs();                                     // save settings in Spiffs
-      }
+  rootButtons();                                                    // handle any user input from page         
 
   latestChanges = 0;                                                // reset stored motion values as could be out of date 
 
@@ -905,21 +682,248 @@ void handleRoot() {
     server.send(200, "text/html", message);      // send the web page
     message = "";      // clear string
 
+}   // handle root 
+
+
+
+// Action any user input on root web page
+void rootButtons() {
+    #if ENABLE_OTA
+      // enable OTA if password supplied in url parameters   (?pass=xxx)
+        if (server.hasArg("pwd")) {
+            String Tvalue = server.arg("pwd");   // read value
+              if (Tvalue == OTAPassword) {
+                otaSetup();    // Over The Air updates (OTA)
+                log_system_message("OTA enabled");
+                OTAEnabled = 1;
+              }
+        }
+    #endif
+
+    // email was clicked -  if an email is sent when triggered 
+      if (server.hasArg("email")) {
+        if (!emailWhenTriggered) {
+              log_system_message("Email when motion detected enabled");
+              EMAILtimer = 0;
+              emailWhenTriggered = 1;
+        } else {
+          log_system_message("Email when motion detected disabled"); 
+          emailWhenTriggered = 0;
+        }
+        SaveSettingsSpiffs();     // save settings in Spiffs
+      }
+      
+    // FTP was clicked -  FTP images when triggered 
+      if (server.hasArg("ftp")) {
+        if (!ftpImages) {
+              log_system_message("FTP when motion detected enabled");
+              ftpImages = 1;
+        } else {
+          log_system_message("FTP when motion detected disabled"); 
+          ftpImages = 0;
+        }
+        SaveSettingsSpiffs();     // save settings in Spiffs
+      }
+
+   // if wipeS was entered  - clear Spiffs
+      if (server.hasArg("wipeS")) WipeSpiffs();        // format Spiffs 
+
+//    // if wipeSD was entered  - clear all stored images on SD Card    (I do not know how to do this)
+//      if (server.hasArg("wipeSD")) {
+//        log_system_message("Clearing all stored images (SD Card)"); 
+//        fs::FS &fs = SD_MMC;
+//        fs.format();     // not a valid command
+//      }
+
+    // if target brightness was entered - targetBrightness
+      if (server.hasArg("daynight")) {
+        String Tvalue = server.arg("daynight");   // read value
+        int val = Tvalue.toInt();
+        if (val >= 0 && val < 256 && val != targetBrightness) { 
+          log_system_message("Target brightness changed to " + Tvalue ); 
+          targetBrightness = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+      
+      // if dblockt was entered - Block_threshold
+      if (server.hasArg("dblockt")) {
+        String Tvalue = server.arg("dblockt");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val < 256 && val != Block_threshold) { 
+          log_system_message("Block_threshold changed to " + Tvalue ); 
+          Block_threshold = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+      
+    // if dimagetl was entered - min-image_threshold
+      if (server.hasArg("dimagetl")) {
+        String Tvalue = server.arg("dimagetl");   // read value
+        int val = Tvalue.toInt();
+        if (val >= 0 && val < 192 && val != Image_thresholdL) { 
+          log_system_message("Min_day_image_threshold changed to " + Tvalue ); 
+          Image_thresholdL = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+
+    // if dimageth was entered - min-image_threshold
+      if (server.hasArg("dimageth")) {
+        String Tvalue = server.arg("dimageth");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val <= 192 && val != Image_thresholdH) { 
+          log_system_message("Max_day_image_threshold changed to " + Tvalue ); 
+          Image_thresholdH = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+            
+    #if IMAGE_SETTINGS       
+      // if exposure was adjusted - cameraImageExposure
+        if (server.hasArg("exp")) {
+          String Tvalue = server.arg("exp");   // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
+              log_system_message("Camera exposure changed to " + Tvalue ); 
+              cameraImageExposure = val;
+              SaveSettingsSpiffs();         // save settings in Spiffs
+              TRIGGERtimer = millis();      // reset last image captured timer (to prevent instant trigger)
+            }
+          }
+        }
+
+      // if image gain was adjusted - cameraImageGain
+        if (server.hasArg("gain")) {
+          String Tvalue = server.arg("gain");   // read value
+            if (Tvalue != NULL) {
+              int val = Tvalue.toInt();
+              if (val >= 0 && val <= 31 && val != cameraImageGain) { 
+                log_system_message("Camera gain changed to " + Tvalue ); 
+                cameraImageGain = val;
+                SaveSettingsSpiffs();        // save settings in Spiffs
+                TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
+              }
+            }
+         }
+    #endif
+
+    // if mask grid check box array was altered
+      if (server.hasArg("submit")) {                           // if submit button was pressed
+        mask_active = 0;  
+        bool maskChanged = 0;                                  // flag if the mask has changed
+        for (int y = 0; y < mask_rows; y++) {
+          for (int x = 0; x < mask_columns; x++) {
+            if (server.hasArg(String(x) + String(y))) { 
+              // set to active
+              if (mask_frame[x][y] == 0) maskChanged = 1;      
+              mask_frame[x][y] = 1;
+              mask_active ++;
+            } else {
+              // set to disabled
+              if (mask_frame[x][y] == 1) maskChanged = 1;    
+              mask_frame[x][y] = 0;
+            }
+          }
+        }
+        if (maskChanged) {
+          Image_thresholdH = mask_active * blocksPerMaskUnit;      // reset max trigger setting to max possible
+          SaveSettingsSpiffs();                                       // save settings in Spiffs
+          log_system_message("Detection mask updated"); 
+        }
+      }
+      
+    // if emailtime was entered - min time between email sends
+      if (server.hasArg("emailtime")) {
+        String Tvalue = server.arg("emailtime");   // read value
+        int val = Tvalue.toInt();
+        if (val > 59 && val < 10000 && val != EmailLimitTime) { 
+          log_system_message("EmailLimitTime changed to " + Tvalue + " seconds"); 
+          EmailLimitTime = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+      
+      // if triggertime was entered - min time between triggers
+      if (server.hasArg("triggertime")) {
+        String Tvalue = server.arg("triggertime");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val < 3600 && val != TriggerLimitTime) { 
+          log_system_message("Triggertime changed to " + Tvalue + " seconds"); 
+          TriggerLimitTime = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+
+      // if consecutive detections required - tCounterTrigger
+      if (server.hasArg("consec")) {
+        String Tvalue = server.arg("consec");   // read value
+        int val = Tvalue.toInt();
+        if (val > 0 && val <= 100 && val != tCounterTrigger) { 
+          log_system_message("Consecutive detections required changed to " + Tvalue); 
+          tCounterTrigger = val;
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
+      }
+  
+    // if button "toggle illuminator LED" was pressed  
+      if (server.hasArg("illuminator")) {
+        // button was pressed 
+          if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting (to stop light triggering it)
+          if (!ReqLEDStatus) {
+            ReqLEDStatus = 1;
+            digitalWrite(Illumination_led, ledON);  
+            log_system_message("Illuminator LED turned on");    
+          } else {
+            ReqLEDStatus = 0;
+            digitalWrite(Illumination_led, ledOFF);  
+            log_system_message("Illuminator LED turned off"); 
+          }
+          TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant trigger)
+          if (DetectionEnabled == 2) DetectionEnabled = 1;        // re enable detection if it was paused
+      }
+      
+    // if button "flash" was pressed  - toggle flash enabled
+      if (server.hasArg("flash")) {
+        // button was pressed 
+        if (UseFlash == 0) {
+            UseFlash = 1;
+            log_system_message("Flash enabled");    
+          } else {
+            UseFlash = 0;
+            log_system_message("Flash disabled");    
+          }
+          SaveSettingsSpiffs();     // save settings in Spiffs
+      }
+      
+    // if button "toggle motion detection" was pressed  
+      if (server.hasArg("detection")) {
+        // button was pressed 
+          if (DetectionEnabled == 0) {
+            TRIGGERtimer = millis();                                // reset last image captured timer (to prevent instant 
+            DetectionEnabled = 1;
+            log_system_message("Motion detection enabled"); 
+            TriggerTime = "Not since detection enabled";
+          } else {
+            DetectionEnabled = 0;
+            log_system_message("Motion detection disabled");  
+          }
+          SaveSettingsSpiffs();                                     // save settings in Spiffs
+      }
 }
 
   
 // ----------------------------------------------------------------
 //     -data web page requested     i.e. http://x.x.x.x/data
 // ----------------------------------------------------------------
-//
-//   This shows information on the root web page which refreshes every few seconds
+// information displayed on the root web page which refreshes every few seconds
 
 void handleData(){
 
   String message = 
       "<!DOCTYPE HTML>\n"
-      "<html><body>\n";
-   
+      "<html><body>\n"; 
           
   // Motion detection
     message += "<BR>Motion detection last triggered: " + TriggerTime + "\n";
@@ -941,7 +945,7 @@ void handleData(){
   message += "<BR><BR>";
 
   // Motion detection
-    if (DetectionEnabled == 1) message += " {Detection enabled} ";
+    if (DetectionEnabled == 1) message += " {" + green + "Detection enabled" + endcolour + "} ";
     else message += " {" + red + "Detection disabled" + endcolour + "} ";
  
   // Illumination LED
@@ -963,16 +967,15 @@ void handleData(){
         if (emailWhenTriggered) message += " {" + red + "Email sending enabled" + endcolour + "} ";
     #endif
 
+//  // show io pin status
+//    if (digitalRead(gioPin)) message += " {IO pin " + red + "High" + endcolour + "} ";
+//    else message += " {IO pin " + green + "Low" + endcolour + "} ";
+
   // show if a sd card is present
     if (SD_Present) {
       uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
       message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
     }
-
-//  // show io pin status
-//    message += "<BR>External sensor pin is: ";
-//    if (digitalRead(gioPin)) message += "High\n";
-//    else message += "Low\n";
 
   message += "</body></htlm>\n";
   
@@ -985,7 +988,7 @@ void handleData(){
 // ----------------------------------------------------------------
 //           -Display live image     i.e. http://x.x.x.x/live
 // ----------------------------------------------------------------
-// captures an image and redirects to image view page
+// captures an image and displays it using the image view page
 
 void handleLive(){
 
@@ -994,9 +997,6 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
   handleImages();
-
-//  server.sendHeader("/images", "/",true);    //Redirect to image viewing page 
-//  server.send(302, "text/plane","");
 }
 
 
@@ -1011,7 +1011,7 @@ void handleImages(){
   uint16_t ImageToShow = SpiffsFileCounter;     // set current image to display when /img called
   String ImageWidthSetting = "90";              // percentage of screen width to use for displaying the image
 
-  // action any buttons presses or url parameters
+  // action any user input on page
 
     // if a image select button was pressed
       if (server.hasArg("button")) {
@@ -1029,19 +1029,20 @@ void handleImages(){
         else log_system_message("Error: Invalid image width specified in URL: " + Bvalue);
       }
       
-  String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");                                      // add the standard html header
-  message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page send it to)
+  String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");       // add the standard html header plus some extra styling
+
+  message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page to send it to)
 
   message += "<H1>Stored Images</H1>\n";
   
-  // create image selection buttons
+  // create the image selection buttons
     for(int i=1; i <= MaxSpiffsImages; i++) {
         message += "<input style='height: 25px; ";
         if (i == ImageToShow) message += "background-color: #0f8;";
         message += "' name='button' value='" + String(i) + "' type='submit'>\n";
     }
 
-  // Insert time info. from text file
+  // Insert image time info. from text file
     String TFileName = "/" + String(ImageToShow) + ".txt";
     File file = SPIFFS.open(TFileName, "r");
     if (!file) message += red + "<BR>File not found" + endcolour + "\n";
@@ -1066,7 +1067,6 @@ void handleImages(){
 
   message += webfooter();                      // add the standard footer
 
-    
   server.send(200, "text/html", message);      // send the web page
   message = "";      // clear string
   
@@ -1076,7 +1076,8 @@ void handleImages(){
 // ----------------------------------------------------------------
 //      -ping web page requested     i.e. http://x.x.x.x/ping
 // ----------------------------------------------------------------
-// responds with either 'enabled' or 'disabled'
+// Responds with either 'enabled' or 'disabled'
+// this can be used by automated scripts etc. to check the camera is operating ok
 
 void handlePing(){
 
@@ -1085,14 +1086,12 @@ void handlePing(){
 
   server.send(404, "text/plain", message);   // send reply as plain text
   message = "";      // clear string
-  
 }
 
 
 // ----------------------------------------------------------------
-// -download settings file from Spiffs     i.e. http://x.x.x.x/download
+// -download the settings file from Spiffs     i.e. http://x.x.x.x/download
 // ----------------------------------------------------------------
-// download the settings file from Spiffs
 // Note - for future development, how to upload a file - https://tttapa.github.io/ESP8266/Chap12%20-%20Uploading%20to%20Server.html
 
 //void handleDownload() {
@@ -1114,7 +1113,7 @@ void handlePing(){
 // ----------------------------------------------------------------
 //   -Imagedata web page requested    i.e. http://x.x.x.x/imagedata
 // ----------------------------------------------------------------
-// display raw greyscale image block data
+// display the raw greyscale image block data
 
 void handleImagedata() {
 
@@ -1235,7 +1234,7 @@ void handleBootLog() {
 
 void handleImg(){
     
-    uint16_t ImageToShow = MaxSpiffsImages + 1;     // set image to display live greyscale image as default
+    uint16_t ImageToShow = MaxSpiffsImages + 1;     // select live greyscale image as default
         
     // if a image to show is specified in url
       if (server.hasArg("pic")) {
@@ -1269,135 +1268,48 @@ void handleImg(){
 
 
 // ----------------------------------------------------------------
-//        capture jpg image and save to Spiffs (and sd card)
+//        capture images - store in Spiffs/SD card and FTP
 // ----------------------------------------------------------------
-// capture live image and save in spiffs (also save to sd-card if present and ftp if enabled)
 
 bool capturePhotoSaveSpiffs(bool UseFlash) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while photo is captured (don't think this is required as only one core?)
-
-  bool ok;
+  if (DetectionEnabled == 1) DetectionEnabled = 2;      // pause motion detecting while photo is captured (don't think this is required as only one core on esp32-cam?)
 
   // increment image count
     SpiffsFileCounter++;
     if (SpiffsFileCounter > MaxSpiffsImages) SpiffsFileCounter = 1;
     SaveSettingsSpiffs();     // save settings in Spiffs
     
-  // first quickly grab a small jpg image and save to spiffs / sdcard
+  // first quickly grab a greyscale image 
     saveGreyscaleFrame(String(SpiffsFileCounter) + "s");
     
-
-  // ------------------- capture a large image ----------------
+  // Capture a high res image
     
-  RestartCamera(PIXFORMAT_JPEG);      // restart camera in jpg mode to take a photo (uses greyscale mode for motion detection)
-
-  ok = 0; // Boolean to indicate if the picture has been taken correctly
-  byte TryCount = 0;    // attempt counter to limit retries
-
-  do {
-
-    TryCount ++;
-      
-    // use flash if required
-      if (UseFlash)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if no sd card and it is required
-   
-    Serial.println("Taking a photo... attempt #" + String(TryCount));
-    cameraImageSettings(FRAME_SIZE_PHOTO);                            // apply camera sensor settings
-    camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
-    if (!fb) {
-      Serial.println("Camera capture failed - rebooting camera");
-      RebootCamera(PIXFORMAT_JPEG);
-      cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
-      fb = esp_camera_fb_get();                       // try again to capture frame
-      if (!fb) Serial.println("Capture image failed");
-    }
-
-    // restore flash status after using it as a flash
-      if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
-      else digitalWrite(Illumination_led, ledOFF);
-       
-
-    // ------------------- save image to Spiffs -------------------
-    
-    String IFileName = "/" + String(SpiffsFileCounter) + ".jpg";      // file names to store in Spiffs
-    String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
-    // Serial.println("Picture file name: " + IFileName);
-
-    SPIFFS.remove(IFileName);                          // delete old image file if it exists
-    File file = SPIFFS.open(IFileName, FILE_WRITE);
-    if (!file) log_system_message("Failed to create file in Spiffs");
-    else {
-      if (file.write(fb->buf, fb->len)) {    
-        Serial.print("The picture has been saved as ");
-        Serial.print(IFileName);
-        Serial.print(" - Size: ");
-        Serial.print(file.size());
-        Serial.println(" bytes");
-      } else {
-        log_system_message("Error: writing image to Spiffs...will format and try again");
-        WipeSpiffs();     // format spiffs 
-        file = SPIFFS.open(IFileName, FILE_WRITE);
-        if (!file.write(fb->buf, fb->len)) log_system_message("Error: Still unable to write image to Spiffs");
-      }
-    }
-    file.close();
-    
-    // save text file to spiffs with time info. 
-      SPIFFS.remove(TFileName);   // delete old file with same name if present
-      file = SPIFFS.open(TFileName, "w");
-      if (!file) log_system_message("Error: Failed to create date file in spiffs");
-      else file.println(currentTime());
-      file.close();
-
-    // ------------------- save image to SD Card -------------------
-    
-    if (SD_Present) {
-
-      fs::FS &fs = SD_MMC; 
-             
-      String SDfilename = "/" + currentTime() + ".jpg";     // file name on sd card
-      
-      // save image
-        file = fs.open(SDfilename, FILE_WRITE);
-        if (!file) log_system_message("Error: Failed to create file on sd-card: " + SDfilename);
-        else {
-            if (file.write(fb->buf, fb->len)) Serial.println("Saved image to sd card");
-            else log_system_message("Error: failed to save image to sd card");
-            file.close();
-        }
-    }    
-    
-    // ---------------------- ftp to server ---------------------
-
-
-    #if FTP_ENABLED
-      if (ftpImages) uploadImageByFTP(fb->buf, fb->len, currentTime() + "-L");
-    #endif
-
-    
-    // ------------------------------------------------------------
-
-    
-    esp_camera_fb_return(fb);    // return frame so memory can be released
-
-    ok = checkPhoto(SPIFFS, IFileName);       // check if file has been correctly saved in SPIFFS
-    
-  } while ( !ok && TryCount < 3);             // if there was a problem taking photo try again 
-
-  RestartCamera(PIXFORMAT_GRAYSCALE);         // restart camera back to greyscale mode for motion detection
-
-  TRIGGERtimer = millis();                                  // reset retrigger timer to stop instant motion trigger
-  if (DetectionEnabled == 2) DetectionEnabled = 1;          // restart paused motion detecting 
-
-  bool tres = (TryCount == 3);
-  if (tres) log_system_message("Error: Unable to capture/store image");
-  return (!tres);
+    RestartCamera(PIXFORMAT_JPEG);      // restart camera in jpg mode to take a photo (uses greyscale mode for motion detection)
+  
+    bool ok = 0;          // Boolean to indicate if the picture has been taken correctly
+    byte TryCount = 0;    // attempt counter to limit retries
+  
+    do {           // try up to 3 times to capture/save image
+      TryCount ++;     
+      if (UseFlash)  digitalWrite(Illumination_led, ledON);                    // turn Illuminator LED on if no sd card and it is required
+      Serial.println("Taking a photo... attempt #" + String(TryCount));
+      saveJpgFrame(String(SpiffsFileCounter));                                 // capture and save/ftp image
+      ok = checkPhoto(SPIFFS, "/" + String(SpiffsFileCounter) + ".jpg");       // check if file has been correctly saved in SPIFFS
+    } while ( !ok && TryCount < 3);                                            // if there was a problem taking photo try again 
+  
+    RestartCamera(PIXFORMAT_GRAYSCALE);                                        // restart camera back to greyscale mode for motion detection
+  
+    TRIGGERtimer = millis();                                                   // reset retrigger timer to stop instant motion trigger
+    if (DetectionEnabled == 2) DetectionEnabled = 1;                           // restart paused motion detecting 
+  
+    bool tres = (TryCount == 3);
+    if (tres) log_system_message("Error: Unable to capture/store image");
+    return (!tres);
 }
 
 
-// check file saved ok 
-//    by making sure file exists and is greater than 100 bytes
+// check file saved to spiffs ok - by making sure file exists and is greater than 100 bytes
 bool checkPhoto( fs::FS &fs, String IFileName ) {
   File f_pic = fs.open( IFileName );
   uint16_t pic_sz = f_pic.size();
@@ -1409,25 +1321,21 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 
 
 // ----------------------------------------------------------------
-//              -restart  the camera in different mode
+//              -restart the camera in different mode
 // ----------------------------------------------------------------
-//  pixformats = PIXFORMAT_ + YUV422,GRAYSCALE,RGB565,JPEG
-//  framesizes = FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA
 // switches camera mode - format = PIXFORMAT_GRAYSCALE or PIXFORMAT_JPEG
 
 void RestartCamera(pixformat_t format) {
-    bool ok;
     esp_camera_deinit();
       if (format == PIXFORMAT_JPEG) config.frame_size = FRAME_SIZE_PHOTO;
       else if (format == PIXFORMAT_GRAYSCALE) config.frame_size = FRAME_SIZE_MOTION;
       else Serial.println("ERROR: Invalid image format");
       config.pixel_format = format;
-    ok = esp_camera_init(&config);
-    if (ok == ESP_OK) {
-      Serial.println("Camera mode switched ok");
-    }
+    bool ok = esp_camera_init(&config);
+    if (ok == ESP_OK) Serial.println("Camera mode switched ok");
     else {
       // failed so try again
+        esp_camera_deinit();
         delay(50);
         ok = esp_camera_init(&config);
         if (ok == ESP_OK) Serial.println("Camera mode switched ok - 2nd attempt");
@@ -1445,14 +1353,14 @@ void RestartCamera(pixformat_t format) {
 //      format = PIXFORMAT_GRAYSCALE or PIXFORMAT_JPEG
 
 void RebootCamera(pixformat_t format) {  
-    log_system_message("ERROR: Problem with camera detected so rebooting it"); 
+    log_system_message("ERROR: Problem with camera detected so resetting it"); 
     // turn camera off then back on      
         digitalWrite(PWDN_GPIO_NUM, HIGH);
-        delay(500);
+        delay(300);
         digitalWrite(PWDN_GPIO_NUM, LOW); 
-        delay(500);
+        delay(300);
     RestartCamera(PIXFORMAT_GRAYSCALE);    // restart camera in motion mode
-    delay(500);
+    delay(300);
     // try capturing a frame, if still problem reboot esp32
         if (!capture_still()) {
             UpdateBootlogSpiffs("Camera failed to reboot so rebooting esp32");    // store in bootlog
@@ -1522,12 +1430,103 @@ void MotionDetected(uint16_t changes) {
 
 
 // ----------------------------------------------------------------
-//           Save greyscale frame as jpg in spiffs/sd card
+//              Save jpg in spiffs/sd card and FTP
+// ----------------------------------------------------------------
+// filesName = name of jpg to save as in spiffs
+
+void saveJpgFrame(String filesName) {
+
+    // file names to use 
+      String IFileName = "/" + String(SpiffsFileCounter) + ".jpg";      // file name for Spiffs
+      String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
+      String SDfilename = "/" + currentTime() + ".jpg";                 // file name for sd card
+      String FTPfilename = currentTime() + "-L";                        // file name for FTP
+    
+    // grab frame
+      cameraImageSettings(FRAME_SIZE_PHOTO);            // apply camera sensor settings
+      camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
+      if (!fb) {
+        Serial.println("Camera capture failed - rebooting camera");
+        RebootCamera(PIXFORMAT_JPEG);
+        cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
+        fb = esp_camera_fb_get();                       // try again to capture frame
+      }
+
+    // restore flash status after using it as a flash
+      if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
+      else digitalWrite(Illumination_led, ledOFF);
+
+      
+   if (fb) {        // only attempt to save images if one was captured ok 
+
+      // ------------------- save image to Spiffs -------------------
+        
+      SPIFFS.remove(IFileName);                          // delete old image file if it exists
+      File file = SPIFFS.open(IFileName, FILE_WRITE);
+      if (!file) log_system_message("Failed to create file in Spiffs");
+      else {
+        if (file.write(fb->buf, fb->len)) {    
+          Serial.print("The picture has been saved as ");
+          Serial.print(IFileName);
+          Serial.print(" - Size: ");
+          Serial.print(file.size());
+          Serial.println(" bytes");
+        } else {
+          log_system_message("Error: writing image to Spiffs...will format and try again");
+          WipeSpiffs();     // format spiffs 
+          file = SPIFFS.open(IFileName, FILE_WRITE);
+          if (!file.write(fb->buf, fb->len)) log_system_message("Error: Still unable to write image to Spiffs");
+        }
+      }
+      file.close();
+      
+      // save text file to spiffs with time info. 
+        SPIFFS.remove(TFileName);   // delete old file with same name if present
+        file = SPIFFS.open(TFileName, "w");
+        if (!file) log_system_message("Error: Failed to create date file in spiffs");
+        else file.println(currentTime());
+        file.close();
+  
+      // ------------------- save image to SD Card -------------------
+      
+      if (SD_Present) {
+  
+        fs::FS &fs = SD_MMC; 
+                       
+        // save image
+          file = fs.open(SDfilename, FILE_WRITE);
+          if (!file) log_system_message("Error: Failed to create file on sd-card: " + SDfilename);
+          else {
+              if (file.write(fb->buf, fb->len)) Serial.println("Saved image to sd card");
+              else log_system_message("Error: failed to save image to sd card");
+              file.close();
+          }
+      }    
+      
+      // ------------------ ftp images to server -------------------
+  
+      #if FTP_ENABLED
+        if (ftpImages) uploadImageByFTP(fb->buf, fb->len, FTPfilename);
+      #endif
+  
+    } else Serial.println("Capture of image failed");  
+
+  esp_camera_fb_return(fb);    // return frame so memory can be released
+
+}
+
+
+// ----------------------------------------------------------------
+//       Save greyscale frame as jpg in spiffs/sd card and FTP
 // ----------------------------------------------------------------
 // filesName = name of jpg to save as in spiffs
 
 void saveGreyscaleFrame(String filesName) {
 
+  // filenames to use
+    String IFileName = "/" + filesName +".jpg";              // file name in spiffs
+    String SDFileName = "/" + currentTime() + "-S.jpg";      // file name on sd card
+    
   // grab greyscale frame
     uint8_t * _jpg_buf;
     size_t _jpg_buf_len;
@@ -1542,8 +1541,7 @@ void saveGreyscaleFrame(String filesName) {
         Serial.println("grey to jpg image conversion failed");
         return;
     }
-  
-  String IFileName = "/" + filesName +".jpg";            // file names to store image
+
 
   // save image to spiffs
     SPIFFS.remove(IFileName);                              // delete old image file if it exists
@@ -1557,8 +1555,7 @@ void saveGreyscaleFrame(String filesName) {
   // save image to sd card
     if (SD_Present) {
       fs::FS &fs = SD_MMC; 
-      IFileName = "/" + currentTime() + "-S.jpg";     // file name on sd card
-      file = fs.open(IFileName, FILE_WRITE);
+      file = fs.open(SDFileName, FILE_WRITE);
       if (!file) log_system_message("Error: creating grey image on sd-card");
       else {
           if (file.write(_jpg_buf, _jpg_buf_len)) Serial.println("Saved grey image to sd card");
