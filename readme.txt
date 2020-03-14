@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 13Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 14Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
@@ -8,31 +8,33 @@ Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
 better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
-Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to amazingly good.
-I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be rectified by installing an external wifi antenna (note: you have to move the jumper resistor to enable the external antenna socket).
-You really need a good power source for these cameras otherwise you they can be very unstable (wifi dropping, reboots, strange error messages etc.).  It needs to be capable of providing a minimum of 500ma and really needs a good smoothing capacitor fitting.
+Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to pretty good.
+I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be rectified by installing an external wifi antenna (note: you have to move the jumper resistor on the board to enable the external antenna socket).
+You really need a good power source for these cameras otherwise you they can be very unstable (wifi dropping, reboots, strange error messages etc.).  It needs to be capable of providing a minimum of 500ma and really needs a good smoothing capacitor fitting as both the LED and wifi can cause a lot of spikes/voltage drop otherwise.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is enabled otherwise OTA will not work.
 In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access it until you have entered a "secret password", the password is entered in the form "http://<ip address of esp>?pwd=12345678".  You can change this password in the main settings (OTAPassword).
 
-Note: This sketch now also has the ability to FTP images if required
+Note: This sketch now also has the ability to FTP captured images if required
 
                    -------------------------------------------------------------------------------------
 
 If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings may need changing on the gmail account.
+
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
 
-
 The last 11 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
-generates. If you install a sd card it will store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 11 images (also it may become unstable as it seems to struggle with the amount of data being processed in my experience). 
+generates. If you install a sd card it will also store all captured images on it.  It has the ability to capture images at a higher resolution but will not be able to store 11 images if you icrease it (also in my experience it may become unstable 
+as it seems to struggle with the bandwidth?). 
 
 It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
              see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
              Once you have entered your wifi password it will restart and you can then connect to it in your browser
              at the address:     http://ESPcam1.local     (if your browser / config supports it)
+             otherwise you need to check the serial output or your router to discover what IP address it has been assigned.
 
 The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
 It works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
