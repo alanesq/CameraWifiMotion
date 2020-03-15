@@ -19,7 +19,7 @@
  **************************************************************************************************/
 
 
-#define DEBUG_MOTION 0        // serial debug enable for motion.h
+#define DEBUG_MOTION 0        // extended serial debug enable for motion.h
 
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 
@@ -174,10 +174,10 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
       s->set_quality(s, 10);                        // (0 - 63)
       s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
-      s->set_brightness(s, 0);                      // (-2 to 2) - set brightness
+      s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
       s->set_lenc(s, 1);                            // lens correction? (1 or 0)
       s->set_saturation(s, 0);                      // (-2 to 2)
-      s->set_contrast(s, 0);                        // (-2 to 2)
+      s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
       s->set_sharpness(s, 0);                       // (-2 to 2)  
       s->set_whitebal(s, 0);                        // white balance 
       s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally

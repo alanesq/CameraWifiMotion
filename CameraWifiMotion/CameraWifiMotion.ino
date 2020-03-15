@@ -37,9 +37,9 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "14Mar20";                     // version of this sketch
+  const String sversion = "15Mar20";                     // version of this sketch
 
-  const char* MDNStitle = "ESPcam1";                     // Mdns title (use 'http://<MDNStitle>.local' )
+  const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
   #define EMAIL_ENABLED 1                                // if emailing is enabled
 
@@ -68,6 +68,10 @@
   const uint16_t MaintCheckRate = 5;                     // how often to do some routine system checks (seconds)
  
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
+
+  int8_t cameraImageBrightness = 0;                      // image brighness (-2 to 2) - has no effect?
+
+  int8_t cameraImageContrast = 0;                        // image contrast (-2 to 2) - has no effect?
 
   // to adjust camera sensor settings see cameraImageSettings() in motion.h
   
@@ -609,16 +613,15 @@ void handleRoot() {
     // link to show live image in popup window
       message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " \n";
     
-    #if IMAGE_SETTINGS                  // Implement adjustment of image settings (not working at present)
-      // image exposure adjustment slider
-        // message += "<BR>Exposure: <input name='exp' type='range' min='0' max='1200' value='" + String(cameraImageExposure) + "'> \n";
-        message += "<BR>Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n";
-      // image gain adjustment slider
-        // message += " - Gain: <input name='gain' width='250px' type='range' min='0' max='31' value='" + String(cameraImageGain) + "'>\n";
-        message += " Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n";       
+    #if IMAGE_SETTINGS      // Implement adjustment of image settings 
+      message += "<BR>";
+      message +=  "Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n";
+      message += " Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n";       
+      // message += " Brightness: <input type='number' name='bright' style='width: 50px' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";  
+      // message += " Contrast: <input type='number' name='cont' style='width: 50px' min='-2' max='2' value='" + String(cameraImageContrast) + "'>\n";  
         
     // Target brightness brightness cuttoff point
-      message += "<BR>Auto image adjustment, target brightness: "; 
+      message += "<BR>Auto image adjustment, target image brightness: "; 
       message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
       message += "(0 = disabled)\n";
     #else
@@ -809,6 +812,35 @@ void rootButtons() {
          }
     #endif
 
+//    // if image brightness was adjusted - cameraImageBrightness
+//      if (server.hasArg("bright")) {
+//        String Tvalue = server.arg("bright");   // read value
+//          if (Tvalue != NULL) {
+//            int val = Tvalue.toInt();
+//            if (val >= -2 && val <= 2 && val != cameraImageBrightness) { 
+//              log_system_message("Camera brightness changed to " + Tvalue ); 
+//              cameraImageBrightness = val;
+//              SaveSettingsSpiffs();        // save settings in Spiffs
+//              TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
+//            }
+//          }
+//       }
+//
+//    // if image contrast was adjusted - cameraImageContrast
+//      if (server.hasArg("cont")) {
+//        String Tvalue = server.arg("cont");   // read value
+//          if (Tvalue != NULL) {
+//            int val = Tvalue.toInt();
+//            if (val >= -2 && val <= 2 && val != cameraImageContrast) { 
+//              log_system_message("Camera contrast changed to " + Tvalue ); 
+//              cameraImageContrast = val;
+//              SaveSettingsSpiffs();        // save settings in Spiffs
+//              TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
+//            }
+//          }
+//       }
+
+    
     // if mask grid check box array was altered
       if (server.hasArg("submit")) {                           // if submit button was pressed
         mask_active = 0;  

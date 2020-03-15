@@ -1,14 +1,15 @@
 /**************************************************************************************************
  *  
- *                                         FTP images to server - 12Mar20 
+ *                                         FTP images to server - 15Mar20 
  *                                         
  *                                         https://github.com/ldab/ESP32_FTPClient
  * 
  **************************************************************************************************/
 
+// Note: this library does not provide any feedback so the sketch does not know if the FTP actually worked ok or not
+
 
 #include <ESP32_FTPClient.h>
-
 
 // Enter your FTP account details here
 char ftp_server[] = "<ftp servers ip address>";

@@ -1,6 +1,6 @@
 /**************************************************************************************************
  * 
- *    Send emails from ESP32 via Gmail    -   17Feb20
+ *    Send emails from ESP32 via Gmail    -   15Mar20
  * 
  *    include in main sketch if sending emails is required with command     #include "gmail.h"
  *    
@@ -26,17 +26,18 @@
 // -------------------------- S e t t i n g s ---------------------
 
 
-  const String emailReceiver = "<email to send to>";         // address to send emails   
   
+// Blank Settings        -    *** ENTER YOUR DETAILS BELOW! ***
+  const String emailReceiver = "<email to send to>";         // address to send emails  
   const String _mailUser = "<email to send from>";
-  
   const String _mailPassword = "<email password>";
   
+
   const String _SMTP = "smtp.gmail.com";
 
   const String _SenderName = stitle;
 
-  bool SendImage = 1;                                                 // set to 1 if sending an image attachment with email
+  bool SendImage = 1;                                          // set to 1 if sending an image attachment with email
   
 
   
@@ -115,7 +116,9 @@ byte sendEmail(String emailTo, String emailSubject, String emailBody) {
   // attach image file to email
     if (SpiffsFileCounter > 0) {
       String TFileName = "/" + String(SpiffsFileCounter) + ".jpg";
+      String SFileName = "/" + String(SpiffsFileCounter) + "s.jpg";
       if (SendImage) smtpData.addAttachFile(TFileName);
+      if (SendImage) smtpData.addAttachFile(SFileName);
     }
 
   smtpData.setSendCallback(sendCallback);
