@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "15Mar20";                     // version of this sketch
+  const String sversion = "18Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -45,13 +45,13 @@
 
   #define FTP_ENABLED 1                                  // if ftp uploads are enabled
 
-  #define ENABLE_OTA 1                                   // if Over The Air updates (OTA) are enabled
+  #define OTA_ENABLED 1                                   // if Over The Air updates (OTA) are enabled
   
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  int MaxSpiffsImages = 11;                              // number of images to store in camera (Spiffs)
+  int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
@@ -123,7 +123,7 @@
 
 #include "motion.h"                          // motion detection / camera
 
-#if ENABLE_OTA
+#if OTA_ENABLED
   #include "ota.h"                           // Over The Air updates (OTA)
 #endif
 
@@ -691,7 +691,7 @@ void handleRoot() {
 
 // Action any user input on root web page
 void rootButtons() {
-    #if ENABLE_OTA
+    #if OTA_ENABLED
       // enable OTA if password supplied in url parameters   (?pass=xxx)
         if (server.hasArg("pwd")) {
             String Tvalue = server.arg("pwd");   // read value
@@ -985,7 +985,7 @@ void handleData(){
     if (UseFlash) message += " {Flash enabled} ";
           
   // OTA status
-    #if ENABLE_OTA
+    #if OTA_ENABLED
       if (OTAEnabled) message += " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
     #endif
 
