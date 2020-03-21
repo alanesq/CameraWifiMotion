@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "18Mar20";                     // version of this sketch
+  const String sversion = "21Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -538,7 +538,7 @@ void handleDefault() {
     // default settings
       emailWhenTriggered = 0;
       targetBrightness = 130;
-      Block_threshold = 17;
+      Block_threshold = 7;
       Image_thresholdL= 15;
       Image_thresholdH= 192;
       TriggerLimitTime = 20;

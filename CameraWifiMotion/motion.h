@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 11Mar20 
+ *  Motion detection from camera image - 21Mar20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -179,21 +179,21 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_saturation(s, 0);                      // (-2 to 2)
       s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
       s->set_sharpness(s, 0);                       // (-2 to 2)  
-      s->set_whitebal(s, 0);                        // white balance 
       s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
       s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
       s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
-      // s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+      // s->set_whitebal(s, 0);                        // white balance 
       // s->set_awb_gain(s, 0);                        // Auto White Balance? 
-      // s->set_raw_gma(s, 0);                         // (1 or 0)?
       // s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
+      // s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+      // s->set_raw_gma(s, 0);                         // (1 or 0)?
       // s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
       // s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
       s->set_bpc(s, 0);                             // black pixel correction
       s->set_wpc(s, 0);                             // white pixel correction
     #endif
 
-    // capture a frame to ensure settings apply asap (not sure if this is really needed)
+    // capture a frame to ensure settings apply (not sure if this is really needed)
       camera_fb_t *frame_buffer = esp_camera_fb_get();    // capture frame from camera
       esp_camera_fb_return(frame_buffer);                 // return frame so memory can be released
     
@@ -271,6 +271,9 @@ bool capture_still() {
 float motion_detect() {
     uint16_t changes = 0;
     const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
+
+    // adjust block_threshold for gain setting (to compensate for noise introduced with gain)
+    uint16_t tThreshold = Block_threshold + (float)(cameraImageGain * 0.65);
     
     // go through all blocks in current frame and check for changes since previous frame
     for (int y = 0; y < H; y++) {
@@ -279,7 +282,7 @@ float motion_detect() {
             uint16_t prev = prev_frame[y][x];
             uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
             // float pChange = abs(current - prev) / prev;   // original code 
-            if (pChange >= Block_threshold) {                // if change in block is enough to qualify as changed
+            if (pChange >= tThreshold) {                     // if change in block is enough to qualify as changed
                 if (block_active(x,y)) changes += 1;         // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
                 Serial.print("diff\t");
