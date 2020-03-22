@@ -1,4 +1,4 @@
-                        CameraWifiMotion - alanesq@disroot.org - 14Mar2020
+                        CameraWifiMotion - alanesq@disroot.org - 22Mar2020
                         ==================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security camera.
@@ -62,6 +62,7 @@ on the page (i.e. "Readings: brightness:105, 1 changed blocks out of 64").
 There is a grid of tick boxes on the right of the main screen, this is a mask to set which parts of the image are used
 when detecting motion (i.e. only the ticked areas are used).  This 4 x 3 grid results in mask sections of 16 blocks (4x4) 
 
+NOTE: As the gain increases the motion detection sensativity automatically decreases to compensate for the added noise in the camera image.  This is to prevent false triggers in low light conditions.
 
 It also has the following URLs you can use:
 
