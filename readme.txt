@@ -8,8 +8,8 @@ Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
 better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
-Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to pretty good.
-I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be rectified by installing an external wifi antenna (note: you have to move the jumper resistor on the board to enable the external antenna socket).
+Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option...
+I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be rectified by installing an external wifi antenna (note: you have to move the jumper resistor on the board to enable the external antenna socket).  Search eBay for "2.4G Antenna IPX13".
 You really need a good power source for these cameras otherwise you they can be very unstable (wifi dropping, reboots, strange error messages etc.).  It needs to be capable of providing a minimum of 500ma and really needs a good smoothing capacitor fitting as both the LED and wifi can cause a lot of spikes/voltage drop otherwise.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of the sketch.
