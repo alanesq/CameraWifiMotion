@@ -7,8 +7,8 @@
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
  *                          
- *             GPIO16 is used as an input pin for external sensors etc. (just reports status change at the moment)
- *             GPIO13 also available for use
+ *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
+ *             GPIO16 also available for use although I have found it to be pulled high when I tried?
  *             GPIO12 can be used but must be low at boot
  *             GPIO1 / 03 Used for serial port
  *             
@@ -37,7 +37,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "21Mar20";                     // version of this sketch
+  const String sversion = "26Mar20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -63,7 +63,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte gioPin = 16;                                // I/O pin (for external sensor input) - not yet fully implemented
+  const byte gioPin = 13;                                // I/O pin (for external sensor input) - not yet fully implemented
   
   const uint16_t MaintCheckRate = 5;                     // how often to do some routine system checks (seconds)
  
@@ -72,6 +72,8 @@
   int8_t cameraImageBrightness = 0;                      // image brighness (-2 to 2) - has no effect?
 
   int8_t cameraImageContrast = 0;                        // image contrast (-2 to 2) - has no effect?
+
+  float thresholdGainCompensation = 0.65;                // motion detection level compensation for increased noise in image when gain increased
 
   // to adjust camera sensor settings see cameraImageSettings() in motion.h
   
@@ -167,10 +169,10 @@ void setup(void) {
 
   // start sd card
       SD_Present = 0;
-      if (!SD_MMC.begin("/sdcard", true)) {                        // if loading sd card fails     
-        //  ("/sdcard", true) = 1 wire - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
-      pinMode(2, INPUT_PULLUP);
-          log_system_message("SD Card not found");   
+      if (!SD_MMC.begin("/sdcard", true)) {         // if loading sd card fails     
+        // note: ("/sdcard", true) = 1 wire - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
+        pinMode(2, INPUT_PULLUP);
+        log_system_message("SD Card not found");   
       } else {
         uint8_t cardType = SD_MMC.cardType();
         if (cardType == CARD_NONE) {                // if no sd card found
@@ -194,7 +196,7 @@ void setup(void) {
   BlinkLed(1);           // flash the led once
 
   // configure the I/O pin (with pullup resistor)
-    pinMode(gioPin,  INPUT_PULLUP);      
+    pinMode(gioPin,  INPUT);      
     SensorStatus = 1;                          
 
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
@@ -288,10 +290,10 @@ void loop(void){
         // input pin status has changed
         if (tstatus == 1) {
           SensorStatus = 1;
-          log_system_message("Sensor input pin has gone high");              
+          ioDetected(1);           
         } else {
           SensorStatus = 0;
-          log_system_message("Sensor input pin has gone low");        
+          ioDetected(0);
         }
       }
     }
@@ -1424,44 +1426,6 @@ bool WipeSpiffs() {
 
       
 // ----------------------------------------------------------------
-//                       -motion has been detected
-// ----------------------------------------------------------------
-
-void MotionDetected(uint16_t changes) {
-
-  if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (prob. not required?)
-  
-    log_system_message("Camera detected motion: " + String(changes)); 
-    TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
-
-    int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
-
-#if EMAIL_ENABLED
-    // send email if long enough since last motion detection (or if this is the first one)
-    if (emailWhenTriggered) {       // && cameraImageGain == 0
-        unsigned long currentMillis = millis();        // get current time  
-        if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
-
-          EMAILtimer = currentMillis;    // reset timer 
-      
-          // send an email
-              String emessage = "Camera triggered at " + currentTime();
-              if (!capres) emessage += "\nNote: there was a problem detected when capturing an image";
-              byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
-              if (q==0) log_system_message("email sent ok" );
-              else log_system_message("Error: sending email, error code=" + String(q) );
-  
-         }
-         else log_system_message("Too soon to send another email");
-    }
-#endif
-
-  TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
-  if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
-}
-
-
-// ----------------------------------------------------------------
 //              Save jpg in spiffs/sd card and FTP
 // ----------------------------------------------------------------
 // filesName = name of jpg to save as in spiffs
@@ -1603,6 +1567,62 @@ void saveGreyscaleFrame(String filesName) {
 
   esp_camera_fb_return(fb);    // return frame so memory can be released
 
+}
+
+
+// ----------------------------------------------------------------
+//                       -gpio input has triggered
+// ----------------------------------------------------------------
+
+void ioDetected(bool iostat) {
+
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                       // pause motion detecting (prob. not required?)
+  
+    log_system_message("IO input has triggered - status = " + String(iostat)); 
+
+    // int capres = capturePhotoSaveSpiffs(UseFlash);                       // capture an image
+
+    // TRIGGERtimer = millis();                                             // reset retrigger timer to stop instant motion trigger
+
+  if (DetectionEnabled == 2) DetectionEnabled = 1;                       // restart paused motion detecting
+}
+
+
+// ----------------------------------------------------------------
+//                       -motion has been detected
+// ----------------------------------------------------------------
+
+void MotionDetected(uint16_t changes) {
+
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (prob. not required?)
+  
+    log_system_message("Camera detected motion: " + String(changes)); 
+    TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
+
+    int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
+
+#if EMAIL_ENABLED
+    // send email if long enough since last motion detection (or if this is the first one)
+    if (emailWhenTriggered) {       // && cameraImageGain == 0
+        unsigned long currentMillis = millis();        // get current time  
+        if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
+
+          EMAILtimer = currentMillis;    // reset timer 
+      
+          // send an email
+              String emessage = "Camera triggered at " + currentTime();
+              if (!capres) emessage += "\nNote: there was a problem detected when capturing an image";
+              byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
+              if (q==0) log_system_message("email sent ok" );
+              else log_system_message("Error: sending email, error code=" + String(q) );
+  
+         }
+         else log_system_message("Too soon to send another email");
+    }
+#endif
+
+  TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
+  if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
 }
 
 
