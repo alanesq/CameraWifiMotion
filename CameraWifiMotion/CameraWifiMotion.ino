@@ -1,8 +1,6 @@
  /*******************************************************************************************************************
  *
- *             ESP32Camera with motion detection and web server -  using Arduino IDE 
- *             
- *             Serves a web page whilst detecting motion on a camera (uses ESP32Cam module)
+ *       ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
  *             
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
@@ -13,9 +11,9 @@
  *             GPIO1 / 03 Used for serial port
  *             
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
- *                          response times especially when using the LED, random restarting) chances are there is a problem 
+ *                          response times, random restarting - especially when using the LED) chances are there is a problem 
  *                          the power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
- *                          capacitor.
+ *                          capacitor near the esp board.
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
  *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -37,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "26Mar20";                     // version of this sketch
+  const String sversion = "11Apr20";                     // version of this sketch
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -45,13 +43,13 @@
 
   #define FTP_ENABLED 1                                  // if ftp uploads are enabled
 
-  #define OTA_ENABLED 1                                   // if Over The Air updates (OTA) are enabled
+  #define OTA_ENABLED 1                                  // if Over The Air updates (OTA) are enabled
   
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  int MaxSpiffsImages = 10;                              // number of images to store in camera (Spiffs)
+  int MaxSpiffsImages = 8;                               // number of images to store in camera (Spiffs)
   
   const uint16_t datarefresh = 5000;                     // Refresh rate of the updating data on web page (1000 = 1 second)
 
@@ -63,26 +61,30 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte gioPin = 13;                                // I/O pin (for external sensor input) - not yet fully implemented
+  const byte flashMode = 1;                              // 1=take picture with flash, 2=flash then take picture
+
+  const byte gioPin = 13;                                // I/O pin (for external sensor input) 
   
-  const uint16_t MaintCheckRate = 5;                     // how often to do some routine system checks (seconds)
+  bool ioRequiredHighToTrigger = 0;                      // If motion detection only triggers if IO input is also high
+  
+  const uint16_t MaintCheckRate = 5;                     // how often to carry out routine system checks (seconds)
  
   uint8_t cameraImageInvert = 0;                         // flip image vertically (i.e. upside down), 1 or 0
 
-  int8_t cameraImageBrightness = 0;                      // image brighness (-2 to 2) - has no effect?
+  int8_t cameraImageBrightness = 0;                      // image brighness (-2 to 2) - Note: has no effect?
 
-  int8_t cameraImageContrast = 0;                        // image contrast (-2 to 2) - has no effect?
+  int8_t cameraImageContrast = 0;                        // image contrast (-2 to 2) - Note: has no effect?
 
   float thresholdGainCompensation = 0.65;                // motion detection level compensation for increased noise in image when gain increased
 
-  // to adjust camera sensor settings see cameraImageSettings() in motion.h
+  // to adjust other camera sensor settings see 'cameraImageSettings()' in 'motion.h'
   
   
 // ---------------------------------------------------------------
 
 
-  float cameraImageExposure = 1200;          // Camera exposure, 0 - 1200
-  float cameraImageGain = 0;                 // Image gain, 0 to 30
+  float cameraImageExposure = 20;            // Camera exposure (0 - 1200)
+  float cameraImageGain = 0;                 // Image gain (0 to 30)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
   uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
@@ -275,13 +277,15 @@ void loop(void){
              tCounter = 0;
              if ((unsigned long)(millis() - TRIGGERtimer) >= (TriggerLimitTime * 1000) ) {    // limit time between triggers
                 TRIGGERtimer = millis();                                                      // update last trigger time
-                MotionDetected(changes);                                                      // run motion detected procedure
+                // run motion detected procedure (blocked if io high is required)
+                  if (ioRequiredHighToTrigger == 0 || SensorStatus == 1) MotionDetected(changes);   
+                  else log_system_message("Motion detected but io input low so ignored");
              } else Serial.println("Too soon to re-trigger");
           } else Serial.println("Not enough consecutive detections");
        }
     } 
 
-  // report when sensor i/o pin status changes 
+  // log when sensor i/o input pin status changes 
     bool tstatus = digitalRead(gioPin);
     if (tstatus != SensorStatus) {
       delay(20);                             
@@ -290,7 +294,7 @@ void loop(void){
         // input pin status has changed
         if (tstatus == 1) {
           SensorStatus = 1;
-          ioDetected(1);           
+          ioDetected(1);                    // trigger io status has changed procedure        
         } else {
           SensorStatus = 0;
           ioDetected(0);
@@ -306,9 +310,10 @@ void loop(void){
       // check status of illumination led is correct
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
-      if (DetectionEnabled == 0) capture_still();    // capture frame to get a current brightness reading
+      if (DetectionEnabled == 0) capture_still();    // capture a frame to get a current brightness reading
       if (targetBrightness > 0) AutoAdjustImage();   // auto adjust image sensor settings
     }
+    
   delay(30);
 } // loop
 
@@ -613,7 +618,12 @@ void handleRoot() {
       message += "</div>\n";
 
     // link to show live image in popup window
-      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " \n";
+      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
+    
+    // link to help/instructions page on github
+      message += blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt'>INSTRUCTIONS</a>" + endcolour + " \n";
+      // <a id='stdLink' target='popup' onclick=\"window.open('https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt' ,'popup', 'width=600,height=480'); return false; \">INSTRUCTIONS</a>" + endcolour + " \n";
+
     
     #if IMAGE_SETTINGS      // Implement adjustment of image settings 
       message += "<BR>";
@@ -1326,7 +1336,7 @@ bool capturePhotoSaveSpiffs(bool UseFlash) {
   
     do {           // try up to 3 times to capture/save image
       TryCount ++;     
-      if (UseFlash)  digitalWrite(Illumination_led, ledON);                    // turn Illuminator LED on if no sd card and it is required
+      if (UseFlash && cameraImageGain > 0)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if it is dark and it is enabled
       Serial.println("Taking a photo... attempt #" + String(TryCount));
       saveJpgFrame(String(SpiffsFileCounter));                                 // capture and save/ftp image
       ok = checkPhoto(SPIFFS, "/" + String(SpiffsFileCounter) + ".jpg");       // check if file has been correctly saved in SPIFFS
@@ -1437,7 +1447,13 @@ void saveJpgFrame(String filesName) {
       String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
       String SDfilename = "/" + currentTime() + ".jpg";                 // file name for sd card
       String FTPfilename = currentTime() + "-L";                        // file name for FTP
-    
+     
+    // restore LED status after using it as a camera flash  (if flashmode = 2 turn it of before taking photo)
+      if (flashMode == 2) {
+        if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
+        else digitalWrite(Illumination_led, ledOFF);
+      }
+
     // grab frame
       cameraImageSettings(FRAME_SIZE_PHOTO);            // apply camera sensor settings
       camera_fb_t *fb = esp_camera_fb_get();            // capture frame from camera
@@ -1448,10 +1464,9 @@ void saveJpgFrame(String filesName) {
         fb = esp_camera_fb_get();                       // try again to capture frame
       }
 
-    // restore flash status after using it as a flash
-      if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
-      else digitalWrite(Illumination_led, ledOFF);
-
+    // restore LED status after using it as a camera flash (any flashmode)
+        if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
+        else digitalWrite(Illumination_led, ledOFF);
       
    if (fb) {        // only attempt to save images if one was captured ok 
 
@@ -1470,6 +1485,10 @@ void saveJpgFrame(String filesName) {
         } else {
           log_system_message("Error: writing image to Spiffs...will format and try again");
           WipeSpiffs();     // format spiffs 
+          // reset image counter and name
+            SpiffsFileCounter = 1;
+            IFileName = "/" + String(SpiffsFileCounter) + ".jpg";      // file name for Spiffs
+            TFileName = "/" + String(SpiffsFileCounter) + ".txt";
           file = SPIFFS.open(IFileName, FILE_WRITE);
           if (!file.write(fb->buf, fb->len)) log_system_message("Error: Still unable to write image to Spiffs");
         }
@@ -1513,7 +1532,7 @@ void saveJpgFrame(String filesName) {
 
 
 // ----------------------------------------------------------------
-//       Save greyscale frame as jpg in spiffs/sd card and FTP
+//       Save greyscale frame as jpg in spiffs/sd card/FTP
 // ----------------------------------------------------------------
 // filesName = name of jpg to save as in spiffs
 
@@ -1534,10 +1553,9 @@ void saveGreyscaleFrame(String filesName) {
     bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
     esp_camera_fb_return(fb);
     if (!jpeg_converted){
-        Serial.println("grey to jpg image conversion failed");
+        log_system_message("grey to jpg image conversion failed");
         return;
     }
-
 
   // save image to spiffs
     SPIFFS.remove(IFileName);                              // delete old image file if it exists
@@ -1569,7 +1587,7 @@ void saveGreyscaleFrame(String filesName) {
 
 }
 
-
+  
 // ----------------------------------------------------------------
 //                       -gpio input has triggered
 // ----------------------------------------------------------------
@@ -1636,22 +1654,30 @@ void handleTest(){
 
   String message = webheader();                                      // add the standard html header
 
-  message += "<BR>Testing page<BR><BR>\n";
+  message += "<BR>TEST PAGE<BR><BR>\n";
 
   // ---------------------------- test section here ------------------------------
 
 
-  // test email
-    #if EMAIL_ENABLED     
-      capturePhotoSaveSpiffs(0);
-      // send email
-        String emessage = "Test email";
-        byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
-        if (q==0) log_system_message("email sent ok" );
-        else log_system_message("Error: sending email code=" + String(q) );
-    #endif
+//  // send a test email
+//    #if EMAIL_ENABLED     
+//      capturePhotoSaveSpiffs(0);
+//      // send email
+//        String emessage = "Test email";
+//        byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
+//        if (q==0) log_system_message("email sent ok" );
+//        else log_system_message("Error: sending email code=" + String(q) );
+//    #endif
 
-
+  // list all files stored in spiffs
+    File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    message += "Files stored in SPIFFS:<BR>";
+    while(file) {
+        message += String(file.name()) + " - " + String(file.size()) + "<BR>";
+        file = root.openNextFile();
+    }
+    root.close();
 
        
   // -----------------------------------------------------------------------------

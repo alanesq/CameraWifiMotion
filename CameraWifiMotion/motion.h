@@ -67,7 +67,7 @@
     uint16_t tCounterTrigger = 2;     // number of consequitive triggers required to count as movement detected
     uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
     const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
-    // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast
+    // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast, thresholdGainAdjust
     
 // store most current motion detection reading for display on main page
     uint16_t latestChanges = 0;
@@ -273,7 +273,7 @@ float motion_detect() {
     const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
 
     // adjust block_threshold for gain setting (to compensate for noise introduced with gain)
-    uint16_t tThreshold = Block_threshold + (float)(cameraImageGain * 0.65);
+    uint16_t tThreshold = Block_threshold + (float)(cameraImageGain * thresholdGainCompensation);
     
     // go through all blocks in current frame and check for changes since previous frame
     for (int y = 0; y < H; y++) {

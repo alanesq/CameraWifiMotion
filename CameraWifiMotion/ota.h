@@ -12,7 +12,7 @@
 
     WARNING: This is not secure, anyone with access to your wifi can upload their own sketch !
 
-    To enable/disable OTA see setting at top of main sketch (#define ENABLE_OTA 1)
+    To enable/disable OTA see setting at top of main sketch (#define OTA_ENABLED 1)
 
  
  **************************************************************************************************/
