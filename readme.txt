@@ -1,4 +1,4 @@
-![GitHub Logo](/logo.jpg)
+![GitHub Logo](/replacement-lens.jpg)
 Format: ![Alt Text](url)
 
                         CameraWifiMotion - alanesq@disroot.org - 01Apr2020
