@@ -1,6 +1,4 @@
 
-![image](replacement-lens.jpg)
-
                         CameraWifiMotion - alanesq@disroot.org - 01Apr2020
                         ==================================================
 
