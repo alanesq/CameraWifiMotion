@@ -1,5 +1,5 @@
 
-![GitHub Logo](https://github.com/alanesq/CameraWifiMotion/blob/master/replacement-lens.jpg?raw=true)
+![image](https://github.com/alanesq/CameraWifiMotion/blob/master/replacement-lens.jpg?raw=true)
 
                         CameraWifiMotion - alanesq@disroot.org - 01Apr2020
                         ==================================================
