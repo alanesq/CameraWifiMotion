@@ -1,6 +1,5 @@
-
-                        CameraWifiMotion - alanesq@disroot.org - 01Apr2020
-                        ==================================================
+                        CameraWifiMotion - alanesq@disroot.org - 28Aug20
+                        ================================================
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security 
 camera.
@@ -99,7 +98,8 @@ It also has the following URLs you can use:
                                 /img - just display a plain jpg 
                                        defaults to the live greyscale image or stored images selected with /img?pic=x
                                        for smaller pre capture images add 100 to x.
-
+                                /stream - Shows a live video stream 
+                                        Thanks to Uwe Gerlach for sending me the code showing how to do this 
 
 If using a gmail account for emails your account needs to be set to "Allow less secure apps: ON"   
   see:  https://myaccount.google.com/lesssecureapps
