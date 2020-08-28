@@ -1,6 +1,7 @@
  /*******************************************************************************************************************
  *
  *       ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
+ *                                                    28 Aug 20
  *             
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
@@ -35,7 +36,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "String(__DATE__);      // Date/time sketch was compiled
+  const String sversion = String(__DATE__);              // Date/time sketch was compiled
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -696,7 +697,13 @@ void handleRoot() {
     message += "</span></P>\n";    // end of section    
     message += webfooter();        // add the standard footer
 
-    server.send(200, "text/html", message);      // send the web page
+  // send html
+    WiFiClient client = server.client();
+    client.write(message.c_str()); 
+    delay(3);
+    client.stop();
+
+    // server.send(200, "text/html", message);      // send html - alt. method
     message = "";      // clear string
 
 }   // handle root 
@@ -1024,8 +1031,14 @@ void handleData(){
     }
 
   message += "</body></htlm>\n";
+
+  // send html
+    WiFiClient client = server.client();
+    client.write(message.c_str()); 
+    delay(3);
+    client.stop();
   
-  server.send(200, "text/html", message);   // send reply as plain text
+  // server.send(200, "text/html", message);   // send reply as plain text
   message = "";      // clear string
 }
 
@@ -1042,7 +1055,7 @@ void handleLive(){
 
   capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
-  handleImages();
+  handleImages();                            // display captured image
 }
 
 
@@ -1113,7 +1126,13 @@ void handleImages(){
 
   message += webfooter();                      // add the standard footer
 
-  server.send(200, "text/html", message);      // send the web page
+  // send html
+    WiFiClient client = server.client();
+    client.write(message.c_str()); 
+    delay(3);
+    client.stop();
+
+  // server.send(200, "text/html", message);      // send the web page
   message = "";      // clear string
   
 }
@@ -1266,9 +1285,14 @@ void handleBootLog() {
         file.close();
 
       message += "<BR><BR>" + webfooter();     // add standard footer html
-    
 
-    server.send(200, "text/html", message);    // send the web page
+    // send html
+      WiFiClient client = server.client();
+      client.write(message.c_str()); 
+      delay(3);
+      client.stop();
+
+    // server.send(200, "text/html", message);    // send the web page
 
 }
 
@@ -1624,7 +1648,7 @@ void MotionDetected(uint16_t changes) {
 
 #if EMAIL_ENABLED
     // send email if long enough since last motion detection (or if this is the first one)
-    if (emailWhenTriggered) {       // && cameraImageGain == 0
+    if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours
         unsigned long currentMillis = millis();        // get current time  
         if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
 
@@ -1725,6 +1749,7 @@ void handleStream(){
   }
   
   log_system_message("Stop streaming video");
+  client.stop();
 
   RestartCamera(PIXFORMAT_GRAYSCALE);   // restart camera back to greyscale mode for motion detection
   TRIGGERtimer = millis();              // reset retrigger timer to stop instant motion trigger
