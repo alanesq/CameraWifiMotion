@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "11Apr20";                     // version of this sketch
+  const String sversion = "String(__DATE__);      // Date/time sketch was compiled
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -61,7 +61,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 1;                              // 1=take picture with flash, 2=flash then take picture
+  const byte flashMode = 2;                              // 1=take picture with flash, 2=flash then take picture
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input) 
   
@@ -137,6 +137,7 @@
 #if FTP_ENABLED
   #include "ftp.h"                           // upload images via FTP
 #endif
+
 
   
 // ---------------------------------------------------------------
@@ -222,6 +223,7 @@ void setup(void) {
     server.on("/img", handleImg);            // latest captured image
     server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
     server.on("/imagedata", handleImagedata);// Show raw image data
+    server.on("/stream", handleStream);      // Stream live image
     // server.on("/download", handleDownload);  // download settings file from Spiffs
     server.onNotFound(handleNotFound);       // invalid page requested
 
@@ -618,7 +620,7 @@ void handleRoot() {
       message += "</div>\n";
 
     // link to show live image in popup window
-      message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
+    //  message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
     
     // link to help/instructions page on github
       message += blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt'>INSTRUCTIONS</a>" + endcolour + " \n";
@@ -1165,61 +1167,62 @@ void handleImagedata() {
 
     capture_still();         // capture current image
 
-    // build the html 
-
-    // add the standard header with some adnl style 
-    String message = webheader("td {border: 1px solid grey; width: 30px; color: red;}");       
-
-      message += "<P>\n";                // start of section
+    WiFiClient client = server.client();
   
-      message += "<br>RAW IMAGE DATA (Blocks) - Detection is ";
-      message += DetectionEnabled ? "enabled" : "disabled";
+    client.write(webheader("td {border: 1px solid grey; width: 30px; color: red;}").c_str());                // add the standard html header with some adnl style 
+
+      client.write("<P>\n");                // start of section
+  
+      client.write("<br>RAW IMAGE DATA (Blocks) - Detection is ");
+      client.write(DetectionEnabled ? "enabled" : "disabled");
      
       // show raw image data in html tables
 
       // difference between images table
-      message += "<BR><center>Difference<BR><table>\n";
+      client.write("<BR><center>Difference<BR><table>\n");
       for (int y = 0; y < H; y++) {
-        message += "<tr>";
+        client.write("<tr>");
         for (int x = 0; x < W; x++) {
           uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
-          message += generateTD(timg);
+          client.write(generateTD(timg).c_str());
         }         
-        message += "</tr>\n";
+        client.write("</tr>\n");
       }
-      message += "</table>";
+      client.write("</table>");
       
       // current image table
-      message += "<BR><BR>Current Frame<BR><table>\n";
+      client.write("<BR><BR>Current Frame<BR><table>\n");
       for (int y = 0; y < H; y++) {
-        message += "<tr>";
+        client.write("<tr>");
         for (int x = 0; x < W; x++) {
-          message += generateTD(current_frame[y][x]);       
+          client.write(generateTD(current_frame[y][x]).c_str());       
         }
-        message += "</tr>\n";
+        client.write("</tr>\n");
       }
-      message += "</table>";
+      client.write("</table>");
 
       // previous image table
-      message += "<BR><BR>Previous Frame<BR><table>\n";
+      client.write("<BR><BR>Previous Frame<BR><table>\n");
       for (int y = 0; y < H; y++) {
-        message += "<tr>";
+        client.write("<tr>");
         for (int x = 0; x < W; x++) {
-          message += generateTD(prev_frame[y][x]);       
+          client.write(generateTD(prev_frame[y][x]).c_str());       
         }
-        message += "</tr>\n";
+        client.write("</tr>\n");
       }
-      message += "</table></center>\n";
+      client.write("</table></center>\n");
 
-      message += "<BR>If detection is disabled the previous frame only updates when this page is refreshed, ";
-      message += "otherwise it automatically refreshes around twice a second";
-      message += "<BR>Each block shown here is the average reading from 16x12 pixels on the camera image, ";
-      message += "The detection mask selection works on 4x4 groups of blocks";
+      client.write("<BR>If detection is disabled the previous frame only updates when this page is refreshed, ");
+      client.write("otherwise it automatically refreshes around twice a second\n");
+      client.write("<BR>Each block shown here is the average reading from 16x12 pixels on the camera image, ");
+      client.write("The detection mask selection works on 4x4 groups of blocks\n");
       
-      message += "<BR>\n" + webfooter();     // add standard footer html
-    
+      client.write("<BR>\n");
+      client.write(webfooter().c_str());     // add standard footer html
 
-    server.send(200, "text/html", message);    // send the web page
+      
+    delay(1);
+    client.stop();
 
     if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous 
 }
@@ -1652,41 +1655,80 @@ void handleTest(){
 
   log_system_message("Testing page requested");      
 
-  String message = webheader();                                      // add the standard html header
+  WiFiClient client = server.client();
+  
+  client.write(webheader().c_str());                // add the standard html header
+  client.write("<BR>TEST PAGE<BR><BR>\n");
 
-  message += "<BR>TEST PAGE<BR><BR>\n";
+  
 
   // ---------------------------- test section here ------------------------------
 
 
-//  // send a test email
-//    #if EMAIL_ENABLED     
-//      capturePhotoSaveSpiffs(0);
-//      // send email
-//        String emessage = "Test email";
-//        byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion sketch", emessage);    
-//        if (q==0) log_system_message("email sent ok" );
-//        else log_system_message("Error: sending email code=" + String(q) );
-//    #endif
 
-  // list all files stored in spiffs
-    File root = SPIFFS.open("/");
-    File file = root.openNextFile();
-    message += "Files stored in SPIFFS:<BR>";
-    while(file) {
-        message += String(file.name()) + " - " + String(file.size()) + "<BR>";
-        file = root.openNextFile();
-    }
-    root.close();
 
        
   // -----------------------------------------------------------------------------
 
-  message += webfooter();                      // add the standard footer
+  client.write(webfooter().c_str());                      // add the standard web page footer
+  delay(1);
+  client.stop();
 
-    
-  server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear string
+  
+}
+
+
+// ----------------------------------------------------------------
+//      -stream requested     i.e. http://x.x.x.x/stream
+// ----------------------------------------------------------------
+// Sends cam stream - thanks to Uwe Gerlach for this code
+
+void handleStream(){
+  log_system_message("Live video stream requested");
+
+  const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
+                        "Access-Control-Allow-Origin: *\r\n" \
+                        "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
+  const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";
+  const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
+  const int hdrLen = strlen(HEADER);
+  const int bdrLen = strlen(BOUNDARY);
+  const int cntLen = strlen(CTNTTYPE);
+
+  char buf[32];
+  int s;
+
+  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while photo is captured
+
+  WiFiClient client = server.client();
+
+  client.write(HEADER, hdrLen);
+  client.write(BOUNDARY, bdrLen);
+
+  RestartCamera(PIXFORMAT_JPEG);                  // set camera in to jpeg mode
+  cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
+
+  camera_fb_t * fb = NULL;                        // pointer to captured frame data
+
+  // send live images until client disconnects
+  while (true)
+  {
+    if (!client.connected()) break;
+      fb = esp_camera_fb_get();                   // capture live image
+      s = fb->len;
+      client.write(CTNTTYPE, cntLen);
+      sprintf( buf, "%d\r\n\r\n", s );
+      client.write(buf, strlen(buf));
+      client.write((char *)fb->buf, s);
+      client.write(BOUNDARY, bdrLen);
+      esp_camera_fb_return(fb);                   // return frame so memory can be released
+  }
+  
+  log_system_message("Stop streaming video");
+
+  RestartCamera(PIXFORMAT_GRAYSCALE);   // restart camera back to greyscale mode for motion detection
+  TRIGGERtimer = millis();              // reset retrigger timer to stop instant motion trigger
+  if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting }
   
 }
 

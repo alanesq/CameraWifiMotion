@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                       Modified version of my 'Standard' procedures  - 26Feb20
+ *                       Modified version of my 'Standard' procedures  - 28Aug20
  *             
  *  
  **************************************************************************************************/
@@ -78,9 +78,10 @@ String webheader(String style = "") {
            "<ul>\n"                  
              "<li><a href='/'>Home</a></li>\n"                       /* home menu button */
              "<li><a href='/log'>Log</a></li>\n"                     /* log menu button */
-             // "<li><a href='/bootlog'>BootLog</a></li>\n"          /* boot log menu button */
-             "<li><a href='/live'>Capture Image</a></li>\n"             /* live menu button */
+             "<li><a href='/bootlog'>BootLog</a></li>\n"             /* boot log menu button */
+             "<li><a href='/stream'>Live Video</a></li>\n"           /* stream live video */
              "<li><a href='/images'>Stored Images</a></li>\n"        /* last menu button */
+             "<li><a href='/live'>Capture Image</a></li>\n"          /* capture image menu button */
              "<li><a href='/imagedata'>Raw Data</a></li>\n"          /* raw data menu button */
              "<h1>" + red + stitle + endcolour + "</h1>\n"           /* display the project title in red */
            "</ul>\n";

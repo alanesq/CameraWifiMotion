@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                                    Wifi / NTP Connections - 26Feb20
+ *                                    Wifi / NTP Connections - 28Aug20
  *             
  *                               Set up wifi for esp32 plus NTP (network time)
  *                    
@@ -193,6 +193,7 @@ void startWifiManager() {
 String currentTime(){
 
    time_t t=now();     // get current time 
+   t+=timeZone;        // adjust for timezone
 
    if (IsBST()) t+=3600;     // add one hour if it is Summer Time
 
