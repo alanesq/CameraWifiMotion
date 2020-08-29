@@ -1,7 +1,6 @@
  /*******************************************************************************************************************
  *
  *       ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
- *                                                    28 Aug 20
  *             
  *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
@@ -36,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = String(__DATE__);              // Date/time sketch was compiled
+  const String sversion = "29Aug20";                     // Date/time sketch was compiled
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -580,6 +579,7 @@ void handleDefault() {
 // ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
+// Info on using html see https://www.arduino.cc/en/Reference/Ethernet 
 
 void handleRoot() {
 
@@ -591,7 +591,7 @@ void handleRoot() {
 
   // build the HTML code 
   
-    String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");                                   // add the standard html header
+    String message = "";                                 
     message += "<FORM action='/' method='post'>\n";                 // used by the buttons (action = the page send it to)
     message += "<P>";                                               // start of section
 
@@ -695,11 +695,13 @@ void handleRoot() {
 //      message += "<input style='height: 30px;' name='wipeSD' value='Wipe SDCard' title='Delete all images on SD Card' type='submit'> \n";
 
     message += "</span></P>\n";    // end of section    
-    message += webfooter();        // add the standard footer
+    
 
   // send html
     WiFiClient client = server.client();
-    client.write(message.c_str()); 
+    client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
+    client.write(message.c_str());                                                              // the html assembled above
+    client.write(webfooter().c_str());                                                          // html page footer
     delay(3);
     client.stop();
 
@@ -1043,7 +1045,6 @@ void handleData(){
 }
 
 
-
 // ----------------------------------------------------------------
 //           -Display live image     i.e. http://x.x.x.x/live
 // ----------------------------------------------------------------
@@ -1088,7 +1089,7 @@ void handleImages(){
         else log_system_message("Error: Invalid image width specified in URL: " + Bvalue);
       }
       
-  String message = webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}");       // add the standard html header plus some extra styling
+  String message = "";      
 
   message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page to send it to)
 
@@ -1124,11 +1125,11 @@ void handleImages(){
                 "  }\n"
                 "</script>\n";
 
-  message += webfooter();                      // add the standard footer
-
   // send html
     WiFiClient client = server.client();
-    client.write(message.c_str()); 
+    client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
+    client.write(message.c_str());                                                              // the html assembled above
+    client.write(webfooter().c_str());                                                          // html page footer
     delay(3);
     client.stop();
 
@@ -1188,7 +1189,7 @@ void handleImagedata() {
 
     WiFiClient client = server.client();
   
-    client.write(webheader("td {border: 1px solid grey; width: 30px; color: red;}").c_str());                // add the standard html header with some adnl style 
+      client.write(webheader("td {border: 1px solid grey; width: 30px; color: red;}").c_str());                // add the standard html header with some adnl style 
 
       client.write("<P>\n");                // start of section
   
@@ -1238,9 +1239,8 @@ void handleImagedata() {
       
       client.write("<BR>\n");
       client.write(webfooter().c_str());     // add standard footer html
-
       
-    delay(1);
+    delay(3);
     client.stop();
 
     if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous 
@@ -1266,7 +1266,7 @@ void handleBootLog() {
 
     // build the html for /bootlog page
 
-    String message = webheader();     // add the standard header
+    String message = "";
 
       message += "<P>\n";                // start of section
   
@@ -1284,11 +1284,13 @@ void handleBootLog() {
         }
         file.close();
 
-      message += "<BR><BR>" + webfooter();     // add standard footer html
+      message += "<BR><BR>";    
 
     // send html
       WiFiClient client = server.client();
-      client.write(message.c_str()); 
+      client.write(webheader().c_str());                                  // html page header  
+      client.write(message.c_str());                                      // the html assembled above
+      client.write(webfooter().c_str());                                  // html page footer
       delay(3);
       client.stop();
 
@@ -1705,7 +1707,7 @@ void handleTest(){
 // ----------------------------------------------------------------
 //      -stream requested     i.e. http://x.x.x.x/stream
 // ----------------------------------------------------------------
-// Sends cam stream - thanks to Uwe Gerlach for this code
+// Sends cam stream - thanks to Uwe Gerlach for the code showing how to do this
 
 void handleStream(){
   log_system_message("Live video stream requested");
@@ -1749,6 +1751,7 @@ void handleStream(){
   }
   
   log_system_message("Stop streaming video");
+  delay(3);
   client.stop();
 
   RestartCamera(PIXFORMAT_GRAYSCALE);   // restart camera back to greyscale mode for motion detection
