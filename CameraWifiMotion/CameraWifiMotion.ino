@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "29Aug20";                     // Date/time sketch was compiled
+  const String sversion = "29Aug20";                     // Sketch version
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -583,7 +583,11 @@ void handleDefault() {
 
 void handleRoot() {
 
-  log_system_message("root webpage requested");     
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+      IPAddress cip = client.remoteIP();
+      log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   rootButtons();                                                    // handle any user input from page         
 
@@ -698,7 +702,6 @@ void handleRoot() {
     
 
   // send html
-    WiFiClient client = server.client();
     client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
     client.write(message.c_str());                                                              // the html assembled above
     client.write(webfooter().c_str());                                                          // html page footer
@@ -976,6 +979,8 @@ void rootButtons() {
 
 void handleData(){
 
+  WiFiClient client = server.client();          // open link with client
+
   String message = 
       "<!DOCTYPE HTML>\n"
       "<html><body>\n"; 
@@ -1035,7 +1040,6 @@ void handleData(){
   message += "</body></htlm>\n";
 
   // send html
-    WiFiClient client = server.client();
     client.write(message.c_str()); 
     delay(3);
     client.stop();
@@ -1052,7 +1056,8 @@ void handleData(){
 
 void handleLive(){
 
-  log_system_message("Live image requested");      
+  // log page request 
+      log_system_message("Live page requested");
 
   capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
@@ -1067,7 +1072,12 @@ void handleLive(){
 
 void handleImages(){
 
-  log_system_message("Stored images page requested");   
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+      IPAddress cip = client.remoteIP();
+      log_system_message("Stored image page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+
   uint16_t ImageToShow = SpiffsFileCounter;     // set current image to display when /img called
   String ImageWidthSetting = "90";              // percentage of screen width to use for displaying the image
 
@@ -1126,7 +1136,6 @@ void handleImages(){
                 "</script>\n";
 
   // send html
-    WiFiClient client = server.client();
     client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
     client.write(message.c_str());                                                              // the html assembled above
     client.write(webfooter().c_str());                                                          // html page footer
@@ -1147,7 +1156,9 @@ void handleImages(){
 
 void handlePing(){
 
-  log_system_message("ping web page requested");      
+  // log page request 
+      log_system_message("Ping page requested");
+
   String message = DetectionEnabled ? "enabled" : "disabled";
 
   server.send(404, "text/plain", message);   // send reply as plain text
@@ -1183,11 +1194,13 @@ void handlePing(){
 
 void handleImagedata() {
 
-    log_system_message("Imagedata webpage requested");     
+    WiFiClient client = server.client();          // open link with client
+
+    // log page request including clients IP address
+        IPAddress cip = client.remoteIP();
+        log_system_message("Image data page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
     capture_still();         // capture current image
-
-    WiFiClient client = server.client();
   
       client.write(webheader("td {border: 1px solid grey; width: 30px; color: red;}").c_str());                // add the standard html header with some adnl style 
 
@@ -1262,7 +1275,11 @@ String generateTD(uint16_t idat) {
 
 void handleBootLog() {
 
-   log_system_message("bootlog webpage requested");     
+    WiFiClient client = server.client();          // open link with client
+
+    // log page request including clients IP address
+        IPAddress cip = client.remoteIP();
+        log_system_message("Boot log page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
     // build the html for /bootlog page
 
@@ -1287,7 +1304,6 @@ void handleBootLog() {
       message += "<BR><BR>";    
 
     // send html
-      WiFiClient client = server.client();
       client.write(webheader().c_str());                                  // html page header  
       client.write(message.c_str());                                      // the html assembled above
       client.write(webfooter().c_str());                                  // html page footer
@@ -1399,6 +1415,7 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 // switches camera mode - format = PIXFORMAT_GRAYSCALE or PIXFORMAT_JPEG
 
 void RestartCamera(pixformat_t format) {
+
     esp_camera_deinit();
       if (format == PIXFORMAT_JPEG) config.frame_size = FRAME_SIZE_PHOTO;
       else if (format == PIXFORMAT_GRAYSCALE) config.frame_size = FRAME_SIZE_MOTION;
@@ -1426,6 +1443,7 @@ void RestartCamera(pixformat_t format) {
 //      format = PIXFORMAT_GRAYSCALE or PIXFORMAT_JPEG
 
 void RebootCamera(pixformat_t format) {  
+
     log_system_message("ERROR: Problem with camera detected so resetting it"); 
     // turn camera off then back on      
         digitalWrite(PWDN_GPIO_NUM, HIGH);
@@ -1450,6 +1468,7 @@ void RebootCamera(pixformat_t format) {
 // ----------------------------------------------------------------
 
 bool WipeSpiffs() {
+
         log_system_message("Formatting/Wiping Spiffs"); 
         bool wres = SPIFFS.format();
         if (!wres) {
@@ -1679,9 +1698,11 @@ void MotionDetected(uint16_t changes) {
 
 void handleTest(){
 
-  log_system_message("Testing page requested");      
+  WiFiClient client = server.client();          // open link with client
 
-  WiFiClient client = server.client();
+  // log page request including clients IP address
+      IPAddress cip = client.remoteIP();
+      log_system_message("Test page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
   
   client.write(webheader().c_str());                // add the standard html header
   client.write("<BR>TEST PAGE<BR><BR>\n");
@@ -1710,7 +1731,12 @@ void handleTest(){
 // Sends cam stream - thanks to Uwe Gerlach for the code showing how to do this
 
 void handleStream(){
-  log_system_message("Live video stream requested");
+
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+      IPAddress cip = client.remoteIP();
+      log_system_message("Video stream requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
                         "Access-Control-Allow-Origin: *\r\n" \
@@ -1724,33 +1750,32 @@ void handleStream(){
   char buf[32];
   int s;
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while photo is captured
+  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while streaming
 
-  WiFiClient client = server.client();
-
-  client.write(HEADER, hdrLen);
-  client.write(BOUNDARY, bdrLen);
+  // send html header 
+    client.write(HEADER, hdrLen);
+    client.write(BOUNDARY, bdrLen);
 
   RestartCamera(PIXFORMAT_JPEG);                  // set camera in to jpeg mode
   cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
 
-  camera_fb_t * fb = NULL;                        // pointer to captured frame data
+  camera_fb_t * fb = NULL;                        // pointer to captured image frame data
 
   // send live images until client disconnects
   while (true)
   {
     if (!client.connected()) break;
       fb = esp_camera_fb_get();                   // capture live image
-      s = fb->len;
-      client.write(CTNTTYPE, cntLen);
-      sprintf( buf, "%d\r\n\r\n", s );
-      client.write(buf, strlen(buf));
-      client.write((char *)fb->buf, s);
-      client.write(BOUNDARY, bdrLen);
+      s = fb->len;                                // store size of image (i.e. buffer length)
+      client.write(CTNTTYPE, cntLen);             // send content type (i.e. jpg image)
+      sprintf( buf, "%d\r\n\r\n", s );            // format image size ready to send 
+      client.write(buf, strlen(buf));             // send image size (i.e. buffer length)
+      client.write((char *)fb->buf, s);           // send the image
+      client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
       esp_camera_fb_return(fb);                   // return frame so memory can be released
   }
   
-  log_system_message("Stop streaming video");
+  log_system_message("Video stream stopped");
   delay(3);
   client.stop();
 
