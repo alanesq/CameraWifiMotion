@@ -1,6 +1,3 @@
- ![](https://github.com/espressif/arduino-esp32/workflows/ESP32%20Arduino%20CI/badge.svg)
-
-
                         CameraWifiMotion - alanesq@disroot.org - 28Aug20
                         ================================================
 
