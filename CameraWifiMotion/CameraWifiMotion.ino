@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "29Aug20";                     // Sketch version
+  const String sversion = "30Aug20";                     // Sketch version
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -583,7 +583,10 @@ void handleDefault() {
 
 void handleRoot() {
 
-  WiFiClient client = server.client();          // open link with client
+  WiFiClient client = server.client();                                                        // open link with client
+  String tstr;                                                                                // temp store for building line of html
+  client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
+
 
   // log page request including clients IP address
       IPAddress cip = client.remoteIP();
@@ -595,121 +598,128 @@ void handleRoot() {
 
   // build the HTML code 
   
-    String message = "";                                 
-    message += "<FORM action='/' method='post'>\n";                 // used by the buttons (action = the page send it to)
-    message += "<P>";                                               // start of section
+    client.write("<FORM action='/' method='post'>\n");                 // used by the buttons (action = the page send it to)
+    client.write("<P>");                                               // start of section
 
   // insert an iFrame containing changing data in to the page
     uint16_t frameHeight = 160;
-    message += "<BR><iframe id='dataframe' height=" + String(frameHeight) + "; width=600; frameborder='0';></iframe>\n";
+    tstr = "<BR><iframe id='dataframe' height=" + String(frameHeight) + "; width=600; frameborder='0';></iframe>\n";
+    client.write(tstr.c_str());
 
   // javascript to refresh the iFrame every few seconds
   //      also refreshes after short delay (bug fix as it often rejects the first request)
-    message +=  "<script type='text/javascript'>\n"
-                "  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + String(JavaRefreshTime) + ");\n"
-                "  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n"
-                "</script>\n";
+    client.write("<script type='text/javascript'>\n");
+    tstr = "  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + String(JavaRefreshTime) + ");\n";
+    client.write(tstr.c_str());
+    tstr = "  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");\n";
+    client.write(tstr.c_str());
+    client.write("</script>\n");
 
     // detection mask check grid (right of screen)
-      message += "<div style='float: right;'>Detection Mask<br>";
+      client.write( "<div style='float: right;'>Detection Mask<br>");
       for (int y = 0; y < mask_rows; y++) {
         for (int x = 0; x < mask_columns; x++) {
-          message += "<input type='checkbox' name='" + String(x) + String(y) + "' ";
-          if (mask_frame[x][y]) message += "checked ";
-          message += ">\n";
+          tstr = "<input type='checkbox' name='" + String(x) + String(y) + "' ";
+          client.write(tstr.c_str());
+          if (mask_frame[x][y]) client.write("checked ");
+          client.write(">\n");
         }
-        message += "<BR>";
+        client.write("<BR>");
       }
-      message += "<BR>" + String(mask_active) + " active";
-      message += "<BR>(" + String(mask_active * blocksPerMaskUnit) + " blocks)";
-      message += "</div>\n";
+      tstr = "<BR>" + String(mask_active) + " active";
+      client.write(tstr.c_str());
+      tstr = "<BR>(" + String(mask_active * blocksPerMaskUnit) + " blocks)";
+      client.write(tstr.c_str());
+      client.write("</div>\n");
 
     // link to show live image in popup window
-    //  message += blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
+    //  tstr = blue + "<a id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
+    //  client.write(tstr.c_str());
     
     // link to help/instructions page on github
-      message += blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt'>INSTRUCTIONS</a>" + endcolour + " \n";
+      tstr = blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt'>INSTRUCTIONS</a>" + endcolour + " \n";
+      client.write(tstr.c_str());
       // <a id='stdLink' target='popup' onclick=\"window.open('https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt' ,'popup', 'width=600,height=480'); return false; \">INSTRUCTIONS</a>" + endcolour + " \n";
-
-    
+   
     #if IMAGE_SETTINGS      // Implement adjustment of image settings 
-      message += "<BR>";
-      message +=  "Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n";
-      message += " Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n";       
-      // message += " Brightness: <input type='number' name='bright' style='width: 50px' min='-2' max='2' value='" + String(cameraImageBrightness) + "'>\n";  
-      // message += " Contrast: <input type='number' name='cont' style='width: 50px' min='-2' max='2' value='" + String(cameraImageContrast) + "'>\n";  
+      client.write("<BR>");
+      client.write("Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n");
+      client.write(" Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n");       
         
     // Target brightness brightness cuttoff point
-      message += "<BR>Auto image adjustment, target image brightness: "; 
-      message += "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
-      message += "(0 = disabled)\n";
+      client.write("<BR>Auto image adjustment, target image brightness: "); 
+      tstr = "<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' value='" + String(targetBrightness) + "'>";
+      client.write(tstr.c_str());
+      client.write("(0 = disabled)\n");
     #else
       targetBrightness = 0;      
     #endif
 
     // minimum seconds between triggers
-      message += "<BR>Minimum time between triggers:";
-      message += "<input type='number' style='width: 50px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
+      client.write("<BR>Minimum time between triggers:");
+      tstr = "<input type='number' style='width: 50px' name='triggertime' min='1' max='3600' value='" + String(TriggerLimitTime) + "'>seconds \n";
+      client.write(tstr.c_str());
 
     // consecutive detections required
-      message += ", Consecutive detections required to trigger:";
-      message += "<input type='number' style='width: 40px' name='consec' title='The number of changed images detected in a row required to trigger motion detected' min='1' max='100' value='" + String(tCounterTrigger) + "'>\n";
+      client.write(", Consecutive detections required to trigger:");
+      tstr = "<input type='number' style='width: 40px' name='consec' title='The number of changed images detected in a row required to trigger motion detected' min='1' max='100' value='" + String(tCounterTrigger) + "'>\n";
+      client.write(tstr.c_str());
 
 #if EMAIL_ENABLED
     // minimum seconds between email sends
       if (emailWhenTriggered) {
-        message += "<BR>Minimum time between E-mails:";
-        message += "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
+        client.write("<BR>Minimum time between E-mails:");
+        tstr = "<input type='number' style='width: 60px' name='emailtime' min='60' max='10000' value='" + String(EmailLimitTime) + "'>seconds \n";
+        client.write(tstr.c_str());
       }
 #endif
 
     // detection parameters 
       if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-      message += "<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(Block_threshold) + "'>, \n";
-      message += "Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdL) + "'> \n"; 
-      message += " and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdH) + "'> blocks changed";
-      message += " out of " + String(mask_active * blocksPerMaskUnit); 
+      tstr = "<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required to count as changed (0-255)' min='1' max='255' value='" + String(Block_threshold) + "'>, \n";
+      client.write(tstr.c_str());
+      tstr = "Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count as motion detected' min='0' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdL) + "'> \n"; 
+      client.write(tstr.c_str());
+      tstr = " and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion detected' min='1' max='" + String(mask_active * blocksPerMaskUnit) + "' value='" + String(Image_thresholdH) + "'> blocks changed";
+      client.write(tstr.c_str());
+      tstr = " out of " + String(mask_active * blocksPerMaskUnit); 
+      client.write(tstr.c_str());
                
     // input submit button  
-      message += "<BR><BR><input type='submit' name='submit'><BR><BR>\n";
+      client.write("<BR><BR><input type='submit' name='submit'><BR><BR>\n");
 
     // Toggle illuminator LED button
-      message += "<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n");
 
     // Toggle 'use flash' button
-      message += "<input style='height: 30px;' name='flash' title='Toggle use of flash when capturing image On/Off' value='Flash' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='flash' title='Toggle use of flash when capturing image On/Off' value='Flash' type='submit'> \n");
 
     // Toggle motion detection
-      message += "<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n");
 
 #if EMAIL_ENABLED
     // Toggle email when motion detection
-      message += "<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n");
 #endif
 
 #if FTP_ENABLED
     // toggle FTP
-      message += "<input style='height: 30px;' name='ftp' value='ftp' title='FTP images when motion detected enable/disable' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='ftp' value='ftp' title='FTP images when motion detected enable/disable' type='submit'> \n");
 #endif
 
     // Clear images in spiffs
-      message += "<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n";
+      client.write("<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n");
     
 //    // Clear images on SD Card
-//      message += "<input style='height: 30px;' name='wipeSD' value='Wipe SDCard' title='Delete all images on SD Card' type='submit'> \n";
+//      client.write("<input style='height: 30px;' name='wipeSD' value='Wipe SDCard' title='Delete all images on SD Card' type='submit'> \n");
 
-    message += "</span></P>\n";    // end of section    
+    client.write("</span></P>\n");    // end of section    
     
 
-  // send html
-    client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
-    client.write(message.c_str());                                                              // the html assembled above
+  // close html page
     client.write(webfooter().c_str());                                                          // html page footer
     delay(3);
     client.stop();
-
-    // server.send(200, "text/html", message);      // send html - alt. method
-    message = "";      // clear string
 
 }   // handle root 
 
@@ -980,72 +990,96 @@ void rootButtons() {
 void handleData(){
 
   WiFiClient client = server.client();          // open link with client
+  String tstr;                                  // temp store for building lines of html;
 
-  String message = 
-      "<!DOCTYPE HTML>\n"
-      "<html><body>\n"; 
+  client.write("<!DOCTYPE HTML>\n");
+  client.write("<html><body>\n"); 
           
   // Motion detection
-    message += "<BR>Motion detection last triggered: " + TriggerTime + "\n";
+    tstr = "Motion detection last triggered: " + TriggerTime + "\n";
+    client.write(tstr.c_str());
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
-        message += "<BR>Current detection level: " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
+        tstr = "<BR>Current detection level: " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
+        client.write(tstr.c_str());
         latestChanges = 0;           // reset stored values once displayed
     }
          
   // show current time and current day/night mode
-    message += "<BR>Current time: " + currentTime() +"\n";   
+    tstr = "<BR>Current time: " + currentTime() +"\n";   
+    client.write(tstr.c_str());
 
   // show image adjustments
-    message += "<BR>Image brightness: " + String(AveragePix);
-    message += ", Gain: " + String((int)cameraImageGain);
-    message += ", Exposure: " + String((int)cameraImageExposure) + "\n";
+    tstr = "<BR>Image brightness: " + String(AveragePix);
+    client.write(tstr.c_str());
+    tstr = ", Gain: " + String((int)cameraImageGain);
+    client.write(tstr.c_str());
+    tstr = ", Exposure: " + String((int)cameraImageExposure) + "\n";
+    client.write(tstr.c_str());
 
-  message += "<BR><BR>";
+  client.write("<BR><BR>");
 
   // Motion detection
-    if (DetectionEnabled == 1) message += " {" + green + "Detection enabled" + endcolour + "} ";
-    else message += " {" + red + "Detection disabled" + endcolour + "} ";
+    if (DetectionEnabled == 1) {
+      tstr = " {" + green + "Detection enabled" + endcolour + "} ";
+      client.write(tstr.c_str());
+    }
+    else {
+      tstr = " {" + red + "Detection disabled" + endcolour + "} ";
+      client.write(tstr.c_str());
+    }
  
   // Illumination LED
-    if (digitalRead(Illumination_led) == ledON) message +=  " {" + red + "Illumination LED is On" + endcolour + "} ";
-    if (UseFlash) message += " {Flash enabled} ";
+    if (digitalRead(Illumination_led) == ledON) {
+      tstr = " {" + red + "Illumination LED is On" + endcolour + "} ";
+      client.write(tstr.c_str());
+    }
+    if (UseFlash) client.write(" {Flash enabled} ");
           
   // OTA status
     #if OTA_ENABLED
-      if (OTAEnabled) message += " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
+      if (OTAEnabled) {
+        tstr = " {" + red + "OTA UPDATES ENABLED" + endcolour + "} ";
+        client.write(tstr.c_str());
+      }
     #endif
 
   // FTP status
     #if FTP_ENABLED
-      if (ftpImages) message += " {FTP enabled} ";
+      if (ftpImages) client.write(" {FTP enabled} ");
     #endif
 
   // email status
     #if EMAIL_ENABLED
-        if (emailWhenTriggered) message += " {" + red + "Email sending enabled" + endcolour + "} ";
+        if (emailWhenTriggered) {
+          tstr = " {" + red + "Email sending enabled" + endcolour + "} ";
+          client.write(tstr.c_str());
+        }
     #endif
 
 //  // show io pin status
-//    if (digitalRead(gioPin)) message += " {IO pin " + red + "High" + endcolour + "} ";
-//    else message += " {IO pin " + green + "Low" + endcolour + "} ";
+//    if (digitalRead(gioPin)) {
+//        tstr = " {IO pin " + red + "High" + endcolour + "} ";
+//        client.write(tstr.c_str());
+//    }
+//    else {
+//          tstr = " {IO pin " + green + "Low" + endcolour + "} ";
+//          client.write(tstr.c_str());
+//    }
 
   // show if a sd card is present
     if (SD_Present) {
       uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024); 
-      message += "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
+      tstr = "<BR>SD-Card present - free space = " + String(SDfreeSpace) + "MB";
+      client.write(tstr.c_str());
     }
 
-  message += "</body></htlm>\n";
-
-  // send html
-    client.write(message.c_str()); 
+  // close html page
+    client.write("</body></htlm>\n");
     delay(3);
     client.stop();
   
-  // server.send(200, "text/html", message);   // send reply as plain text
-  message = "";      // clear string
 }
 
 
@@ -1072,8 +1106,10 @@ void handleLive(){
 
 void handleImages(){
 
-  WiFiClient client = server.client();          // open link with client
-
+  WiFiClient client = server.client();                                                        // open link with client
+  client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
+  String tstr;                                                                                // temp store for building lines of html
+  
   // log page request including clients IP address
       IPAddress cip = client.remoteIP();
       log_system_message("Stored image page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
@@ -1099,52 +1135,53 @@ void handleImages(){
         else log_system_message("Error: Invalid image width specified in URL: " + Bvalue);
       }
       
-  String message = "";      
+  client.write("<FORM action='/images' method='post'>\n");               // used by the buttons (action = the page to send it to)
 
-  message += "<FORM action='/images' method='post'>\n";               // used by the buttons (action = the page to send it to)
-
-  message += "<H1>Stored Images</H1>\n";
+  client.write("<H1>Stored Images</H1>\n");
   
   // create the image selection buttons
     for(int i=1; i <= MaxSpiffsImages; i++) {
-        message += "<input style='height: 25px; ";
-        if (i == ImageToShow) message += "background-color: #0f8;";
-        message += "' name='button' value='" + String(i) + "' type='submit'>\n";
+        client.write("<input style='height: 25px; ");
+        if (i == ImageToShow) client.write("background-color: #0f8;");
+        tstr = "' name='button' value='" + String(i) + "' type='submit'>\n";
+        client.write(tstr.c_str());
     }
 
   // Insert image time info. from text file
     String TFileName = "/" + String(ImageToShow) + ".txt";
     File file = SPIFFS.open(TFileName, "r");
-    if (!file) message += red + "<BR>File not found" + endcolour + "\n";
+    if (!file) {
+      tstr = red + "<BR>File not found" + endcolour + "\n";
+      client.write(tstr.c_str());
+    }
     else {
       String line = file.readStringUntil('\n');      // read first line of text file
-      message += "<BR>" + line +"\n";
+      tstr = "<BR>" + line +"\n";
+      client.write(tstr.c_str());
     }
     file.close();
 
   // button to show small version of image in popup window
-    message += blue + "<BR><a id='stdLink' target='popup' onclick=\"window.open('/img?pic=" + String(ImageToShow + 100) + "' ,'popup','width=320,height=240'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
+    tstr = blue + "<BR><a id='stdLink' target='popup' onclick=\"window.open('/img?pic=" + String(ImageToShow + 100) + "' ,'popup','width=320,height=240'); return false;\">PRE CAPTURE IMAGE</a>" + endcolour + "\n";
+    client.write(tstr.c_str());
 
   // insert image in to html 
-    message += "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";   
+    tstr = "<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='" + ImageWidthSetting + "%' src='/img?pic=" + String(ImageToShow) + "'>\n";
+    client.write(tstr.c_str());   
 
-  // javascript to refresh the image if it fails to load (bug fix as it often rejects the request otherwise)
-    message +=  "<script type='text/javascript'>\n"
-                "  function QpageRefresh() {\n"
-                "    setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "'; }, " + JavaRefreshTime + ");\n"
-                "  }\n"
-                "</script>\n";
+  // javascript to refresh the image if it fails to load (bug fix as it often rejects the request otherwise - may no longer be required?)
+    client.write("<script type='text/javascript'>\n");
+    client.write("  function QpageRefresh() {\n");
+    tstr = "    setTimeout(function(){ document.getElementById('img').src='/img?pic=" + String(ImageToShow) + "'; }, " + JavaRefreshTime + ");\n";
+    client.write(tstr.c_str()); 
+    client.write("  }\n");
+    client.write("</script>\n");
 
-  // send html
-    client.write(webheader("#stdLink:hover { background-color: rgb(180, 180, 0);}").c_str());   // html page header  (with extra formatting)
-    client.write(message.c_str());                                                              // the html assembled above
-    client.write(webfooter().c_str());                                                          // html page footer
+  // close html page
+    client.write(webfooter().c_str());                  // html page footer
     delay(3);
     client.stop();
 
-  // server.send(200, "text/html", message);      // send the web page
-  message = "";      // clear string
-  
 }
 
 
@@ -1276,6 +1313,8 @@ String generateTD(uint16_t idat) {
 void handleBootLog() {
 
     WiFiClient client = server.client();          // open link with client
+    client.write(webheader().c_str());            // html page header  
+    String tstr;                                  // temp store for building lines of html  
 
     // log page request including clients IP address
         IPAddress cip = client.remoteIP();
@@ -1283,34 +1322,32 @@ void handleBootLog() {
 
     // build the html for /bootlog page
 
-    String message = "";
-
-      message += "<P>\n";                // start of section
+      client.write("<P>\n");                // start of section
   
-      message += "<br>SYSTEM BOOT LOG<br><br>\n";
+      client.write("<br>SYSTEM BOOT LOG<br><br>\n");
   
       // show contents of bootlog.txt in Spiffs
         File file = SPIFFS.open("/bootlog.txt", "r");
-        if (!file) message += red + "No Boot Log Available" + endcolour + "<BR>\n";
+        if (!file) {
+          tstr = red + "No Boot Log Available" + endcolour + "<BR>\n";
+          client.write(tstr.c_str());
+        }
         else {
           String line;
           while(file.available()){
             line = file.readStringUntil('\n');      // read first line of text file
-            message += line +"<BR>\n";
+            tstr = line +"<BR>\n";
+            client.write(tstr.c_str());
           }
         }
         file.close();
 
-      message += "<BR><BR>";    
+      client.write("<BR><BR>");    
 
-    // send html
-      client.write(webheader().c_str());                                  // html page header  
-      client.write(message.c_str());                                      // the html assembled above
+    // close html page
       client.write(webfooter().c_str());                                  // html page footer
       delay(3);
       client.stop();
-
-    // server.send(200, "text/html", message);    // send the web page
 
 }
 
