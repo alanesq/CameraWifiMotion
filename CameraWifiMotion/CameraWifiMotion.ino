@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "30Aug20";                     // Sketch version
+  const String sversion = "31Aug20";                     // Sketch version
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -1418,7 +1418,6 @@ bool capturePhotoSaveSpiffs(bool UseFlash) {
   
     do {           // try up to 3 times to capture/save image
       TryCount ++;     
-      if (UseFlash && cameraImageGain > 0)  digitalWrite(Illumination_led, ledON);   // turn Illuminator LED on if it is dark and it is enabled
       Serial.println("Taking a photo... attempt #" + String(TryCount));
       saveJpgFrame(String(SpiffsFileCounter));                                 // capture and save/ftp image
       ok = checkPhoto(SPIFFS, "/" + String(SpiffsFileCounter) + ".jpg");       // check if file has been correctly saved in SPIFFS
@@ -1532,12 +1531,9 @@ void saveJpgFrame(String filesName) {
       String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
       String SDfilename = "/" + currentTime() + ".jpg";                 // file name for sd card
       String FTPfilename = currentTime() + "-L";                        // file name for FTP
-     
-    // restore LED status after using it as a camera flash  (if flashmode = 2 turn it of before taking photo)
-      if (flashMode == 2) {
-        if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
-        else digitalWrite(Illumination_led, ledOFF);
-      }
+
+    // turn flah on if required (i.e. it is dark, UseFlash set to on and flashMode = 1)
+      if (UseFlash == 1 && flashMode == 1 && cameraImageGain > 0)  digitalWrite(Illumination_led, ledON); 
 
     // grab frame
       cameraImageSettings(FRAME_SIZE_PHOTO);            // apply camera sensor settings
@@ -1549,9 +1545,16 @@ void saveJpgFrame(String filesName) {
         fb = esp_camera_fb_get();                       // try again to capture frame
       }
 
-    // restore LED status after using it as a camera flash (any flashmode)
-        if (ReqLEDStatus) digitalWrite(Illumination_led, ledON);   
-        else digitalWrite(Illumination_led, ledOFF);
+    // flash after taking photo (i.e. if flashmode=2)
+      if (UseFlash == 1 && flashMode == 2 && cameraImageGain > 0 && ReqLEDStatus == 0)  {
+        digitalWrite(Illumination_led, ledON); 
+        delay(700);
+      }
+
+    // turn flash off
+      if (ReqLEDStatus == 0) digitalWrite(Illumination_led, ledOFF); 
+
+
       
    if (fb) {        // only attempt to save images if one was captured ok 
 
