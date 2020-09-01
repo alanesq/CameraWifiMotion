@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "31Aug20";                     // Sketch version
+  const String sversion = "01Sep20";                     // Sketch version
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -61,7 +61,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 2;                              // 1=take picture with flash, 2=flash then take picture
+  const byte flashMode = 2;                              // 1=take picture using flash, 2=flash after taking picture
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input) 
   
@@ -83,8 +83,8 @@
 // ---------------------------------------------------------------
 
 
-  float cameraImageExposure = 20;            // Camera exposure (0 - 1200)
-  float cameraImageGain = 0;                 // Image gain (0 to 30)
+  float cameraImageExposure = 0;             // Camera exposure (loaded from spiffs)
+  float cameraImageGain = 0;                 // Image gain (loaded from spiffs)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
   uint32_t EMAILtimer = 0;                   // used for limiting rate emails can be sent
   byte DetectionEnabled = 1;                 // flag if capturing motion is enabled (0=stopped, 1=enabled, 2=paused)
@@ -1254,7 +1254,8 @@ void handleImagedata() {
         client.write("<tr>");
         for (int x = 0; x < W; x++) {
           uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
-          client.write(generateTD(timg).c_str());
+          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1) - "block_active" is in motion.h
+          client.write(generateTD(timg,mactive).c_str());
         }         
         client.write("</tr>\n");
       }
@@ -1265,7 +1266,8 @@ void handleImagedata() {
       for (int y = 0; y < H; y++) {
         client.write("<tr>");
         for (int x = 0; x < W; x++) {
-          client.write(generateTD(current_frame[y][x]).c_str());       
+          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
+          client.write(generateTD(current_frame[y][x],mactive).c_str());       
         }
         client.write("</tr>\n");
       }
@@ -1276,7 +1278,8 @@ void handleImagedata() {
       for (int y = 0; y < H; y++) {
         client.write("<tr>");
         for (int x = 0; x < W; x++) {
-          client.write(generateTD(prev_frame[y][x]).c_str());       
+          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
+          client.write(generateTD(prev_frame[y][x],mactive).c_str());       
         }
         client.write("</tr>\n");
       }
@@ -1297,11 +1300,18 @@ void handleImagedata() {
 }
 
 
+
 // generate the html for a table cell 
-String generateTD(uint16_t idat) {
-          String bcol = String(idat, HEX);     // block color in hex  (for style command 'background-color: #fff;')
-          if (bcol.length() == 1) bcol = "0" + bcol;
-          return "<td style='background-color: #" + bcol + bcol + bcol + ";'>" + String(idat) + "</td>";
+//    idat=the greyscale value, mactive=if in the active area of the mask
+
+String generateTD(uint16_t idat, bool mactive) {
+          String bcol = String(idat, HEX);                                       // block color in hex  (for style command 'background-color: #fff;')
+          if (bcol.length() == 1) bcol = "0" + bcol;                             // ensure string length = 2
+          String ccolour = "background-color: #" + bcol + bcol + bcol;           // cell background color set to greyscale level
+          String cborder = "";                                                   // border around cell (increased if not active in mask)
+          if (mactive == 0) cborder = "border: 3px solid #FFFF00";
+          String html = "<td style='" + ccolour + "; " + cborder + ";'>" + String(idat) + "</td>";     // build the html for this cell
+          return html;
 }
 
 
