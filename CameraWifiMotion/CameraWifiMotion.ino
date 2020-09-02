@@ -35,7 +35,7 @@
 
   const String stitle = "CameraWifiMotion";              // title of this sketch
 
-  const String sversion = "01Sep20";                     // Sketch version
+  const String sversion = "02Sep20";                     // Sketch version
 
   const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
 
@@ -61,7 +61,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 2;                              // 1=take picture using flash, 2=flash after taking picture
+  const byte flashMode = 1;                              // 1=take picture using flash, 2=flash after taking picture
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input) 
   
@@ -101,8 +101,8 @@
   bool SensorStatus = 1;                     // Status of the sensor i/o pin (gioPin)
   bool OTAEnabled = 0;                       // flag if OTA has been enabled (via supply of password)
 
-#include "soc/soc.h"                         // Disable brownout problems
-#include "soc/rtc_cntl_reg.h"                // Disable brownout problems
+#include "soc/soc.h"                         // Used to disable brownout problems
+#include "soc/rtc_cntl_reg.h"                
 
 // spiffs used to store images and settings
   #include <SPIFFS.h>
@@ -218,14 +218,14 @@ void setup(void) {
     server.on("/test", handleTest);          // testing page
     server.on("/reboot", handleReboot);      // reboot the esp
     server.on("/default", handleDefault);    // All settings to defaults
-    server.on("/live", handleLive);          // capture and display live image
+    server.on("/live", handleLive);          // capture then display live image
     server.on("/images", handleImages);      // display images
     server.on("/img", handleImg);            // latest captured image
-    server.on("/bootlog", handleBootLog);    // Display boot log from Spiffs
-    server.on("/imagedata", handleImagedata);// Show raw image data
-    server.on("/stream", handleStream);      // Stream live image
-    // server.on("/download", handleDownload);  // download settings file from Spiffs
+    server.on("/bootlog", handleBootLog);    // display boot log (stored in Spiffs)
+    server.on("/imagedata", handleImagedata);// show raw image data
+    server.on("/stream", handleStream);      // stream live image
     server.onNotFound(handleNotFound);       // invalid page requested
+    // server.on("/download", handleDownload);  // download settings file from Spiffs
 
   // start web server
     Serial.println(("Starting web server"));
@@ -938,7 +938,7 @@ void rootButtons() {
     // if button "toggle illuminator LED" was pressed  
       if (server.hasArg("illuminator")) {
         // button was pressed 
-          if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting (to stop light triggering it)
+          if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting to stop light triggering it (not required with single core esp32?)
           if (!ReqLEDStatus) {
             ReqLEDStatus = 1;
             digitalWrite(Illumination_led, ledON);  
@@ -1308,8 +1308,11 @@ String generateTD(uint16_t idat, bool mactive) {
           String bcol = String(idat, HEX);                                       // block color in hex  (for style command 'background-color: #fff;')
           if (bcol.length() == 1) bcol = "0" + bcol;                             // ensure string length = 2
           String ccolour = "background-color: #" + bcol + bcol + bcol;           // cell background color set to greyscale level
-          String cborder = "";                                                   // border around cell (increased if not active in mask)
-          if (mactive == 0) cborder = "border: 3px solid #FFFF00";
+
+          // border around cell (style)
+          String cborder = "border: 1px solid #00DD00";                          // default border (green)
+          if (mactive == 1) cborder = "border: 1px solid #DD0000";               // if in an active frame (red)
+
           String html = "<td style='" + ccolour + "; " + cborder + ";'>" + String(idat) + "</td>";     // build the html for this cell
           return html;
 }
@@ -1409,7 +1412,7 @@ void handleImg(){
 
 bool capturePhotoSaveSpiffs(bool UseFlash) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;      // pause motion detecting while photo is captured (don't think this is required as only one core on esp32-cam?)
+  if (DetectionEnabled == 1) DetectionEnabled = 2;      // pause motion detecting while photo is captured (not required with single core esp32?)
 
   // increment image count
     SpiffsFileCounter++;
@@ -1692,7 +1695,7 @@ void saveGreyscaleFrame(String filesName) {
 
 void ioDetected(bool iostat) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;                       // pause motion detecting (prob. not required?)
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                       // pause motion detecting (not required with single core esp32?)
   
     log_system_message("IO input has triggered - status = " + String(iostat)); 
 
@@ -1710,7 +1713,7 @@ void ioDetected(bool iostat) {
 
 void MotionDetected(uint16_t changes) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (prob. not required?)
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (not required with single core esp32?)
   
     log_system_message("Camera detected motion: " + String(changes)); 
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
@@ -1788,19 +1791,22 @@ void handleStream(){
       IPAddress cip = client.remoteIP();
       log_system_message("Video stream requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
+  // HTML used in the web page
   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
                         "Access-Control-Allow-Origin: *\r\n" \
                         "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
-  const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";
-  const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
-  const int hdrLen = strlen(HEADER);
+  const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
+  const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
+  const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
   const int bdrLen = strlen(BOUNDARY);
   const int cntLen = strlen(CTNTTYPE);
 
-  char buf[32];
-  int s;
+  // temp stores
+    char buf[32];  
+    int s;
+    camera_fb_t * fb = NULL;
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while streaming
+  if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while streaming (not required with single core esp32?)
 
   // send html header 
     client.write(HEADER, hdrLen);
@@ -1809,18 +1815,16 @@ void handleStream(){
   RestartCamera(PIXFORMAT_JPEG);                  // set camera in to jpeg mode
   cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
 
-  camera_fb_t * fb = NULL;                        // pointer to captured image frame data
-
   // send live images until client disconnects
   while (true)
   {
     if (!client.connected()) break;
-      fb = esp_camera_fb_get();                   // capture live image
+      fb = esp_camera_fb_get();                   // capture live image frame
       s = fb->len;                                // store size of image (i.e. buffer length)
-      client.write(CTNTTYPE, cntLen);             // send content type (i.e. jpg image)
-      sprintf( buf, "%d\r\n\r\n", s );            // format image size ready to send 
-      client.write(buf, strlen(buf));             // send image size (i.e. buffer length)
-      client.write((char *)fb->buf, s);           // send the image
+      client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
+      sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html 
+      client.write(buf, strlen(buf));             // send image size 
+      client.write((char *)fb->buf, s);           // send the image data
       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
       esp_camera_fb_return(fb);                   // return frame so memory can be released
   }
@@ -1829,9 +1833,10 @@ void handleStream(){
   delay(3);
   client.stop();
 
-  RestartCamera(PIXFORMAT_GRAYSCALE);   // restart camera back to greyscale mode for motion detection
-  TRIGGERtimer = millis();              // reset retrigger timer to stop instant motion trigger
-  if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting }
+  RestartCamera(PIXFORMAT_GRAYSCALE);                    // restart camera back to greyscale mode for motion detection
+  cameraImageSettings(FRAME_SIZE_MOTION);                // apply camera sensor settings
+  TRIGGERtimer = millis();                               // reset retrigger timer to stop instant motion trigger
+  if (DetectionEnabled == 2) DetectionEnabled = 1;       // restart paused motion detecting 
   
 }
 
