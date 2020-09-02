@@ -1,8 +1,6 @@
                         CameraWifiMotion - alanesq@disroot.org - 28Aug20
                         ================================================
 
-<img src="https://github.com/bdring/6-Pack_CNC_Controller/blob/master/images/20200711_120633.jpg" width="600">
-
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security 
 camera.
 It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  
