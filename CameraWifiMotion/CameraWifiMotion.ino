@@ -1224,9 +1224,9 @@ void handlePing(){
 //}
 
 
-// ----------------------------------------------------------------
-//   -Imagedata web page requested    i.e. http://x.x.x.x/imagedata
-// ----------------------------------------------------------------
+// ---------------------------------------------------------------------
+//   -Raw image data web page requested    i.e. http://x.x.x.x/imagedata
+// ---------------------------------------------------------------------
 // display the raw greyscale image block data
 
 void handleImagedata() {
@@ -1309,11 +1309,11 @@ String generateTD(uint16_t idat, bool mactive) {
           if (bcol.length() == 1) bcol = "0" + bcol;                             // ensure string length = 2
           String ccolour = "background-color: #" + bcol + bcol + bcol;           // cell background color set to greyscale level
 
-          // border around cell (style)
-          String cborder = "border: 1px solid #00DD00";                          // default border (green)
-          if (mactive == 1) cborder = "border: 1px solid #DD0000";               // if in an active frame (red)
+          // Text colour (html style)
+          String ctext = "color: #00DD00";                          // default colour (green)
+          if (mactive == 1) ctext = "color: #DD0000";               // if in an active frame (red)
 
-          String html = "<td style='" + ccolour + "; " + cborder + ";'>" + String(idat) + "</td>";     // build the html for this cell
+          String html = "<td style='" + ccolour + "; " + ctext + ";'>" + String(idat) + "</td>";     // build the html for this cell
           return html;
 }
 
