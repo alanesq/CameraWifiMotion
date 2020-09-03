@@ -4,12 +4,12 @@
   <td><img src="/screen%20capture%201.png" width="640"/></td>
   <td><img src="/screen%20capture%202.png" width="640"/></td>
 </tr></table>                  
-                        
-This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security 
+
+This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
-It captures an image around 4 times a second, each time comparing this with the previous image looking for any changes.  
-If significant change is detected it captures a higher res image and stores it in internal memory (also to SD card if one 
-is installed) and can also email the image if required.
+It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
+any changes.  If significant change is detected it captures a higher res image and stores it in internal memory.  
+It also has the options to email or FTP the captured images or store them to sd card.
 
 Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
@@ -20,7 +20,9 @@ from completely useless to ok.  You need a lens with a large iris, I am still se
 I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be
 rectified by installing an external wifi antenna (note: you have to move the jumper resistor on the board to enable the
 external antenna socket).  Search eBay for "2.4G Antenna IPX13".
-You really need a good power source for these cameras otherwise you they can be very unstable (wifi dropping, reboots, strange error messages etc.).  It needs to be capable of providing a minimum of 500ma and really needs a good smoothing capacitor fitting as both the LED and wifi can cause a lot of spikes/voltage drop otherwise.
+You really need a good power source for these cameras otherwise you they can be very unstable (wifi dropping, reboots, 
+strange error messages etc.).  It needs to be capable of providing a minimum of 500ma and really needs a good smoothing 
+capacitor fitting as both the LED and wifi can cause a lot of spikes/voltage drop otherwise.
 
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of 
 the sketch.
@@ -32,7 +34,7 @@ it until you have entered a "secret password", the password is entered in the fo
 
 Note: This sketch now also has the ability to FTP captured images if required
 
-                   -------------------------------------------------------------------------------------
+-----------------
 
 If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings 
 may need changing on the gmail account.
