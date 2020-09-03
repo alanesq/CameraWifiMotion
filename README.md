@@ -30,24 +30,22 @@ If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP3
 enabled otherwise OTA will not work.
 In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access 
 it until you have entered a "secret password", the password is entered in the form 
-"http://<ip address of esp>?pwd=12345678".  You can change this password in the main settings (OTAPassword).
-
-Note: This sketch now also has the ability to FTP captured images if required
+"http://x.x.x.x/?pwd=12345678".  You can change this password in the main settings (OTAPassword).
 
 -----------------
 
 If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings 
-may need changing on the gmail account.
+may need changing on the gmail account for it to accept them  see: https://myaccount.google.com/lesssecureapps
 
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
 
-The last 11 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
+The last 8 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will also store all captured images on it.  It has the ability to capture images at 
-a higher resolution but will not be able to store 11 images if you icrease it (also in my experience it may become unstable 
+a higher resolution but will not be able to store 8 images if you icrease it (also in my experience it may become unstable 
 as it seems to struggle with the bandwidth?). 
 
-It uses WifiManager so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in
+It uses the WifiManager library so first time the ESP starts it will create an access point "ESPCamera" which you need to connect to in
 order to enter your wifi details.  
              default password = "12345678"   (note-it may not work if anything other than 8 characters long?)
              see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
@@ -107,11 +105,6 @@ It also has the following URLs you can use:
                                 /stream - Shows a live video stream 
                                         Thanks to Uwe Gerlach for sending me the code showing how to do this 
 
-If using a gmail account for emails your account needs to be set to "Allow less secure apps: ON"   
-  see:  https://myaccount.google.com/lesssecureapps
-  you then need to edit gmail_esp32.h with your details
-
- 
 -----------------
 
 Adjusting the settings:
