@@ -1,7 +1,7 @@
-<img src="/WifiCameraMotion.jpg" width="100%"/>
+<img src="/WifiCameraMotion.jpg" width="90%"/>
 <table><tr>
-  <td><img src="/screen%20capture%201.png" width="50%"/></td>
-  <td><img src="/screen%20capture%202.png" width="50%"/></td>
+  <td><img src="/screen%20capture%201.png" /></td>
+  <td><img src="/screen%20capture%202.png" /></td>
 </tr></table>                  
 
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
