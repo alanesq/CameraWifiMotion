@@ -1,14 +1,15 @@
 <img src="/WifiCameraMotion.jpg" width="90%"/>
-<table><tr>
-  <td><img src="/screen%20capture%201.png" /></td>
-  <td><img src="/screen%20capture%202.png" /></td>
-</tr></table>                  
-
+              
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
 It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
 any changes.  If significant change is detected it captures a higher res image and stores it in internal memory.  
 It also has the options to email or FTP the captured images or store them to sd card.
+
+<table><tr>
+  <td><img src="/screen%20capture%201.png" /></td>
+  <td><img src="/screen%20capture%202.png" /></td>
+</tr></table>   
 
 Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
