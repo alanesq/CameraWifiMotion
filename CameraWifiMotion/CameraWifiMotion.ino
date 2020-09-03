@@ -13,7 +13,7 @@
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times, random restarting - especially when using the LED) chances are there is a problem 
  *                          the power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
- *                          capacitor near the esp board.
+ *                          capacitor near the esp board in the order 3000uF.
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
  *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
@@ -637,7 +637,7 @@ void handleRoot() {
     //  client.write(tstr.c_str());
     
     // link to help/instructions page on github
-      tstr = blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt'>INSTRUCTIONS</a>" + endcolour + " \n";
+      tstr = blue + " <a href='https://github.com/alanesq/CameraWifiMotion/blob/master/README.md'>INSTRUCTIONS</a>" + endcolour + " \n";
       client.write(tstr.c_str());
       // <a id='stdLink' target='popup' onclick=\"window.open('https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt' ,'popup', 'width=600,height=480'); return false; \">INSTRUCTIONS</a>" + endcolour + " \n";
    
