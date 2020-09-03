@@ -1,7 +1,7 @@
                         CameraWifiMotion - alanesq@disroot.org - 03Sep20
                         ================================================
-
-![ScreenShot](/replacement-lens.jpg)
+                        
+<img src="/screen%20capture%201.png" width="640"/>
                         
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera boards as a motion detecting security 
 camera.
