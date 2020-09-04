@@ -1,4 +1,4 @@
-<img src="/WifiCameraMotion.jpg" width="90%"/>
+<img src="/Images/CameraWifiMotion.jpg" width="90%"/>
               
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
@@ -7,8 +7,8 @@ any changes.  If significant change is detected it captures a higher res image a
 It also has the options to email or FTP the captured images or store them to sd card.
 
 <table><tr>
-  <td><img src="/screen%20capture%201.png" /></td>
-  <td><img src="/screen%20capture%202.png" /></td>
+  <td><img src="/Images/screen1.png" /></td>
+  <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
 Tips / Mods:
