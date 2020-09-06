@@ -1,4 +1,4 @@
-<img src="/Images/CameraWifiMotion.jpg" width="90%"/>
+<p align="center"><img src="/Images/CameraWifiMotion.jpg" width="90%"/></p>
               
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
