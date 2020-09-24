@@ -144,7 +144,7 @@ Also I find that a smoothing capacitor is required on the 3.3v side otherwise th
 lot of problems (specifically causing it to keep re-triggering and other random behaviour).
 Using the flash can often trigger such problems if there is any problem with the power supply.
 
-If you require more io pins you can consider soldering directly to the esp32-s modules pins
-     Possible ins to consider:    16, 17, 9, 10, 11, 6, 7, 8    
+If you require more io pins you can consider soldering directly to the esp32-s modules pins.   
+      Possible pins to consider:    16, 17, 9, 10, 11, 6, 7, 8    
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
