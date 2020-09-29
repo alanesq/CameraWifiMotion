@@ -39,6 +39,7 @@ may need changing on the gmail account for it to accept them  see: https://myacc
 
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
+To add ESP32 suport to the Arduino IDE see: https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/
 
 The last 8 images captured are stored in the onboard Spiffs memory and these can be viewed on the web page this device 
 generates. If you install a sd card it will also store all captured images on it.  It has the ability to capture images at 
