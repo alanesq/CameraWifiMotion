@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *                                Over The Air updates (OTA) - 05Sep20
+ *                                Over The Air updates (OTA) - 30Sep20
  * 
  *                                   part of the Webserver library
  *                                   
@@ -75,28 +75,25 @@ void otaSetup() {
 void handleOTA(){
 
   WiFiClient client = server.client();          // open link with client
-  String tstr;                                  // temp store for building lines of html;
 
-  client.write(webheader().c_str());            // add the standard html header
+  webheader(client);                            // add the standard html header
 
   // log page request including clients IP address
       IPAddress cip = client.remoteIP();
       log_system_message("OTA web page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   client.write("<BR><H1>Update firmware</H1><BR>\n");
-  tstr = "Current version = " + stitle + ", " + sversion + "<BR><BR>";
-  client.write(tstr.c_str());
+  client.printf("Current version = %s, %s<BR><BR>", stitle, sversion);
   
   client.write("<form method='POST' action='/update' enctype='multipart/form-data'>\n");
   client.write("<input type='file' style='width: 300px' name='update'>\n");
   client.write("<BR><BR><input type='submit' value='Update'></form><BR>\n");
 
   client.write("<BR><BR>Device will reboot when upload complete");
-  tstr = red + "<BR>To disable OTA restart device<BR>" + endcolour;
-  client.write(tstr.c_str());
+  client.printf("%s<BR>To disable OTA restart device<BR>%s", colRed, colEnd);
                           
   // close html page
-    client.write(webfooter().c_str());                      // add the standard web page footer
+    webfooter(client);                      // add the standard web page footer
     delay(3);
     client.stop();
   

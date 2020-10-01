@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *  Motion detection from camera image - 21Mar20 
+ *  Motion detection from camera image - 08Sep20 
  * 
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  * 
@@ -24,14 +24,14 @@
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 
 
-// Settings
+// Image Settings
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
-  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       //   Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-  #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing
+  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing (20)
 
-// camera type (CAMERA_MODEL_AI_THINKER)
+// camera type settings (CAMERA_MODEL_AI_THINKER)
   #define CAMERA_MODEL_AI_THINKER
-  #define PWDN_GPIO_NUM     32      // power down pin
+  #define PWDN_GPIO_NUM     32      // power to camera enable
   #define RESET_GPIO_NUM    -1      // -1 = not used
   #define XCLK_GPIO_NUM      0
   #define SIOD_GPIO_NUM     26      // i2c sda
@@ -166,7 +166,8 @@ bool cameraImageSettings(framesize_t fsize) {
       if (fsize == FRAME_SIZE_MOTION) s->set_pixformat(s, PIXFORMAT_GRAYSCALE);
       if (fsize == FRAME_SIZE_PHOTO) s->set_pixformat(s, PIXFORMAT_JPEG);
 
-      // note: if you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
+      // If you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
+      // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
       s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
       s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
       s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
@@ -182,13 +183,13 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
       s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
       s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
-      // s->set_whitebal(s, 0);                        // white balance 
-      // s->set_awb_gain(s, 0);                        // Auto White Balance? 
-      // s->set_wb_mode(s, 0);                         // white balance mode (0 to 4)
-      // s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
-      // s->set_raw_gma(s, 0);                         // (1 or 0)?
-      // s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
-      // s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
+//       s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
+//       s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1) 
+//       s->set_wb_mode(s, 0);                         // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+//       s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+//       s->set_raw_gma(s, 1);                         // (1 or 0)
+//       s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
+//       s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
       s->set_bpc(s, 0);                             // black pixel correction
       s->set_wpc(s, 0);                             // white pixel correction
     #endif
@@ -220,8 +221,11 @@ bool capture_still() {
     cameraImageSettings(FRAME_SIZE_MOTION);                   // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
-    if (!frame_buffer) return false;
-
+    if (!frame_buffer) {                                      // if there was a problem grabbing a frame try again
+      camera_fb_t *frame_buffer = esp_camera_fb_get();    
+      if (!frame_buffer)return false;                         // failed to capture image
+    }
+ 
     // down-sample image in to blocks
       for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
           const uint16_t x = i % WIDTH;

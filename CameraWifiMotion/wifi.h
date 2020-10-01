@@ -99,7 +99,7 @@ void startWifiManager() {
  
   uint32_t startedAt = millis();
 
-  ESP_WiFiManager ESP_wifiManager(stitle.c_str());     
+  ESP_WiFiManager ESP_wifiManager(stitle);     
   
   ESP_wifiManager.setMinimumSignalQuality(-1);
 

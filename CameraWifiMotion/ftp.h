@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *  
- *                                         FTP images to server - 15Mar20 
+ *                                         FTP images to server - 26Mar20 
  *                                         
  *                                         https://github.com/ldab/ESP32_FTPClient
  * 
@@ -16,7 +16,7 @@ char ftp_server[] = "<ftp servers ip address>";
 char ftp_user[]   = "<ftp user name>";
 char ftp_pass[]   = "<ftp password>";
 
-ESP32_FTPClient ftp (ftp_server,ftp_user,ftp_pass, 4000, 2);             // timeout and debbug mode on the last 2 arguments
+ESP32_FTPClient ftp (ftp_server,ftp_user,ftp_pass, 5000, 2);             // timeout and debbug mode on the last 2 arguments
 
 // forward declarations
   void uploadImageByFTP(uint8_t*, size_t, String);
