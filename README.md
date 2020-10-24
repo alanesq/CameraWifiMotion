@@ -149,3 +149,6 @@ If you require more io pins you can consider soldering directly to the esp32-s m
       Possible pins to consider:    16, 17, 9, 10, 11, 6, 7, 8    
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
+
+A more basic sketch which may be of interest/use if you wish to create your own custom project using one of these Esp32Cam modules
+  https://github.com/alanesq/esp32cam-demo
