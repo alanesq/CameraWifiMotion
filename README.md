@@ -147,6 +147,8 @@ Using the flash can often trigger such problems if there is any problem with the
 
 If you require more io pins you can consider soldering directly to the esp32-s modules pins.   
       Possible pins to consider:    16, 17, 9, 10, 11, 6, 7, 8    
+      
+I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
