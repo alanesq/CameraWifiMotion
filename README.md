@@ -145,8 +145,11 @@ Also I find that a smoothing capacitor is required on the 3.3v side otherwise th
 lot of problems (specifically causing it to keep re-triggering and other random behaviour).
 Using the flash can often trigger such problems if there is any problem with the power supply.
 
-If you require more io pins you can consider soldering directly to the esp32-s modules pins.   
-      Possible pins to consider:    16, 17, 9, 10, 11, 6, 7, 8    
+GPIO:
+io pins available for use are 13 and 12 (12 must not be high at boot)
+pin16 can be used but it has a 10k pullup resistor connected to it on this board for some reason so only good as an input
+You could also use 1 and 3 if you disable the use of Serial or 14,2&15 if not using SD Card
+Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
       
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
