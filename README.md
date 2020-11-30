@@ -158,3 +158,4 @@ Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshootin
 
 A more basic sketch which may be of interest/use if you wish to create your own custom project using one of these Esp32Cam modules
   https://github.com/alanesq/esp32cam-demo
+                                                                                       https://github.com/alanesq/CameraWifiMotion
