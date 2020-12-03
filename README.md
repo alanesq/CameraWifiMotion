@@ -132,9 +132,6 @@ Notes:
 If you ever need to erase the stored wifi settings or if the esp32 goes in to a power loop where you are unable to get
 Wifimanager to work see - https://www.robmiles.com/journal/2019/05/26/esp32reset
 
-If you get a lot of errors writing to Spiffs I have found that reducing the processor speed when compiling the sketch 
-can help prevent this from happening.
-
 I am a very amateur programmer so any help/advice improving this would be very greatly received. - alanesq@disroot.org
 This sketch includes a lot of other peoples code from many sources which I have included links to   
 Most specifically - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
