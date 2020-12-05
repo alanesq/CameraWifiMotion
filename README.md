@@ -11,6 +11,10 @@ It also has the options to email or FTP the captured images or store them to sd 
   <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
+LATEST NEWS!!!
+It seems there is now a motherboard available for the esp32cam which should make it as easy to use as any other esp development board :-)
+Search eBay for "esp32cam mb"
+
 Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
