@@ -155,6 +155,7 @@ pin 16 is used for psram but you may get away with using it as input for a butto
 You could also use 1 and 3 if you disable the use of Serial or 14,2&15 if not using SD Card
 Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
+Another option (which I have not actually tried yet) would be to attach a MCP23017 Bidirectional 16-Bit I/O Expander (possibly need to use the serial tx and rx pins) which would then give you 16 gpio pins to play with :-)
       
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
