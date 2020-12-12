@@ -20,7 +20,7 @@ These cheap cameras are surprisingly good apart from very poor performance in lo
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
 better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going 
-from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option...
+from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option (I think 'M12 F1.4' is the type of thing we need)...
 I find that as soon as you try to install the camera in any kind of case the wifi signal becomes very weak.  This can be
 rectified by installing an external wifi antenna (note: you have to move the jumper resistor on the board to enable the
 external antenna socket).  Search eBay for "2.4G Antenna IPX13".
