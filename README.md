@@ -11,6 +11,12 @@ It also has the options to email or FTP the captured images or store them to sd 
   <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
+LATEST NEWS!!!
+There is now a motherboard available for the esp32cam which make it prety much as easy to use as any other esp development board. 
+Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
+It looks like older esp32cam modules the reset button has no effect on them so on these you have to plug the USB in whilst holding the program button to 
+upload a sketch also on mine I find I have to use the lowest upload speed or it fails to upload.
+
 Tips / Mods:
 These cheap cameras are surprisingly good apart from very poor performance in low light conditions, I have done all I can
 in software to improve this but if you want to use the cameras in anything other than full daylight you need to fit a
