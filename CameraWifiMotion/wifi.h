@@ -76,7 +76,7 @@ byte wifiok = 0;          // flag if wifi is connected ok (1 = ok)
   #include <TimeLib.h>
   #include <WiFiUdp.h>                         // UDP library which is how we communicate with Time Server
   const uint16_t localPort = 8888;              // Just an open port we can use for the UDP packets coming back in
-  const char timeServer[] = "uk.pool.ntp.org"; 
+  const char timeServer[] = "pool.ntp.org"; 
   const uint16_t NTP_PACKET_SIZE = 48;          // NTP time stamp is in the first 48 bytes of the message
   byte packetBuffer[NTP_PACKET_SIZE];          // buffer to hold incoming and outgoing packets
   WiFiUDP NTPUdp;                              // A UDP instance to let us send and receive packets over UDP
