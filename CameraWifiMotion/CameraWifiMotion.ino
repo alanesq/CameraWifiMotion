@@ -228,6 +228,7 @@ void setup(void) {
     server.on("/bootlog", handleBootLog);    // display boot log (stored in Spiffs)
     server.on("/imagedata", handleImagedata);// show raw image data
     server.on("/stream", handleStream);      // stream live image
+    server.on("/ota", handleOTA);
     server.onNotFound(handleNotFound);       // invalid page requested
     // server.on("/download", handleDownload);  // download settings file from Spiffs
 
@@ -719,17 +720,6 @@ void handleRoot() {
 
 // Action any user input on root web page
 void rootButtons() {
-    #if OTA_ENABLED
-      // enable OTA if password supplied in url parameters   (?pass=xxx)
-        if (server.hasArg("pwd")) {
-            String Tvalue = server.arg("pwd");   // read value
-              if (Tvalue == OTAPassword) {
-                otaSetup();    // Over The Air updates (OTA)
-                log_system_message("OTA enabled");
-                OTAEnabled = 1;
-              }
-        }
-    #endif
 
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
