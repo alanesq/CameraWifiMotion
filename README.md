@@ -37,8 +37,8 @@ the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is 
 enabled otherwise OTA will not work.
 In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access 
-it until you have entered a "secret password", the password is entered in the form 
-"http://x.x.x.x/?pwd=12345678".  You can change this password in the main settings (OTAPassword).
+it until you have first entered a password, accessed via "http://x.x.x.x/ota"
+You can change this password in the main settings (OTAPassword).
 
 -----------------
 
