@@ -58,8 +58,14 @@ void log_system_message(String smes) {
 //    additional style settings can be included
 
 void webheader(WiFiClient &client, char style[] = " ") {
+  
+      // send standard html header
+        client.write("HTTP/1.1 200 OK\r\n");
+        client.write("Content-Type: text/html\r\n");
+        client.write("Connection: close\r\n");
+        client.write("\r\n");
+        client.write("<!DOCTYPE HTML>"\n);  
 
-      client.write("<!DOCTYPE html>\n");
       client.write("<html lang='en'>\n");
       client.write(   "<head>\n");
       client.write(     "<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
