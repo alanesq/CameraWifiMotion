@@ -975,7 +975,13 @@ void handleData(){
 
   WiFiClient client = server.client();          // open link with client
 
-  client.write("<!DOCTYPE HTML>\n");
+  // send standard html header
+    client.write("HTTP/1.1 200 OK\r\n");
+    client.write("Content-Type: text/html\r\n");
+    client.write("Connection: close\r\n");
+    client.write("\r\n");
+    client.write("<!DOCTYPE HTML>"\n);
+ 
   client.write("<html lang='en'><head><title>Data</title></head><body>\n"); 
           
   // Motion detection
