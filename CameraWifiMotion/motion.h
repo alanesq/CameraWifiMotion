@@ -30,6 +30,7 @@
   #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing (20)
 
 // camera type settings (CAMERA_MODEL_AI_THINKER)
+//     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
   #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power to camera enable
   #define RESET_GPIO_NUM    -1      // -1 = not used

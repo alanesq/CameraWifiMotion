@@ -1,8 +1,10 @@
 /**************************************************************************************************
  *
- *                       Modified version of my 'Standard' procedures  - 30Sep20
+ *      Standard procedures - 04Mar21 (not standard)
+ *      
+ *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
+ *      
  *             
- *  
  **************************************************************************************************/
 
 
@@ -12,23 +14,38 @@
   void webfooter();
   void handleLogpage();
   void handleNotFound();
-  String requestpage();
   void handleReboot();
   void WIFIcheck();
-  void UpdateBootlogSpiffs(String);             // in CameraWifiMotion.ino  
+  String decodeIP(String);
   
+
+// ----------------------------------------------------------------
+//                    -decode IP addresses
+// ----------------------------------------------------------------
+// Check for known IP addresses 
+
+String decodeIP(String IPadrs) {
+    if (IPadrs == "192.168.1.176") return "HA server";
+    if (IPadrs == "192.168.1.103") return "Parlour laptop";
+    if (IPadrs == "192.168.1.101") return "Bedroom laptop";
+    if (IPadrs == "192.168.1.169") return "Linda's laptop";
+    if (IPadrs == "192.168.1.170") return "Shed 1 laptop";
+    if (IPadrs == "192.168.1.143") return "Shed 2 laptop";
+    return IPadrs;
+}
+
 
 // ----------------------------------------------------------------
 //                              -Startup
 // ----------------------------------------------------------------
   
-// html text colour codes  
+// html text colour codes (obsolete html now and should use CSS instead)
   const char colRed[] = "<font color='#FF0000'>";           // red text
   const char colGreen[] = "<font color='#006F00'>";         // green text
   const char colBlue[] = "<font color='#0000FF'>";          // blue text
   const char colEnd[] = "</font>";                          // end coloured text
 
-String system_message[LogNumber + 1];                    // system log messages
+String system_message[LogNumber + 1];                       // system log message store
 
 
 // ----------------------------------------------------------------
@@ -42,30 +59,24 @@ void log_system_message(String smes) {
       system_message[i]=system_message[i+1];
     }
 
-  // add the message
+  // add the new message to the end
     system_message[LogNumber] = currentTime() + " - " + smes;
   
   // also send message to serial port
-    Serial.println(system_message[LogNumber]);
+    if (serialDebug) Serial.println("Log:" + system_message[LogNumber]);
 }
-
 
 
 // ----------------------------------------------------------------
 //                         -header (html) 
 // ----------------------------------------------------------------
 // HTML at the top of each web page
-//    additional style settings can be included
+//    additional style settings can be included and auto page refresh rate
 
-void webheader(WiFiClient &client, char style[] = " ") {
-  
-      // send standard html header
-        client.write("HTTP/1.1 200 OK\r\n");
-        client.write("Content-Type: text/html\r\n");
-        client.write("Connection: close\r\n");
-        client.write("\r\n");
-        client.write("<!DOCTYPE HTML>"\n);  
 
+void webheader(WiFiClient &client, char style[] = " ", int refresh = 0) {
+
+      client.write("<!DOCTYPE html>\n");
       client.write("<html lang='en'>\n");
       client.write(   "<head>\n");
       client.write(     "<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
@@ -93,71 +104,78 @@ void webheader(WiFiClient &client, char style[] = " ") {
 }
 
 
-
 // ----------------------------------------------------------------
 //                             -footer (html)
 // ----------------------------------------------------------------
-
 // HTML at the end of each web page
-
 
 void webfooter(WiFiClient &client) {
 
-             /* Status display at bottom of screen */
-             client.write("   <br><div style='text-align: center;background-color:rgb(128, 64, 0)'>\n");
-             client.printf(   "<small>%s",colRed); 
-             client.printf(       "<a href='https://github.com/alanesq/CameraWifiMotion'>%s</a> %s", stitle, sversion); 
-             client.printf(       " | Memory: %dK", (ESP.getFreeHeap() / 1000) ); 
-             client.printf(       " | Wifi: %ddBm", WiFi.RSSI()); 
-             // NTP server link status
-                if (NTPok == 1) client.write(" | NTP Link OK");
-                else client.write(" | NTP Link DOWN");
-             client.printf(       " | Spiffs: %dK", (SPIFFS.totalBytes() - SPIFFS.usedBytes()) / 1000 );
-             client.printf(   "%s </small>\n", colEnd); 
-             client.write("</div>\n");
-               
-             /* end of HTML */  
-               client.write("</body></html>\n");
+   // get mac address
+     byte mac[6];
+     WiFi.macAddress(mac);
+   
+   client.print("<br>\n"); 
+   
+   /* Status display at bottom of screen */
+   client.print("<div style='text-align: center;background-color:rgb(128, 64, 0)'>\n");
+   client.printf("<small> %s", colRed); 
+   client.printf("%s %s", stitle, sversion); 
+   client.printf(" | Memory: %dK", ESP.getFreeHeap() /1000); 
+   client.printf(" | Wifi: %ddBm", WiFi.RSSI()); 
+   // NTP server link status
+    int tstat = timeStatus();   // ntp status
+    if (tstat == timeSet) client.print(" | NTP OK");
+    else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
+    else if (tstat == timeNotSet) client.print(" | NTP Failed");
+   // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs 
+   // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
+   client.printf("%s </small>\n", colEnd);
+   client.print("</div>\n"); 
+     
+  /* end of HTML */  
+   client.print("</body>\n");
+   client.print("</html>\n");
 
 }
-
 
 
 // ----------------------------------------------------------------
 //   -log web page requested    i.e. http://x.x.x.x/log
 // ----------------------------------------------------------------
 
-
 void handleLogpage() {
 
-  WiFiClient client = server.client();                                                        // open link with client
+  WiFiClient client = server.client();                     // open link with client
 
-  // log page request including clients IP address
-      IPAddress cip = client.remoteIP();
-      log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));    
-
+// log page request including clients IP address
+  IPAddress cip = client.remoteIP();
+  String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+  clientIP = decodeIP(clientIP);               // check for known IP addresses
+  log_system_message("Log page requested from: " + clientIP);  
+      
 
     // build the html for /log page
 
-      webheader(client);                    // insert html page header 
+      webheader(client);                    // send html page header  
 
-      client.write("<P>\n");                // start of section
+      client.print("<P>\n");                // start of section
   
-      client.write("<br>SYSTEM LOG<br><br>\n");
+      client.print("<br>SYSTEM LOG<br><br>\n");
   
       // list all system messages
       for (int i=LogNumber; i != 0; i--){
-        client.write(system_message[i].c_str());
-        if (i == LogNumber) client.printf("  %s Most Recent %s", colRed, colEnd);        // flag most recent entry
-        client.write("<BR>\n");    // new line
+        client.print(system_message[i].c_str());
+        if (i == LogNumber) {
+          client.printf("%s  {Most Recent Entry} %s", colRed, colEnd);          // build line of html
+        }
+        client.print("<br>\n");    // new line
       }
-  
-      // client.write("<a href='/'>BACK TO MAIN PAGE</a>\n");       // link back to root page
-  
-      client.write("<br>");
+    
+      client.print("<br>");
     
       // close html page
-        webfooter(client);                          // html page footer
+        webfooter(client);                          // send html page footer
         delay(3);
         client.stop();
 
@@ -170,7 +188,7 @@ void handleLogpage() {
 
 void handleNotFound() {
   
-  log_system_message("Invalid web page requested");      
+  log_system_message("invalid web page requested");      
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -190,62 +208,6 @@ void handleNotFound() {
 }
 
 
-
-// ----------------------------------------------------------------
-//        -request a web page and return reply as a string
-// ----------------------------------------------------------------
-//
-//     parameters = ip address, page to request, port to use (usually 80)     e.g.   "alanesq.com","/index.htm",80
-
-
-String requestpage(const char* ip, String page, int port){
-
-  Serial.print("requesting web page: ");
-  Serial.println(ip + page);
-  //log_system_message("requesting web page");      
-
-  // Connect to the site 
-    WiFiClient client;
-    if (!client.connect(ip, port)) {
-      Serial.println("Connection failed :-(");
-      log_system_message("Error: Web connection failed");      
-      return "connection failed";
-    }  
-    Serial.println("Connected to host - sending request...");
-
-
-    // request the page
-    client.print(String("GET " + page + " HTTP/1.1\r\n") +
-                 "Host: " + ip + "\r\n" + 
-                 "Connection: close\r\n\r\n");
-  
-    Serial.println("Request sent - waiting for reply...");
-  
-    //Wait up to 5 seconds for server to respond then read response
-    int i = 0;
-    while ((!client.available()) && (i < 500)) {
-      delay(10);
-      i++;
-    }
-    
-    String wpage="";    // reply stored here
-    
-    // Read the entire response up to 200 characters
-    while( (client.available()) && (wpage.length() <= 200) ) {
-      wpage += client.readStringUntil('\r');     
-    }
-    Serial.println("-----received web page--------");
-    Serial.println(wpage);
-    Serial.println("------------------------------");
-
-    client.stop();    // close connection
-    Serial.println("Connection closed.");
-
-  return wpage;
-
-}
-
-
 // ----------------------------------------------------------------
 //   -reboot web page requested        i.e. http://x.x.x.x/reboot  
 // ----------------------------------------------------------------
@@ -259,7 +221,6 @@ void handleReboot(){
       server.send(404, "text/plain", message);   // send reply as plain text
 
       // rebooting
-        UpdateBootlogSpiffs("Rebooting - URL request");     // update bootlog
         delay(500);          // give time to send the above html
         ESP.restart();   
         delay(5000);         // restart fails without this line
@@ -270,7 +231,6 @@ void handleReboot(){
 // --------------------------------------------------------------------------------------
 //                                -wifi connection check
 // --------------------------------------------------------------------------------------
-
 
 void WIFIcheck() {
   

@@ -25,10 +25,13 @@
 */
 // -------------------------- S e t t i n g s ---------------------
 
- 
-// Blank Settings        -    *** ENTER YOUR DETAILS BELOW! ***
+  
+  //     *** ENTER YOUR EMAIL DETAILS BELOW! ***
+  
   const String emailReceiver = "<email to send to>";         // address to send emails  
+  
   const String _mailUser = "<email to send from>";
+  
   const String _mailPassword = "<email password>";
   
 

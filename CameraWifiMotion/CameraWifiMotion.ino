@@ -2,7 +2,7 @@
  *
  *       ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
  *             
- *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.h
+ *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.hse
  *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
  *                          
  *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
@@ -16,7 +16,7 @@
  *             
  *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
  *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
- *             see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
+ *             see: https://github.com/espressif/arduino-esp32/blob/master/docs/arduino-ide/boards_manager.md
  *
  *      Motion detection based on: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  *      
@@ -37,27 +37,28 @@
 //                          -SETTINGS
 // ---------------------------------------------------------------
 
-  const char stitle[] = "CameraWifiMotion";              // title of this sketch
+  const char* stitle = "CameraWifiMotion";               // title of this sketch
 
-  const char sversion[] = "01Oct20";                     // Sketch version
+  const char* sversion = "27Mar21";                      // Sketch version
 
-  const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
+  // const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
+
+  bool serialDebug = 1;                                  // Show debug info. on serial port
 
   #define EMAIL_ENABLED 1                                // if emailing is enabled
 
   #define FTP_ENABLED 1                                  // if ftp uploads are enabled
 
   #define OTA_ENABLED 1                                  // if Over The Air updates (OTA) are enabled
-  
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  int MaxSpiffsImages = 8;                               // number of images to store in camera (Spiffs)
+  const int8_t MaxSpiffsImages = 8;                      // number of images to store in camera (Spiffs)
   
-  const char datarefresh[] = "5000";                     // Refresh rate of the updating data on web page (1000 = 1 second)
+  const char* datarefresh = "5000";                      // Refresh rate of the updating data on web page (1000 = 1 second)
 
-  const char JavaRefreshTime[] = "600";                  // time delay when loading url in web pages (Javascript) to prevent failed requests
+  const char* JavaRefreshTime = "600";                   // time delay when loading url in web pages (Javascript) to prevent failed requests
     
   const uint16_t LogNumber = 50;                         // number of entries to store in the system log
 
@@ -65,7 +66,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 2;                              // 1=take picture using flash, 2=flash after taking picture
+  const byte flashMode = 1;                              // 1=take picture using flash, 2=flash after taking picture
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input) 
   
@@ -79,16 +80,17 @@
 
   int8_t cameraImageContrast = 0;                        // image contrast (-2 to 2) - Note: has no effect?
 
-  float thresholdGainCompensation = 0.65;                // motion detection level compensation for increased noise in image when gain increased
+  float thresholdGainCompensation = 0.65;                // motion detection level compensation for increased noise in image when gain increased (i.e. in darker conditions)
 
-  const int serialSpeed = 115200;                        // Serial data speed to use
 
-  // to adjust other camera sensor settings see 'cameraImageSettings()' in 'motion.h'
+  // Note: to adjust other camera sensor settings see 'cameraImageSettings()' in 'motion.h'
   
   
 // ---------------------------------------------------------------
 
 
+  bool wifiok = 0;                           // Flag if wifi connected ok
+  const String HomeLink = "/";               // Link home button uses
   float cameraImageExposure = 0;             // Camera exposure (loaded from spiffs)
   float cameraImageGain = 0;                 // Image gain (loaded from spiffs)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
@@ -107,13 +109,14 @@
   bool SensorStatus = 1;                     // Status of the sensor i/o pin (gioPin)
   bool OTAEnabled = 0;                       // flag if OTA has been enabled (via supply of password)
 
- #include "soc/soc.h"                         // Used to disable brownout problems
+
+ #include "soc/soc.h"                         // Used to disable brownout detection
  #include "soc/rtc_cntl_reg.h"                
 
 // spiffs used to store images and settings
   #include <SPIFFS.h>
   #include <FS.h>                            // gives file access on spiffs
-  int SpiffsFileCounter = 0;                 // counter of last image stored
+  int16_t SpiffsFileCounter = 0;             // counter of last image stored
 
 // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
   #include "SD_MMC.h"
@@ -122,26 +125,24 @@
   #define SD_CS 5                            // sd chip select pin
   bool SD_Present;                           // flag if an sd card was found (0 = no)
 
+#include "wifi.h"                            // Include wifi.h file for network access
 
-#include "wifi.h"                            // Load the Wifi / NTP stuff
-
-#include "standard.h"                        // Standard procedures
-
+#include "standard.h"                        // Include standard.h file for some standard procedures
 #if EMAIL_ENABLED
-  #include "gmail_esp32.h"                   // send email via smtp
+  #include "gmail_esp32.h"                   // Include gmail_esp32.h file for sendimg emails code
 #endif
 
-#include "motion.h"                          // motion detection / camera
+#include "motion.h"                          // Include motion.h file for camera/motion detection code
 
 #if OTA_ENABLED
-  #include "ota.h"                           // Over The Air updates (OTA)
+  #include "ota.h"                           // Include ota.h file for OTA updates
 #endif
 
 // forward declarations
   void RestartCamera(pixformat_t);
 
 #if FTP_ENABLED
-  #include "ftp.h"                           // used to upload images via FTP
+  #include "ftp.h"                           // Include ftp.h file for the ftp of captured images
 #endif
 
 
@@ -152,7 +153,7 @@
 
 void setup(void) {
     
-  Serial.begin(serialSpeed);                       // serial port
+  Serial.begin(115200);                            // serial port
 
   Serial.println("\n\n\n");                        // line feeds
   Serial.println("---------------------------------------");
@@ -165,12 +166,11 @@ void setup(void) {
     if (!SPIFFS.begin(true)) {
       Serial.println(("An Error has occurred while mounting SPIFFS - restarting"));
       delay(5000);
-      ESP.restart();
+      ESP.restart();                                // restart and try again
       delay(5000);
     } else {
-      Serial.print(("SPIFFS mounted successfully."));
-      Serial.print("total bytes: " + String(SPIFFS.totalBytes()));
-      Serial.println(", used bytes: " + String(SPIFFS.usedBytes()));
+      Serial.print(("SPIFFS mounted successfully: "));
+      Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
       LoadSettingsSpiffs();     // Load settings from text file in Spiffs
     }
 
@@ -208,9 +208,9 @@ void setup(void) {
 
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
   
-  if (MDNS.begin(MDNStitle)) {
-    Serial.println(("MDNS responder started"));
-  }
+//  if (MDNS.begin(MDNStitle)) {
+//    Serial.println(("MDNS responder started"));
+//  }
   
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
 
@@ -228,7 +228,7 @@ void setup(void) {
     server.on("/bootlog", handleBootLog);    // display boot log (stored in Spiffs)
     server.on("/imagedata", handleImagedata);// show raw image data
     server.on("/stream", handleStream);      // stream live image
-    server.on("/ota", handleOTA);
+    server.on("/ota", handleOTA);            // OTA update page
     server.onNotFound(handleNotFound);       // invalid page requested
     // server.on("/download", handleDownload);  // download settings file from Spiffs
 
@@ -242,7 +242,7 @@ void setup(void) {
        
   // set up camera
     Serial.print(("Initialising camera: "));
-    Serial.println(setupCameraHardware() ? "OK" : "ERR INIT");
+    Serial.println(setupCameraHardware() ? "OK" : "ERR INIT"); 
 
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -251,7 +251,9 @@ void setup(void) {
   
   UpdateBootlogSpiffs("Booted");                   // store time of boot in bootlog
 
-  TRIGGERtimer = millis();                         // reset retrigger timer to stop instant motion trigger
+  TRIGGERtimer = millis();                         // reset retrigger timer to stop instant triggering of motion detection
+
+  log_system_message("Started");
 }
 
 
@@ -278,7 +280,7 @@ void loop(void){
     if (DetectionEnabled == 1) {    
       if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                                // capture image, if problem reboot camera and try again
         uint16_t changes = motion_detect();                                                   // find amount of change in current image frame compared to the last one     
-        update_frame();                                                                       // Copy current frame to previous
+        update_frame();                                                                       // Copy current stored frame to previous stored frame
         if ( (changes >= Image_thresholdL) && (changes <= Image_thresholdH) ) {               // if enough change to count as motion detected 
           if (tCounter >= tCounterTrigger) {                                                  // only trigger if movement detected in more than one consequitive frames
              tCounter = 0;
@@ -304,7 +306,7 @@ void loop(void){
           ioDetected(1);                    // trigger io status has changed procedure        
         } else {
           SensorStatus = 0;
-          ioDetected(0);
+          ioDetected(0);                    // trigger io status has changed procedure     
         }
       }
     }
@@ -323,6 +325,7 @@ void loop(void){
     
   delay(30);
 } // loop
+
 
 
 
@@ -351,6 +354,7 @@ void AutoAdjustImage() {
           capture_still();                             // update stored image with the changed image settings to prevent trigger
           update_frame(); 
 }
+
 
 
 // ----------------------------------------------------------------
@@ -487,6 +491,7 @@ void ReadLineSpiffs(File* file, String* line, uint16_t* tnum) {
 // ----------------------------------------------------------------
 
 void SaveSettingsSpiffs() {
+
     String TFileName = "/settings.txt";
     SPIFFS.remove(TFileName);   // delete old file if present
     File file = SPIFFS.open(TFileName, "w");
@@ -633,7 +638,7 @@ void handleRoot() {
 
     // link to show live image in popup window
     //  tstr = blue + "<a href='#' id='stdLink' target='popup' onclick=\"window.open('/img' ,'popup','width=320,height=240,left=50,top=50'); return false; \">DISPLAY CURRENT IMAGE</a>" + endcolour + " - \n ";
-    //  client.write(tstr.c_str());
+    //  client.print(tstr);
     
     // link to help/instructions page on github
       client.printf(" %s<a href='https://github.com/alanesq/CameraWifiMotion/blob/master/README.md'>INSTRUCTIONS</a>%s\n", colBlue, colEnd);
@@ -720,6 +725,17 @@ void handleRoot() {
 
 // Action any user input on root web page
 void rootButtons() {
+//    #if OTA_ENABLED     - no longer used
+//      // enable OTA if password supplied in url parameters   (?pass=xxx)
+//        if (server.hasArg("pwd")) {
+//            String Tvalue = server.arg("pwd");   // read value
+//              if (Tvalue == OTAPassword) {
+//                otaSetup();    // Over The Air updates (OTA)
+//                log_system_message("OTA enabled");
+//                OTAEnabled = 1;
+//              }
+//        }
+//    #endif
 
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
@@ -975,18 +991,12 @@ void handleData(){
 
   WiFiClient client = server.client();          // open link with client
 
-  // send standard html header
-    client.write("HTTP/1.1 200 OK\r\n");
-    client.write("Content-Type: text/html\r\n");
-    client.write("Connection: close\r\n");
-    client.write("\r\n");
-    client.write("<!DOCTYPE HTML>"\n);
- 
+  client.write("<!DOCTYPE HTML>\n");
   client.write("<html lang='en'><head><title>Data</title></head><body>\n"); 
           
   // Motion detection
     tstr = "Motion detection last triggered: " + TriggerTime + "\n";
-    client.write(tstr.c_str());
+    client.print(tstr);
 
   // display adnl info if detection is enabled
     if (DetectionEnabled == 1) {
@@ -996,7 +1006,7 @@ void handleData(){
          
   // show current time and current day/night mode
     tstr = "<BR>Current time: " + currentTime() +"\n";   
-    client.write(tstr.c_str());
+    client.print(tstr);
 
   // show image adjustments
     client.printf("<BR>Image brightness: %d", AveragePix);
@@ -1031,11 +1041,11 @@ void handleData(){
 //  // show io pin status
 //    if (digitalRead(gioPin)) {
 //        tstr = " {IO pin " + red + "High" + endcolour + "} ";
-//        client.write(tstr.c_str());
+//        client.print(tstr);
 //    }
 //    else {
 //          tstr = " {IO pin " + green + "Low" + endcolour + "} ";
-//          client.write(tstr.c_str());
+//          client.print(tstr);
 //    }
 
   // show if a sd card is present
@@ -1122,7 +1132,7 @@ void handleImages(){
     else {
       String line = file.readStringUntil('\n');      // read first line of text file
       tstr = "<BR>" + line + "\n";
-      client.write(tstr.c_str());
+      client.print(tstr);
     }
     file.close();
 
@@ -1311,7 +1321,7 @@ void handleBootLog() {
           while(file.available()){
             line = file.readStringUntil('\n');      // read first line of text file
             tstr = line +"<BR>\n";
-            client.write(tstr.c_str());
+            client.print(tstr);
           }
         }
         file.close();
@@ -1540,7 +1550,7 @@ void saveJpgFrame(String filesName) {
       File file = SPIFFS.open(IFileName, FILE_WRITE);
       if (!file) log_system_message("Failed to create file in Spiffs");
       else {
-        if (file.write(fb->buf, fb->len)) {    
+        if (file.write(fb->buf, fb->len)) {
           Serial.print("The picture has been saved as ");
           Serial.print(IFileName);
           Serial.print(" - Size: ");
@@ -1683,7 +1693,7 @@ void MotionDetected(uint16_t changes) {
 
 #if EMAIL_ENABLED
     // send email if long enough since last motion detection (or if this is the first one)
-    if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours
+    if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours (i.e. Chris's setting)
         unsigned long currentMillis = millis();        // get current time  
         if ( ((unsigned long)(currentMillis - EMAILtimer) >= (EmailLimitTime * 1000)) || (EMAILtimer == 0) ) {
 
@@ -1703,41 +1713,6 @@ void MotionDetected(uint16_t changes) {
 
   TRIGGERtimer = millis();                                       // reset retrigger timer to stop instant motion trigger
   if (DetectionEnabled == 2) DetectionEnabled = 1;               // restart paused motion detecting
-}
-
-
-// ----------------------------------------------------------------
-//           -testing page     i.e. http://x.x.x.x/test
-// ----------------------------------------------------------------
-
-void handleTest(){
-
-  WiFiClient client = server.client();          // open link with client
-
-  // log page request including clients IP address
-      IPAddress cip = client.remoteIP();
-      log_system_message("Test page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
-  
-  webheader(client);                     // add the standard html header
-  client.write("<BR>TEST PAGE<BR><BR>\n");
-
-  
-
-  // ---------------------------- test section here ------------------------------
-
-
-
-
-       
-  // -----------------------------------------------------------------------------
-
-  
-  // close html page
-    webfooter(client);                      // add the standard web page footer
-    delay(3);
-    client.stop();
-
-  
 }
 
 
@@ -1803,5 +1778,54 @@ void handleStream(){
   
 }
 
+
+// ----------------------------------------------------------------
+//           -testing page     i.e. http://x.x.x.x/test
+// ----------------------------------------------------------------
+
+void handleTest(){
+
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+      IPAddress cip = client.remoteIP();
+      log_system_message("Test page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+  
+  webheader(client);                     // add the standard html header
+  client.write("<BR>TEST PAGE<BR><BR>\n");
+
+  
+
+  // ---------------------------- test section here ------------------------------
+
+
+
+
+
+
+
+    // list all files stored in spiffs
+        client.print("FILES STORED IN SPIFFS<br>\n");
+        File root = SPIFFS.open("/");
+        File file = root.openNextFile();
+        while(file){
+            client.print(file.name());
+            client.print("<br>\n");
+            file = root.openNextFile();
+        }
+        file.close();
+      
+
+       
+  // -----------------------------------------------------------------------------
+
+  
+  // close html page
+    webfooter(client);                      // add the standard web page footer
+    delay(3);
+    client.stop();
+
+  
+}
 
 // --------------------------- E N D -----------------------------
