@@ -162,6 +162,9 @@ Another option (which I have not actually tried yet) would be to attach a MCP230
       
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
+If you have several cameras there is a HTML page here which can be used to give a menu of all your available cameras
+https://github.com/alanesq/CameraWifiMotion/blob/master/misc/menu-of-projects.htm
+
 Camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
 
 A more basic sketch which may be of interest/use if you wish to create your own custom project using one of these Esp32Cam modules
