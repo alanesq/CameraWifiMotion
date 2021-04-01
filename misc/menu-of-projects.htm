@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+* {
+    box-sizing: border-box;
+  }
+
+#iframe1 {
+    height: calc(100vh - 45px);
+}
+
+body, html {
+  height: 100%;
+  margin: 0;
+  background-color: rgb(128, 64, 0);
+  font-family: Arial;
+}
+
+.tablink {
+  background-color: rgb(128, 64, 0);
+  color: white;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tablink:hover {
+  background-color: rgb(100, 0, 0);
+}
+
+</style>
+
+</head>
+<body>
+
+<div class="tab">
+  <button class="tablink" onclick="openPage(this, 'http://192.168.1.104')">Project1</button>
+  <button class="tablink" onclick="openPage(this, 'http://192.168.1.105')">Project2</button>
+  <button class="tablink" onclick="openPage(this, 'http://192.168.1.106')">Project3</button>
+
+</div>
+
+<iframe id='iframe1' width='100%' src=''></iframe>
+
+<script>
+    function openPage(elmnt,target) {
+        var i, tablinks;
+        tablinks = document.getElementsByClassName('tablink');
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].style.backgroundColor = '';
+        }
+        elmnt.style.backgroundColor = 'rgb(180, 0, 0)';
+        document.getElementById("iframe1").src = target;
+    }
+</script>
+   
+</body>
+</html> 
