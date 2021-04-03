@@ -1,8 +1,6 @@
 /**************************************************************************************************
  *
- *      Standard procedures - 04Mar21 (not standard)
- *      
- *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
+ *      Standard procedures - 03Apr21
  *      
  *             
  **************************************************************************************************/
@@ -17,6 +15,22 @@
   void handleReboot();
   void WIFIcheck();
   String decodeIP(String);
+
+
+// ----------------------------------------------------------------
+//                              -Startup
+// ----------------------------------------------------------------  
+
+// html text colour codes (obsolete html now and should use CSS)
+  const char colRed[] = "<font color='#FF0000'>";           // red text
+  const char colGreen[] = "<font color='#006F00'>";         // green text
+  const char colBlue[] = "<font color='#0000FF'>";          // blue text
+  const char colEnd[] = "</font>";                          // end coloured text
+
+// misc variables
+  String lastClient = "n/a";                  // IP address of most recent client connected
+  int system_message_pointer = 0;             // pointer for current system message position
+  String system_message[LogNumber + 1];       // system log message store  
   
 
 // ----------------------------------------------------------------
@@ -25,27 +39,18 @@
 // Check for known IP addresses 
 
 String decodeIP(String IPadrs) {
-    if (IPadrs == "192.168.1.176") return "HA server";
-    if (IPadrs == "192.168.1.103") return "Parlour laptop";
-    if (IPadrs == "192.168.1.101") return "Bedroom laptop";
-    if (IPadrs == "192.168.1.169") return "Linda's laptop";
-    if (IPadrs == "192.168.1.170") return "Shed 1 laptop";
-    if (IPadrs == "192.168.1.143") return "Shed 2 laptop";
+  
+    if (IPadrs == "192.168.1.176") IPadrs = "laptop";
+    else if (IPadrs == "192.168.1.103") IPadrs = "phone";
+
+    // log last IP client connected
+      if (IPadrs != lastClient) {
+        lastClient = IPadrs;
+        log_system_message("New IP client connected: " + IPadrs);
+      }
+    
     return IPadrs;
 }
-
-
-// ----------------------------------------------------------------
-//                              -Startup
-// ----------------------------------------------------------------
-  
-// html text colour codes (obsolete html now and should use CSS instead)
-  const char colRed[] = "<font color='#FF0000'>";           // red text
-  const char colGreen[] = "<font color='#006F00'>";         // green text
-  const char colBlue[] = "<font color='#0000FF'>";          // blue text
-  const char colEnd[] = "</font>";                          // end coloured text
-
-String system_message[LogNumber + 1];                       // system log message store
 
 
 // ----------------------------------------------------------------
@@ -54,16 +59,15 @@ String system_message[LogNumber + 1];                       // system log messag
 
 void log_system_message(String smes) {
 
-  //scroll old log entries up 
-    for (int i=0; i < LogNumber; i++){
-      system_message[i]=system_message[i+1];
-    }
+  // increment position pointer
+    system_message_pointer++;
+    if (system_message_pointer >= LogNumber) system_message_pointer = 0;
 
-  // add the new message to the end
-    system_message[LogNumber] = currentTime() + " - " + smes;
+  // add the new message to log
+    system_message[system_message_pointer] = currentTime() + " - " + smes;
   
   // also send message to serial port
-    if (serialDebug) Serial.println("Log:" + system_message[LogNumber]);
+    if (serialDebug) Serial.println("Log:" + system_message[system_message_pointer]);
 }
 
 
@@ -118,24 +122,30 @@ void webfooter(WiFiClient &client) {
    client.print("<br>\n"); 
    
    /* Status display at bottom of screen */
-   client.print("<div style='text-align: center;background-color:rgb(128, 64, 0)'>\n");
-   client.printf("<small> %s", colRed); 
-   client.printf("%s %s", stitle, sversion); 
-   client.printf(" | Memory: %dK", ESP.getFreeHeap() /1000); 
-   client.printf(" | Wifi: %ddBm", WiFi.RSSI()); 
-   // NTP server link status
-    int tstat = timeStatus();   // ntp status
-    if (tstat == timeSet) client.print(" | NTP OK");
-    else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
-    else if (tstat == timeNotSet) client.print(" | NTP Failed");
-   // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs 
-   // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
-   client.printf("%s </small>\n", colEnd);
-   client.print("</div>\n"); 
+     client.write("<div style='text-align: center;background-color:rgb(128, 64, 0)'>\n");
+     client.printf("<small> %s", colRed); 
+     client.printf("%s %s", stitle, sversion); 
+     
+     client.printf(" | Memory: %dK", ESP.getFreeHeap() /1000); 
+     
+     client.printf(" | Wifi: %ddBm", WiFi.RSSI()); 
+     
+     // NTP server link status
+      int tstat = timeStatus();   // ntp status
+      if (tstat == timeSet) client.print(" | NTP OK");
+      else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
+      else if (tstat == timeNotSet) client.print(" | NTP Failed");
+      
+     // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs 
+     
+     // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
+     
+     client.printf("%s </small>\n", colEnd);
+     client.write("</div>\n"); 
      
   /* end of HTML */  
-   client.print("</body>\n");
-   client.print("</html>\n");
+   client.write("</body>\n");
+   client.write("</html>\n");
 
 }
 
@@ -148,36 +158,34 @@ void handleLogpage() {
 
   WiFiClient client = server.client();                     // open link with client
 
-// log page request including clients IP address
-  IPAddress cip = client.remoteIP();
-  String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-  clientIP = decodeIP(clientIP);               // check for known IP addresses
-  log_system_message("Log page requested from: " + clientIP);  
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    //log_system_message("Log page requested from: " + clientIP);  
+
       
+  // build the html for /log page
 
-    // build the html for /log page
+    webheader(client);                         // send html page header  
 
-      webheader(client);                    // send html page header  
+    client.println("<P>");                     // start of section
 
-      client.print("<P>\n");                // start of section
-  
-      client.print("<br>SYSTEM LOG<br><br>\n");
-  
-      // list all system messages
-      for (int i=LogNumber; i != 0; i--){
-        client.print(system_message[i].c_str());
-        if (i == LogNumber) {
-          client.printf("%s  {Most Recent Entry} %s", colRed, colEnd);          // build line of html
-        }
-        client.print("<br>\n");    // new line
-      }
+    client.println("<br>SYSTEM LOG<br><br>");
+
+    // list all system messages
+    int lpos = system_message_pointer;         // most recent entry
+    for (int i=0; i < LogNumber; i++){         // count through number of entries
+      client.print(system_message[lpos]);
+      client.println("<br>");
+      lpos--;
+      if (lpos < 0) lpos = LogNumber - 1;
+    }
     
-      client.print("<br>");
-    
-      // close html page
-        webfooter(client);                          // send html page footer
-        delay(3);
-        client.stop();
+    // close html page
+      webfooter(client);                       // send html page footer
+      delay(3);
+      client.stop();
 
 }
 
@@ -187,8 +195,15 @@ void handleLogpage() {
 // ----------------------------------------------------------------
 
 void handleNotFound() {
+
+  WiFiClient client = server.client();          // open link with client
   
-  log_system_message("invalid web page requested");      
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    log_system_message("Invalid URL requested from " + clientIP);  
+       
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
