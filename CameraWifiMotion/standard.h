@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Standard procedures - 03Apr21
+ *      Standard procedures - 30Apr21
  *      
  *             
  **************************************************************************************************/
@@ -136,7 +136,10 @@ void webfooter(WiFiClient &client) {
       else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
       else if (tstat == timeNotSet) client.print(" | NTP Failed");
       
-     // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs 
+     // Spiffs info
+      int tk=SPIFFS.totalBytes() / 1024;
+      int uk=SPIFFS.usedBytes() / 1024;
+      client.print(" | Spiffs: " + String(tk - uk) + "kb free");      
      
      // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
      
