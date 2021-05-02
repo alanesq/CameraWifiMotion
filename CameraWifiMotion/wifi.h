@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Wifi / NTP Connections using WifiManager - 19Mar21
+ *      Wifi / NTP Connections using WifiManager - 02May21
  *      
  *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *             
@@ -161,7 +161,7 @@ String currentTime(){
    
    ttime += " " + DoW[weekday(t)-1] + " ";                                                  // day of week
    
-   ttime += String(day(t)) + "/" + String(month(t)) + "/" + String(year(t)) + " ";    // date
+   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t)) + " ";    // date
 
    return ttime;
    
