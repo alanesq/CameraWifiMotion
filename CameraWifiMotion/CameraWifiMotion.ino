@@ -1753,18 +1753,20 @@ void handleStream(){
   RestartCamera(PIXFORMAT_JPEG);                  // set camera in to jpeg mode
   cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
 
-  // send live images until client disconnects
-  while (true)
+  // send live images until client disconnects or timeout
+  int sTimeout = 5000;                          // limit to time stream can run for
+  while (sTimeout > 0)
   {
     if (!client.connected()) break;
-      fb = esp_camera_fb_get();                   // capture live image frame
-      s = fb->len;                                // store size of image (i.e. buffer length)
-      client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-      sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html 
-      client.write(buf, strlen(buf));             // send image size 
-      client.write((char *)fb->buf, s);           // send the image data
-      client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-      esp_camera_fb_return(fb);                   // return frame so memory can be released
+    sTimeout--;                                 // decrement timout counter
+    fb = esp_camera_fb_get();                   // capture live image frame
+    s = fb->len;                                // store size of image (i.e. buffer length)
+    client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
+    sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html 
+    client.write(buf, strlen(buf));             // send image size 
+    client.write((char *)fb->buf, s);           // send the image data
+    client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+    esp_camera_fb_return(fb);                   // return frame so memory can be released
   }
   
   log_system_message("Video stream stopped");
