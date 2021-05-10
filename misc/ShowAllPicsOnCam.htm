@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
+    <title>All Images stored in Esp32Cam Spiffs</title>
+  </head>
+  <body style="background-color: #555;">
+  
+  <p>All pictures stored on ESP32Cam</p>
+  
+  <script>
+  
+  
+          // camera settings
+          
+          var pics=8;              // maximum number of images stored in spiffs
+          
+          var ip="86.9.2.3";        // ip addess of camera
+    
+    
+    var i;
+    for (i = 1; i <= pics; i++) {
+      document.write("<br>" + i);
+      document.write("<img style='width: 320px; height: 240px;' alt='pic' src='http://" + ip + "/img?pic=1");
+      if (i<10) document.write("0");
+      document.write( i + "'>");
+      document.write("<img style='width: 320px; height: 240px;' alt='pic' src='http://" + ip + "/img?pic=" + i + "'>");
+    }
+  </script>
+  
+
+
+  </body>
+
+</html>
+
