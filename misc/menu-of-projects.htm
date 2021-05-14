@@ -1,42 +1,85 @@
 <!DOCTYPE html>
 
-<!-- ESP Projects consolidator - 03Apr21 -->
+<!-- ESP Projects consolidator - 14May21 -->
 
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>main ha control panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP Projects</title>
 
 <style>
-* {
-    box-sizing: border-box;
-  }
 
-#iframe1 {
-    height: calc(100vh - 45px);
-}
-
-body, html {
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: rgb(128, 64, 0);
   height: 100%;
   margin: 0;
-  background-color: rgb(128, 64, 0);
-  font-family: Arial;
 }
 
-.tablink {
+#iframe1 {
+    height: calc(100vh - 40px);
+    width: calc(100vw - 5px);
+}
+
+.navbar {
+  overflow: hidden;
   background-color: rgb(128, 64, 0);
-  color: white;
+}
+
+.navbar a {
   float: left;
+  padding: 4px 12px;
+  font-size: 17px;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+}
+
+.dropdown {
+  float: left;
+  overflow: hidden;
+}
+
+.dropdown .dropbtn {
+  padding: 4px 12px;
+  font-size: 17px; 
   border: none;
   outline: none;
-  cursor: pointer;
-  padding: 10px 14px;
-  font-size: 17px;
+  color: white;
+  background-color: inherit;
+  font-family: inherit;
+  margin: 0;
 }
 
-/* Change background color of buttons on hover */
-.tablink:hover {
+.navbar a:hover, .dropdown:hover .dropbtn {
   background-color: rgb(100, 0, 0);
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: rgb(128, 64, 0);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  float: none;
+  color: black;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  color: white;
+  text-align: left;
+}
+
+.dropdown-content a:hover {
+  background-color: rgb(100, 0, 0);
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
 }
 
 </style>
@@ -44,25 +87,58 @@ body, html {
 </head>
 <body>
 
-<div class="tab">
-  <button class="tablink" onclick="openPage(this, 'http://192.168.1.104')">Project1</button>
-  <button class="tablink" onclick="openPage(this, 'http://192.168.1.105')">Project2</button>
-  <button class="tablink" onclick="openPage(this, 'http://192.168.1.106')">Project3</button>
+<div class="navbar">
 
+  <a class="menuitem" onclick="openPage(this, 'http://1.2.3.106')">module1</a>
+  <a class="menuitem"  onclick="openPage(this, 'http://1.2.3.183')">module2</a>
+  <a class="menuitem"  onclick="openPage(this, 'http://1.2.3.166')">module3</a>
+  
+  <!-- dropdown menu  -->
+  <div class="dropdown">
+    <button class="dropbtn">LIST1
+      <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-content">
+      <a class="menuitem" onclick="openPage(this, 'http://1.2.3.104')">module4</a>
+      <a class="menuitem" onclick="openPage(this, 'http://1.2.3.156')">module5</a>
+    </div>
+  </div>   
+  
+  <!-- dropdown menu -->
+  <div class="dropdown">
+    <button class="dropbtn">LIST2 
+      <i class="fa fa-caret-down"></i>
+    </button>
+    <div class="dropdown-content">
+      <a class="menuitem" onclick="openPage(this, 'http://1.2.3.4')">module6</a>
+      <a class="menuitem" onclick="openPage(this, 'http://1.2.3.4')">module7</a>
+      <a class="menuitem" onclick="openPage(this, 'http://1.2.3.4')">module8</a>
+    </div>
+  </div> 
+  
+    
 </div>
+
 
 <iframe id='iframe1' width='100%' src=''></iframe>
 
+
+
 <script>
+
     function openPage(elmnt,target) {
+
         var i, tablinks;
-        tablinks = document.getElementsByClassName('tablink');
+        tablinks = document.getElementsByClassName('menuitem');
         for (i = 0; i < tablinks.length; i++) {
             tablinks[i].style.backgroundColor = '';
         }
         elmnt.style.backgroundColor = 'rgb(180, 0, 0)';
-        document.getElementById("iframe1").src = target;
+
+      document.getElementById("iframe1").src = target;
+      
     }
+    
 </script>
    
 </body>
