@@ -44,6 +44,7 @@ You can change this password in the main settings (OTAPassword).
 
 If you wish to use the email facility you need to enter your email details in gmail_esp.h and note the security settings 
 may need changing on the gmail account for it to accept them  see: https://myaccount.google.com/lesssecureapps
+I have found gmail's security to mean it proves unreliable and find gmx.com to be more relaibe / easy to set up (you just need to enable POP access).
 
 There is a zip file containing the libraries used.  The main ones you will need to install are:
   ESP32_mail_client, ESP_wifimanager and Time.
