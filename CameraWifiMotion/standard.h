@@ -253,12 +253,13 @@ void handleReboot(){
 void WIFIcheck() {
   
     if (WiFi.status() != WL_CONNECTED) {
+      // wifi connection is down
       if ( wifiok == 1) {
         log_system_message("Wifi connection lost");          // log system message if wifi was ok but now down
         wifiok = 0;                                          // flag problem with wifi
-      }
+      } else WiFi.reconnect();   // wifi is already flagged as down so try to reconnect
     } else { 
-      // wifi is ok
+      // wifi connection is ok
       if ( wifiok == 0) {
         log_system_message("Wifi connection is back");       // log system message if wifi was down but now back
         wifiok = 1;                                          // flag wifi is now ok
