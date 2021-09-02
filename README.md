@@ -1,5 +1,10 @@
 <p align="center"><img src="/Images/CameraWifiMotion.jpg" width="90%"/></p>
-              
+      
+
+NOTE: may reboot if no sd card present with latest esp32 addin
+      known bug: https://github.com/espressif/arduino-esp32/issues/5195
+      
+      
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
 It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
