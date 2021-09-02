@@ -3,6 +3,8 @@
 
 NOTE: may reboot if no sd card present with latest esp32 addin
       known bug: https://github.com/espressif/arduino-esp32/issues/5195
+Also it looks like the latest WifiManager has changed yet again and so 
+      does not work !
       
       
 This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
