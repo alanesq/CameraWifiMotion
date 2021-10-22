@@ -1,10 +1,16 @@
- /*******************************************************************************************************************
+/*******************************************************************************************************************
  *
- *       ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
- *             
- *             Included files: gmail-esp32.h, standard.h and wifi.h, motion.h, ota.h, ftp.hse
- *             Bult using Arduino IDE 1.8.10, esp32 boards v1.0.4
- *                          
+ *        CameraWifiMotion - v2.0
+ *
+ *        ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 
+ * 
+ *                                   https://github.com/alanesq/CameraWifiMotion
+ *                      Tested with ESP32 board manager version 1.0.6, WifiManager v1.7.4
+ *                              Use standrad development board with PSRAM enabled
+ *                   If using Esp33cam with motherboard you may need to lower the upload speed
+ * 
+ *                             Included files: email.h, standard.h, ota.h, wifi.h 
+ *                             
  *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             GPIO12 can be used for io but must be low at boot
  *             GPIO1 / 03 Used for serial port
@@ -12,58 +18,76 @@
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times, random restarting - especially when using the LED) chances are there is a problem 
  *                          the power to the board.  It needs a good 500ma supply and ideally a good sized smoothing 
- *                          capacitor near the esp board in the order 3000uF.
- *             
- *      First time the ESP starts it will create an access point "ESPConfig" which you need to connect to in order to enter your wifi details.  
- *             default password = "12345678"   (note-it may not work if anything other than 8 characters long for some reason?)
- *             see: https://github.com/espressif/arduino-esp32/blob/master/docs/arduino-ide/boards_manager.md
- *
+ *                          capacitor near the esp board in the order 3000uF.            
+ *          
  *      Motion detection based on: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  *      
  *      camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
  *      
  *      ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
- *                  
- *                                                                                              www.alanesq.eu5.net
- *                                                                                              
- *      CameraWifiMotion is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
- *      implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * 
+ *      First time the ESP starts it will create an access point "ESPPortal" which you need to connect to in order to 
+ *      enter your wifi details.  default password = "12345678"   (change this in wifi.h)
+ *      see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
+ * 
+ *                                                            
+ *            Distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
+ *                    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *      
- ********************************************************************************************************************/
+ ********************************************************************************************************************/                
 
+
+#if (!defined ESP32)
+  #error This sketch is for esp32cam only
+#endif
 
 
 // ---------------------------------------------------------------
 //                          -SETTINGS
 // ---------------------------------------------------------------
 
+
   const char* stitle = "CameraWifiMotion";               // title of this sketch
 
-  const char* sversion = "27Mar21";                      // Sketch version
+  const char* sversion = "22Oct21";                      // version of this sketch
 
-  // const char* MDNStitle = "ESPcam1";                     // Mdns title (access with: 'http://<MDNStitle>.local' )
+  const bool serialDebug = 1;                            // provide debug info on serial port
 
-  bool serialDebug = 1;                                  // Show debug info. on serial port
+  bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
-  #define EMAIL_ENABLED 1                                // if emailing is enabled
-
-  #define FTP_ENABLED 1                                  // if ftp uploads are enabled
-
-  #define OTA_ENABLED 1                                  // if Over The Air updates (OTA) are enabled
+  #define EMAIL_ENABLED 1                                // Enable E-mail support
+  
+  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
-  #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
+  #define FTP_ENABLED 0                                  // if ftp uploads are enabled
 
-  const int8_t MaxSpiffsImages = 8;                      // number of images to store in camera (Spiffs)
+  const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
+
+  const char datarefresh[] = "2000";                     // Refresh rate of the updating data on web page (ms)
+  const char JavaRefreshTime[] = "400";                  // time delay when loading url in web pages via Javascript (ms)
   
-  const char* datarefresh = "5000";                      // Refresh rate of the updating data on web page (1000 = 1 second)
-
-  const char* JavaRefreshTime = "600";                   // time delay when loading url in web pages (Javascript) to prevent failed requests
-    
-  const uint16_t LogNumber = 50;                         // number of entries to store in the system log
+  const byte LogNumber = 30;                             // number of entries in the system log
 
   const uint16_t ServerPort = 80;                        // ip port to serve web pages on
 
+  const byte onboardLED = 33;                            // indicator LED 
+
+  const bool ledBlinkEnabled = 1;                        // enable blinking status LED
+  const uint16_t ledBlinkRate = 1500;                    // Speed to blink the status LED (milliseconds) - also perform some system tasks
+
+  const int serialSpeed = 115200;                        // Serial data speed to use
+
+
+  // camera related
+    
+  #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
+
+  const int8_t MaxSpiffsImages = 8;                      // number of images to store in camera (Spiffs)
+
+  const uint32_t maxCamStreamTime = 60;                  // max camera stream can run for (seconds)
+  
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
   const byte flashMode = 1;                              // 1=take picture using flash, 2=flash after taking picture
@@ -82,15 +106,23 @@
 
   float thresholdGainCompensation = 0.65;                // motion detection level compensation for increased noise in image when gain increased (i.e. in darker conditions)
 
-
   // Note: to adjust other camera sensor settings see 'cameraImageSettings()' in 'motion.h'
-  
-  
+
+
 // ---------------------------------------------------------------
 
 
+// forward declarations
+  void log_system_message(String);  
+  //void RestartCamera(pixformat_t);
+     
+
+// ---------------------------------------------------------------
+
+//#define ARRAYSIZE(x) (sizeof(x)/sizeof(x[0]))
+
+// global variables  
   bool wifiok = 0;                           // Flag if wifi connected ok
-  const String HomeLink = "/";               // Link home button uses
   float cameraImageExposure = 0;             // Camera exposure (loaded from spiffs)
   float cameraImageGain = 0;                 // Image gain (loaded from spiffs)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
@@ -108,10 +140,13 @@
   bool UseFlash = 1;                         // use flash when taking a picture
   bool SensorStatus = 1;                     // Status of the sensor i/o pin (gioPin)
   bool OTAEnabled = 0;                       // flag if OTA has been enabled (via supply of password)
+  bool disableAllFunctions = 0;              // flag to disable all functions other than web server
+    
+#include "wifi.h"                       // Load the Wifi / NTP stuff
+#include "standard.h"                   // Some standard procedures
 
-
- #include "soc/soc.h"                         // Used to disable brownout detection
- #include "soc/rtc_cntl_reg.h"                
+#include "soc/soc.h"                    // Used to disable brownout detection
+#include "soc/rtc_cntl_reg.h"   
 
 // spiffs used to store images and settings
   #include <SPIFFS.h>
@@ -124,32 +159,29 @@
   #include <FS.h>                            // gives file access (already loaded?)
   #define SD_CS 5                            // sd chip select pin
   bool SD_Present;                           // flag if an sd card was found (0 = no)
-
-#include "wifi.h"                            // Include wifi.h file for network access
-
-#include "standard.h"                        // Include standard.h file for some standard procedures
-#if EMAIL_ENABLED
-  #include "gmail_esp32.h"                   // Include gmail_esp32.h file for sendimg emails code
-#endif
+  
+Led statusLed1(onboardLED, LOW);        // set up onboard LED as led1 (LOW = on) - standard.h
 
 #include "motion.h"                          // Include motion.h file for camera/motion detection code
 
-#if OTA_ENABLED
-  #include "ota.h"                           // Include ota.h file for OTA updates
+#if ENABLE_OTA
+  #include "ota.h"                      // Over The Air updates (OTA)
 #endif
 
-// forward declarations
-  void RestartCamera(pixformat_t);
+#if EMAIL_ENABLED
+    #define _SenderName "ESP"           // name of email sender (no spaces)
+    #include "email.h"
+#endif
 
 #if FTP_ENABLED
   #include "ftp.h"                           // Include ftp.h file for the ftp of captured images
 #endif
-
-
   
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
 // ---------------------------------------------------------------
+//
+// setup section (runs once at startup)
 
 void setup(void) {
     
@@ -204,7 +236,11 @@ void setup(void) {
 
   // configure the I/O pin (with pullup resistor)
     pinMode(gioPin,  INPUT);      
-    SensorStatus = 1;                          
+    SensorStatus = 1;    
+
+  // configure ondoard indicator led
+    pinMode(onboardLED, OUTPUT);
+    digitalWrite(onboardLED, HIGH);   // off                          
 
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
   
@@ -215,14 +251,16 @@ void setup(void) {
   WiFi.mode(WIFI_STA);     // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF
 
   // set up web page request handling
-    server.on("/", handleRoot);              // root page
+    server.on(HomeLink, handleRoot);         // root page
     server.on("/data", handleData);          // This displays information which updates every few seconds (used by root web page)
     server.on("/ping", handlePing);          // ping requested
+    server.on("/disable", handleDisable);    // disable all functions other than web server
     server.on("/log", handleLogpage);        // system log
     server.on("/test", handleTest);          // testing page
     server.on("/reboot", handleReboot);      // reboot the esp
     server.on("/default", handleDefault);    // All settings to defaults
-    server.on("/live", handleLive);          // capture then display live image
+    server.on("/live", handleLive);          // capture and display live image
+    server.on("/capture", handleCapture);    // capture an image
     server.on("/images", handleImages);      // display images
     server.on("/img", handleImg);            // latest captured image
     server.on("/bootlog", handleBootLog);    // display boot log (stored in Spiffs)
@@ -274,8 +312,14 @@ void BlinkLed(byte Bcount) {
 
 void loop(void){
 
-  server.handleClient();                                                                    // service any web requests 
+  server.handleClient();                                                                      // service any web requests 
 
+  if (disableAllFunctions) return;                                                            // if device is disabled
+
+  #if ENABLE_EMAIL
+      EMAILloop();                  // handle emails
+  #endif
+      
   // camera motion detection 
     if (DetectionEnabled == 1) {    
       if (!capture_still()) RebootCamera(PIXFORMAT_GRAYSCALE);                                // capture image, if problem reboot camera and try again
@@ -313,20 +357,17 @@ void loop(void){
 
   // periodic system tasks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {   
-      WIFIcheck();                                   // check if wifi connection is ok
-      MaintTiming = millis();                        // reset system tasks timer
-      time_t t=now();                                // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
+      if (DetectionEnabled && flashIndicatorLED) digitalWrite(onboardLED, !digitalRead(onboardLED));  // flash onboard indicator led
+      WIFIcheck();                                        // check if wifi connection is ok
+      MaintTiming = millis();                             // reset system tasks timer
+      time_t t=now();                                     // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
       // check status of illumination led is correct
         if (ReqLEDStatus) digitalWrite(Illumination_led, ledON); 
         else digitalWrite(Illumination_led, ledOFF);
-      if (DetectionEnabled == 0) capture_still();    // capture a frame to get a current brightness reading
-      if (targetBrightness > 0) AutoAdjustImage();   // auto adjust image sensor settings
+      if (DetectionEnabled == 0) capture_still();         // capture a frame to get a current brightness reading
+      if (targetBrightness > 0) AutoAdjustImage();        // auto adjust image sensor settings
     }
-    
-  delay(30);
-} // loop
-
-
+}   // loop
 
 
 // Auto image adjustment 
@@ -353,8 +394,7 @@ void AutoAdjustImage() {
           cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
           capture_still();                             // update stored image with the changed image settings to prevent trigger
           update_frame(); 
-}
-
+}  // autoadjustimage
 
 
 // ----------------------------------------------------------------
@@ -584,12 +624,12 @@ void handleDefault() {
     server.send(404, "text/plain", message);   // send reply as plain text
     message = "";      // clear string
       
-}
+}   // handle default
+
 
 // ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
-// Info on using html see https://www.arduino.cc/en/Reference/Ethernet 
 
 void handleRoot() {
 
@@ -600,7 +640,7 @@ void handleRoot() {
 
   // log page request including clients IP address
       IPAddress cip = client.remoteIP();
-      log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+      // log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   rootButtons();                                                    // handle any user input from page         
 
@@ -617,10 +657,10 @@ void handleRoot() {
 
   // javascript to refresh the iFrame every few seconds
   //      also refreshes after short delay (bug fix as it often rejects the first request)
-    client.write("<script>\n");
-    client.printf("  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, %s);\n", JavaRefreshTime);
-    client.printf("  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, %s);\n", datarefresh);
-    client.write("</script>\n");
+    client.println("<script>");
+    client.println("  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + String(JavaRefreshTime) + ");");
+    client.println("  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");");
+    client.println("</script>");
 
     // detection mask check grid (right of screen)
       client.write( "<div style='float: right;'>Detection Mask<br>");
@@ -722,20 +762,8 @@ void handleRoot() {
 }   // handle root 
 
 
-
 // Action any user input on root web page
 void rootButtons() {
-//    #if OTA_ENABLED     - no longer used
-//      // enable OTA if password supplied in url parameters   (?pass=xxx)
-//        if (server.hasArg("pwd")) {
-//            String Tvalue = server.arg("pwd");   // read value
-//              if (Tvalue == OTAPassword) {
-//                otaSetup();    // Over The Air updates (OTA)
-//                log_system_message("OTA enabled");
-//                OTAEnabled = 1;
-//              }
-//        }
-//    #endif
 
     // email was clicked -  if an email is sent when triggered 
       if (server.hasArg("email")) {
@@ -974,16 +1002,18 @@ void rootButtons() {
           } else {
             DetectionEnabled = 0;
             log_system_message("Motion detection disabled");  
+            digitalWrite(onboardLED, HIGH);   // indicator led off
           }
           SaveSettingsSpiffs();                                     // save settings in Spiffs
       }
-}
+}   // root buttons
 
   
 // ----------------------------------------------------------------
 //     -data web page requested     i.e. http://x.x.x.x/data
 // ----------------------------------------------------------------
-// information displayed on the root web page which refreshes every few seconds
+//
+//   This shows information on the root web page which refreshes every few seconds
 
 void handleData(){
 
@@ -991,8 +1021,14 @@ void handleData(){
 
   WiFiClient client = server.client();          // open link with client
 
-  client.write("<!DOCTYPE HTML>\n");
-  client.write("<html lang='en'><head><title>Data</title></head><body>\n"); 
+  // HTML header
+    client.write("HTTP/1.1 200 OK\r\n");
+    client.write("Content-Type: text/html\r\n");
+    client.write("Connection: close\r\n");
+    client.write("\r\n");
+    client.write("<!DOCTYPE HTML>\n");  
+    client.write("<html lang='en'><head><title>Data</title></head><body>\n"); 
+    client.write("<html lang='en'><head><title>Data</title></head><body>\n"); 
           
   // Motion detection
     tstr = "Motion detection last triggered: " + TriggerTime + "\n";
@@ -1016,35 +1052,38 @@ void handleData(){
   client.write("<BR><BR>");
 
   // Motion detection
-    if (DetectionEnabled == 1) client.printf(" {%sDetection enabled%s} ", colGreen, colEnd);
-    else client.printf(" {%sDetection disabled%s} ", colRed, colEnd);
+    if (DetectionEnabled == 1) client.printf(" {%sDetection enabled%s}&ensp;", colGreen, colEnd);
+    else client.printf(" {%sDetection disabled%s}&ensp;", colRed, colEnd);
  
   // Illumination LED / flash enabled
-    if (digitalRead(Illumination_led) == ledON) client.printf(" {%sIllumination LED is On%s} ", colRed, colEnd);
-    if (UseFlash) client.write(" {Flash enabled} ");
+    if (digitalRead(Illumination_led) == ledON) client.printf(" {%sIllumination LED is On%s}&ensp;", colRed, colEnd);
+    if (UseFlash) client.write(" {Flash enabled}&ensp;");
           
   // OTA status
-    #if OTA_ENABLED
-      if (OTAEnabled) client.printf(" {%sOTA UPDATES ENABLED%s} ", colRed, colEnd);
+    #if ENABLE_OTA
+      if (OTAEnabled) client.printf(" {%sOTA UPDATES ENABLED%s}&ensp;", colRed, colEnd);
     #endif
 
   // FTP status
     #if FTP_ENABLED
-      if (ftpImages) client.write(" {FTP enabled} ");
+      if (ftpImages) client.write(" {FTP enabled}&ensp;");
     #endif
 
   // email status
     #if EMAIL_ENABLED
-        if (emailWhenTriggered) client.printf(" {%sEmail sending enabled%s} ", colRed, colEnd);
+        if (emailWhenTriggered) client.printf(" {%sEmail sending enabled%s}&ensp;", colRed, colEnd);
     #endif
+        
+  //  if system disabled
+    if (disableAllFunctions) client.printf("%s{ALL FUNCTIONS ARE DISABLED!}%s&ensp;", colRed, colEnd);
 
 //  // show io pin status
 //    if (digitalRead(gioPin)) {
-//        tstr = " {IO pin " + red + "High" + endcolour + "} ";
+//        tstr = " {IO pin " + red + "High" + endcolour + "}&ensp;";
 //        client.print(tstr);
 //    }
 //    else {
-//          tstr = " {IO pin " + green + "Low" + endcolour + "} ";
+//          tstr = " {IO pin " + green + "Low" + endcolour + "}&ensp;";
 //          client.print(tstr);
 //    }
 
@@ -1063,7 +1102,20 @@ void handleData(){
 
 
 // ----------------------------------------------------------------
-//           -Display live image     i.e. http://x.x.x.x/live
+//      -ping web page requested     i.e. http://x.x.x.x/ping
+// ----------------------------------------------------------------
+
+void handlePing(){
+
+  log_system_message("ping web page requested");      
+  String message = "ok";
+  server.send(404, "text/plain", message);   // send reply as plain text
+  
+}
+
+
+// ----------------------------------------------------------------
+//   Capture and display -live image     i.e. http://x.x.x.x/live
 // ----------------------------------------------------------------
 // captures an image and displays it using the image view page
 
@@ -1075,6 +1127,23 @@ void handleLive(){
   capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
   handleImages();                            // display captured image
+}
+
+
+// ----------------------------------------------------------------
+//           -capture live image     i.e. http://x.x.x.x/capture
+// ----------------------------------------------------------------
+// captures an image and displays it using the image view page
+
+void handleCapture(){
+
+  // log page request 
+      log_system_message("Capture image page requested");
+
+  server.send(404, "text/plain", "capturing live image");   // send reply as plain text
+
+  capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
+
 }
 
 
@@ -1158,44 +1227,26 @@ void handleImages(){
 
 }
 
-
 // ----------------------------------------------------------------
-//      -ping web page requested     i.e. http://x.x.x.x/ping
+//      -disable all functions     i.e. http://x.x.x.x/disable
 // ----------------------------------------------------------------
-// Responds with either 'enabled' or 'disabled'
-// this can be used by automated scripts etc. to check the camera is operating ok
 
-void handlePing(){
+void handleDisable(){
 
-  // log page request 
-      log_system_message("Ping page requested");
+  WiFiClient client = server.client();          // open link with client
 
-  String message = DetectionEnabled ? "enabled" : "disabled";
+  disableAllFunctions = 1;
 
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    // log_system_message("Disable page requested from: " + clientIP);  
+    
+  String message = "disabled!";
   server.send(404, "text/plain", message);   // send reply as plain text
-  message = "";      // clear string
+  
 }
-
-
-// ----------------------------------------------------------------
-// -download the settings file from Spiffs     i.e. http://x.x.x.x/download
-// ----------------------------------------------------------------
-// Note - for future development, how to upload a file - https://tttapa.github.io/ESP8266/Chap12%20-%20Uploading%20to%20Server.html
-
-//void handleDownload() {
-//
-//    log_system_message("Download settings web page requested");    
-//
-//    String TFileName = "settings.txt";
-//    File download = SPIFFS.open("/" + TFileName, "r");
-//    if (download) {
-//      server.sendHeader("Content-Type", "text/text");
-//      server.sendHeader("Content-Disposition", "attachment; filename="+TFileName);
-//      server.sendHeader("Connection", "close");
-//      server.streamFile(download, "application/octet-stream");
-//      download.close();
-//    }
-//}
 
 
 // ---------------------------------------------------------------------
@@ -1380,8 +1431,9 @@ void handleImg(){
 // ----------------------------------------------------------------
 //        capture images - store in Spiffs/SD card and FTP
 // ----------------------------------------------------------------
+// note: bool Flash is no longer used?
 
-bool capturePhotoSaveSpiffs(bool UseFlash) {
+bool capturePhotoSaveSpiffs(bool Flash) {
 
   if (DetectionEnabled == 1) DetectionEnabled = 2;      // pause motion detecting while photo is captured (not required with single core esp32?)
 
@@ -1689,7 +1741,7 @@ void MotionDetected(uint16_t changes) {
     log_system_message("Camera detected motion: " + String(changes)); 
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
 
-    int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
+    int capres = capturePhotoSaveSpiffs(UseFlash);                        // capture an image
 
 #if EMAIL_ENABLED
     // send email if long enough since last motion detection (or if this is the first one)
@@ -1700,12 +1752,13 @@ void MotionDetected(uint16_t changes) {
           EMAILtimer = currentMillis;    // reset timer 
       
           // send an email
-              String emessage = "Camera triggered at " + currentTime();
-              if (!capres) emessage += "\nNote: there was a problem detected when capturing an image";
-              byte q = sendEmail(emailReceiver,"Message from CameraWifiMotion", emessage);    
-              if (q==0) log_system_message("email sent ok" );
-              else log_system_message("Error: sending email, error code=" + String(q) );
-  
+            _message[0]=0; _subject[0]=0;          // clear any existing text
+            strcat(_subject,"ESPcamera");
+            strcat(_message,"Camera triggered at ");
+            String tt=currentTime();
+            strcat(_message, tt.c_str());
+            if (!capres) strcat(_message, "\nNote: there was a problem detected when capturing an image");
+            sendEmail(_emailReceiver, _subject, _message);  
          }
          else log_system_message("Too soon to send another email");
     }
@@ -1750,15 +1803,14 @@ void handleStream(){
     client.write(HEADER, hdrLen);
     client.write(BOUNDARY, bdrLen);
 
-  RestartCamera(PIXFORMAT_JPEG);                  // set camera in to jpeg mode
-  cameraImageSettings(FRAME_SIZE_PHOTO);          // apply camera sensor settings
+  RestartCamera(PIXFORMAT_JPEG);                // set camera in to jpeg mode
+  cameraImageSettings(FRAME_SIZE_PHOTO);        // apply camera sensor settings
 
   // send live images until client disconnects or timeout
-  int sTimeout = 5000;                          // limit to time stream can run for
-  while (sTimeout > 0)
+  uint32_t streamStop = (unsigned long)millis() + (maxCamStreamTime * 1000);              // time limit for stream 
+  while (millis() < streamStop )
   {
     if (!client.connected()) break;
-    sTimeout--;                                 // decrement timout counter
     fb = esp_camera_fb_get();                   // capture live image frame
     s = fb->len;                                // store size of image (i.e. buffer length)
     client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
@@ -1790,44 +1842,44 @@ void handleTest(){
   WiFiClient client = server.client();          // open link with client
 
   // log page request including clients IP address
-      IPAddress cip = client.remoteIP();
-      log_system_message("Test page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+    IPAddress cip = client.remoteIP();
+    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    log_system_message("Test page requested from: " + clientIP);   
   
-  webheader(client);                     // add the standard html header
-  client.write("<BR>TEST PAGE<BR><BR>\n");
+  webheader(client);                 // add the standard html header
+  client.write("<br>TEST PAGE<br><br>\n");
 
-  
 
   // ---------------------------- test section here ------------------------------
 
 
 
+//// demo of how to send a sms message via GSM board (phone number is a String in the format "+447871862749")
+//  sendSMS(phoneNumber, "this is a test message from the gsm demo sketch");
 
 
 
+//// demo of how to request a web page over Wifi
+//  String webpage = requestWebPage("86.3.1.8","/ping",80,800,"");
 
-    // list all files stored in spiffs
-        client.print("FILES STORED IN SPIFFS<br>\n");
-        File root = SPIFFS.open("/");
-        File file = root.openNextFile();
-        while(file){
-            client.print(file.name());
-            client.print("<br>\n");
-            file = root.openNextFile();
-        }
-        file.close();
-      
 
-       
+
+//  // demo of how to request a web page over GSM
+//    requestWebPageGSM("alanesq.eu5.net", "/temp/q.txt", 80);
+    
+
+
+
+  
   // -----------------------------------------------------------------------------
 
-  
-  // close html page
-    webfooter(client);                      // add the standard web page footer
-    delay(3);
-    client.stop();
 
-  
+  // end html page
+    webfooter(client);            // add the standard web page footer
+    delay(1);
+    client.stop();
 }
+
 
 // --------------------------- E N D -----------------------------

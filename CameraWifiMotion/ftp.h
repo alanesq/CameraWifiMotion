@@ -11,11 +11,11 @@
 
 #include <ESP32_FTPClient.h>
 
-
-// Enter your FTP account details here
-    char ftp_server[] = "<ftp servers ip address>";
-    char ftp_user[]   = "<ftp user name>";
-    char ftp_pass[]   = "<ftp password>";
+// FTP settings
+  char ftp_server[] = "111.111.111.111";
+  char ftp_user[]   = "username";
+  char ftp_pass[]   = "password";
+  
 
 ESP32_FTPClient ftp (ftp_server,ftp_user,ftp_pass, 5000, 2);             // timeout and debbug mode on the last 2 arguments
 

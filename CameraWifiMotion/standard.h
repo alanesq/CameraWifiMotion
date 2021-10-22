@@ -1,6 +1,8 @@
 /**************************************************************************************************
  *
- *      Standard procedures - 30Apr21
+ *      Standard procedures WITH MODIFIED HEADER - 22Oct21
+ *      
+ *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *      
  *             
  **************************************************************************************************/
@@ -13,7 +15,7 @@
   void handleLogpage();
   void handleNotFound();
   void handleReboot();
-  void WIFIcheck();
+  bool WIFIcheck();
   String decodeIP(String);
 
 
@@ -30,8 +32,40 @@
 // misc variables
   String lastClient = "n/a";                  // IP address of most recent client connected
   int system_message_pointer = 0;             // pointer for current system message position
-  String system_message[LogNumber + 1];       // system log message store  
+  String system_message[LogNumber + 1];       // system log message store  (suspect serial port issues caused if not +1 ???)
   
+
+// ----------------------------------------------------------------
+//                            -repeatTimer
+// ---------------------------------------------------------------- 
+// repeat an operation periodically 
+// example to repeat every 2 seconds:   static repeatTimer timer1;             // set up a timer     
+//                                      if (timer1.check(2000)) {do stuff};    // repeat every 2 seconds
+
+class repeatTimer {
+
+  private:
+    uint32_t  _lastTime;                                              // store of last time this event triggered
+
+  public:
+    repeatTimer() {
+      reset();
+    }
+
+    bool check(uint32_t timerInterval, bool timerReset=1) {           // check if provided time has passed 
+      if ( (unsigned long)(millis() - _lastTime) >= timerInterval ) {
+        if (timerReset) reset(); 
+        return 1;
+      } 
+      return 0;
+    }
+
+    void reset() {                                                    // reset the timer
+      _lastTime = millis();
+    }
+
+};
+
 
 // ----------------------------------------------------------------
 //                    -decode IP addresses
@@ -40,8 +74,12 @@
 
 String decodeIP(String IPadrs) {
   
-    if (IPadrs == "192.168.1.176") IPadrs = "laptop";
-    else if (IPadrs == "192.168.1.103") IPadrs = "phone";
+    if (IPadrs == "192.168.1.176") IPadrs = "HA server";
+    else if (IPadrs == "192.168.1.103") IPadrs = "Parlour laptop";
+    else if (IPadrs == "192.168.1.101") IPadrs = "Bedroom laptop";
+    else if (IPadrs == "192.168.1.169") IPadrs = "Linda's laptop";
+    else if (IPadrs == "192.168.1.170") IPadrs = "Shed 1 laptop";
+    else if (IPadrs == "192.168.1.143") IPadrs = "Shed 2 laptop";
 
     // log last IP client connected
       if (IPadrs != lastClient) {
@@ -77,34 +115,48 @@ void log_system_message(String smes) {
 // HTML at the top of each web page
 //    additional style settings can be included and auto page refresh rate
 
-
 void webheader(WiFiClient &client, char style[] = " ", int refresh = 0) {
 
-      client.write("<!DOCTYPE html>\n");
-      client.write("<html lang='en'>\n");
-      client.write(   "<head>\n");
-      client.write(     "<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
-      client.write(     "<link rel=\'icon\' href=\'data:,\'>\n");
-      client.printf(    "<title> %s </title>\n", stitle);               // insert sketch title
-      client.write(     "<style>\n");                                   // Settings here for the top of screen menu appearance 
-      client.write(       "ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);}\n");
-      client.write(       "li {float: left;}\n");
-      client.write(       "li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}\n");
-      client.write(       "li a:hover { background-color: rgb(100, 0, 0);}\n" );
-      client.printf(      "%s\n", style);                              // insert aditional style if supplied 
-      client.write(     "</style>\n");
-      client.write(   "</head>\n");
-      client.write(  "<body style='color: rgb(0, 0, 0); background-color: yellow; text-align: center;'>\n");
-      client.write(     "<ul>\n");             
-      client.write(       "<li><a href='/'>Home</a></li>\n");                       /* home menu button */
-      client.write(       "<li><a href='/log'>Log</a></li>\n");                     /* log menu button */
-      client.write(       "<li><a href='/bootlog'>BootLog</a></li>\n");             /* boot log menu button */
-      client.write(       "<li><a href='/stream'>Live Video</a></li>\n");           /* stream live video */
-      client.write(       "<li><a href='/images'>Stored Images</a></li>\n");        /* last menu button */
-      client.write(       "<li><a href='/live'>Capture Image</a></li>\n");          /* capture image menu button */
-      client.write(       "<li><a href='/imagedata'>Raw Data</a></li>\n");          /* raw data menu button */
-      client.printf(      "<h1> %s %s %s </h1>\n", colRed, stitle, colEnd);         /* display the project title in red */
-      client.write(     "</ul>\n");
+  // html header
+    client.write("HTTP/1.1 200 OK\r\n");
+    client.write("Content-Type: text/html\r\n");
+    client.write("Connection: close\r\n");
+    client.write("\r\n");
+    client.write("<!DOCTYPE HTML>\n");  
+    client.write("<html lang='en'>\n");
+    client.write("<head>\n");
+    client.write("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
+
+  // page refresh
+    if (refresh > 0) client.print( "<meta http-equiv='refresh' content='" + String(refresh) + "'>\n");   
+
+  // page title
+    client.printf("<title> %s </title>\n", stitle); 
+    
+  // CSS 
+    client.write("<style>\n"); 
+    client.write("ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);}\n");
+    client.write("li {float: left;}\n");
+    client.write("li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}\n");
+    client.write("li a:hover { background-color: rgb(100, 0, 0);}\n");
+    client.print(style);                                // insert aditional style if supplied 
+    client.write("</style>\n");
+    
+  client.write("</head>\n");
+  client.write("<body style='color: rgb(0, 0, 0); background-color: yellow; text-align: center;'>\n");
+
+  // menu (custom for CameraWifiMotion)
+    client.println("<ul>");
+    client.println("<li><a href='" + HomeLink + "'>Home</a></li>");  // home menu button 
+    client.println("<li><a href='/log'>Log</a></li>");               // log menu button 
+    client.println("<li><a href='/bootlog'>BootLog</a></li>");       // boot log menu button 
+    client.println("<li><a href='/stream'>Live Video</a></li>");     // stream live video
+    client.println("<li><a href='/images'>Stored Images</a></li>");  // last menu button
+    client.println("<li><a href='/live'>Capture Image</a></li>");    // capture image menu button        
+    client.println("<li><a href='/imagedata'>Raw Data</a></li>");    // raw data menu button
+    
+    client.printf("<h1> <font color='#FF0000'>%s</h1></font>\n", stitle);           // sketch title
+    client.println("</ul>");
 }
 
 
@@ -136,10 +188,7 @@ void webfooter(WiFiClient &client) {
       else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
       else if (tstat == timeNotSet) client.print(" | NTP Failed");
       
-     // Spiffs info
-      int tk=SPIFFS.totalBytes() / 1024;
-      int uk=SPIFFS.usedBytes() / 1024;
-      client.print(" | Spiffs: " + String(tk - uk) + "kb free");      
+     // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs 
      
      // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
      
@@ -181,8 +230,8 @@ void handleLogpage() {
     for (int i=0; i < LogNumber; i++){         // count through number of entries
       client.print(system_message[lpos]);
       client.println("<br>");
+      if (lpos == 0) lpos = LogNumber;
       lpos--;
-      if (lpos < 0) lpos = LogNumber - 1;
     }
     
     // close html page
@@ -250,23 +299,133 @@ void handleReboot(){
 //                                -wifi connection check
 // --------------------------------------------------------------------------------------
 
-void WIFIcheck() {
+bool WIFIcheck() {
   
     if (WiFi.status() != WL_CONNECTED) {
-      // wifi connection is down
       if ( wifiok == 1) {
         log_system_message("Wifi connection lost");          // log system message if wifi was ok but now down
         wifiok = 0;                                          // flag problem with wifi
-      } else WiFi.reconnect();   // wifi is already flagged as down so try to reconnect
+      }
     } else { 
-      // wifi connection is ok
+      // wifi is ok
       if ( wifiok == 0) {
         log_system_message("Wifi connection is back");       // log system message if wifi was down but now back
         wifiok = 1;                                          // flag wifi is now ok
       }
     }
 
+    return wifiok;
+
 }
+
+
+// --------------------------------------------------------------------------------------
+//                                    -LED control code
+// --------------------------------------------------------------------------------------
+// Supply gpio pin, if LED ON when pin is high or low
+// useage:      Led led1(LED_1_GPIO, HIGH);       led1.on();
+
+class Led {
+  
+  private:
+    byte _gpioPin;       // gpio pin of the LED
+    bool _onState;       // if on when pin is high or low
+    
+  public:
+    Led(byte gpioPin, bool onState=HIGH) {
+      this->_gpioPin = gpioPin;
+      this->_onState = onState;
+      pinMode(_gpioPin, OUTPUT);
+      off();
+    }
+
+    void on() {
+      digitalWrite(_gpioPin, _onState);
+    }
+
+    void off() {
+      digitalWrite(_gpioPin, _onState);
+    }
+
+    void flip() {
+      digitalWrite(_gpioPin, !digitalRead(_gpioPin));   // flip the led status
+    }
+
+    bool status() {                           // returns 1 if LED is on
+      bool sstate = digitalRead(_gpioPin);
+      if (_onState == HIGH) return sstate;
+      else return !sstate;
+    }
+
+    void flash(int fledDelay=350, int freps=1) {
+      if (fledDelay < 0 || fledDelay > 20000) fledDelay=300;   // capture invalid delay
+      bool ftempStat = digitalRead(_gpioPin);
+      if (ftempStat == _onState) {            // if led is already on
+        off();
+        delay(fledDelay);
+      }
+      for (int i=0; i<freps; i++) {
+        on();
+        delay(fledDelay);
+        off();
+        delay(fledDelay);
+      }
+      if (ftempStat == _onState) on();        // return led status to on
+    }
+}; 
+
+
+// --------------------------------------------------------------------------------------
+//                                   -button control code
+// --------------------------------------------------------------------------------------
+// Supply gpio pin, normal state (i.e. high or low when not pressed)
+// useage:      Button button1(GPIO_PIN, HIGH);     if (button1.isPressed()) {};
+// Note: Because of the debouncing used it needs to be polled regularly as a single check will be ignored
+
+class Button {
+  
+  private:
+    int  _debounceDelay = 40;                  // default debounce setting (ms)
+    byte _gpiopin;                             // gpio pin of the button
+    bool _normalState;                         // pin state when button not pressed
+    bool _state;                               // current status of button
+
+    void update() {
+      bool unewReading = digitalRead(_gpiopin);
+      if (unewReading != _state) {             // if the button status has changed
+        delay(_debounceDelay);
+        unewReading = digitalRead(_gpiopin);
+      }
+      _state = unewReading;
+    }
+        
+  public:
+    Button(byte bpin, bool bnormalState = LOW) {
+      this->_gpiopin = bpin;
+      this->_normalState = bnormalState;
+      init();
+    }
+
+    void init() {
+      pinMode(_gpiopin, INPUT);
+      _state = digitalRead(_gpiopin);           // store current state of button
+    }
+
+    bool getState() {                           // returns the logic state of the gpio pin
+      update();
+      return _state;
+    }
+
+    bool isPressed() {                          // returns TRUE if button is curently pressed
+      if (_normalState == LOW) return getState();
+      else return (!getState());
+    }
+
+    bool debounce(int debounceDelay) {          // change debounce setting
+      _debounceDelay = max(debounceDelay,0);
+    }
+    
+}; 
 
 
 // --------------------------- E N D -----------------------------
