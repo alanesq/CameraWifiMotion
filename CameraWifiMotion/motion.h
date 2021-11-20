@@ -1,32 +1,32 @@
 /**************************************************************************************************
- *  
- *  Motion detection from camera image - 08Sep20 
- * 
+ *
+ *  Motion detection from camera image - 08Sep20
+ *
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
- * 
- * 
+ *
+ *
  * This works by capturing a greyscale image from the camera, splitting this up in to blocks of pixels (BLOCK_SIZE x BLOCK_SIZE)
- * then reading all the pixel values inside each block and producing an average value for the block. 
+ * then reading all the pixel values inside each block and producing an average value for the block.
  * The previous frames block values are then compared with the current and the number of blocks which have changed beyond
  * a threshold (dayBlock_threshold) are counted.  If enough of the blocks have changed between two thresholds (dayImage_thresholdL and H)
  * then motion is detected.
- * - Many thanks to eloquentarduino for creating this code and for taking the time to answer my questions whilst I was 
+ * - Many thanks to eloquentarduino for creating this code and for taking the time to answer my questions whilst I was
  *   developing this security camera sketch.
- *  
+ *
  * For info on the camera module see: https://github.com/espressif/esp32-camera
- * 
- * 
+ *
+ *
  **************************************************************************************************/
 
 
 #define DEBUG_MOTION 0        // extended serial debug enable for motion.h
 
-#include "esp_camera.h"       // https://github.com/espressif/esp32-camera
+//#include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 
 
 // Image Settings
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
-  #define FRAME_SIZE_PHOTO FRAMESIZE_SVGA       // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  #define FRAME_SIZE_PHOTO FRAMESIZE_SVGA      // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
   #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing (20)
 
 // camera type settings (CAMERA_MODEL_AI_THINKER)
@@ -49,17 +49,17 @@
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
-  
+
 //   ---------------------------------------------------------------------------------------------------------------------
 
-  
+
 // detection parameters (these are set by user and stored in Spiffs)
     uint16_t targetBrightness = 120;      // Brightness level which is aimed to maintain by adjustment of camera settings
     uint16_t Block_threshold = 10;        // average pixel variation in block required to count as changed - range 0 to 255
     uint16_t Image_thresholdL = 15;       // min changed blocks in image required to count as motion detected in percent
     uint16_t Image_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
 
-// misc     
+// misc
     #define WIDTH 320                 // motion sensing frame size
     #define HEIGHT 240
     #define W (WIDTH / BLOCK_SIZE)
@@ -69,14 +69,14 @@
     uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
     const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
     // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast, thresholdGainAdjust
-    
+
 // store most current motion detection reading for display on main page
     uint16_t latestChanges = 0;
 
 // frame stores (blocks)
     uint16_t prev_frame[H][W] = { 0 };      // previously captured frame
     uint16_t current_frame[H][W] = { 0 };   // current frame
-    
+
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
 //   4 x 3 grid results in mask areas of 16 blocks (4x4) - image = 320x240 pixels, blocks = 20x20 pixels
     const uint8_t mask_columns = 4;         // columns in detection mask
@@ -88,7 +88,7 @@
                                                  {1,1,1},
                                                  {1,1,1},
                                                  {1,1,1} };
-    
+
 // forward delarations
     bool setupCameraHardware(framesize_t);
     bool capture_still();
@@ -105,13 +105,13 @@
 
 //   ---------------------------------------------------------------------------------------------------------------------
 
-    
+
 /**
  * Setup camera hardware
  */
 
 bool setupCameraHardware() {
-  
+
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
     config.pin_d0 = Y2_GPIO_NUM;
@@ -132,15 +132,15 @@ bool setupCameraHardware() {
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
     config.pixel_format = PIXFORMAT_GRAYSCALE;    // PIXFORMAT_ + YUV422, GRAYSCALE, RGB565, JPEG, RGB888?
-    config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA, CIF, VGA, SVGA, XGA, SXGA, UXGA 
+    config.frame_size = FRAME_SIZE_MOTION;        // FRAMESIZE_ + QVGA, CIF, VGA, SVGA, XGA, SXGA, UXGA
     config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-    
+
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
 
     cameraImageSettings(FRAME_SIZE_MOTION);       // apply camera sensor settings
-    
+
     return (camerr == ESP_OK);                    // return boolean result of camera initilisation
 }
 
@@ -151,16 +151,16 @@ bool setupCameraHardware() {
  * apply camera sensor/image settings
  */
 
-bool cameraImageSettings(framesize_t fsize) { 
-   
-    sensor_t *s = esp_camera_sensor_get();  
+bool cameraImageSettings(framesize_t fsize) {
+
+    sensor_t *s = esp_camera_sensor_get();
 
     if (s == NULL) {
       Serial.println("Error: problem getting camera sensor settings");
       return 0;
-    } 
+    }
 
-    #if IMAGE_SETTINGS           // Implement adjustment of image settings 
+    #if IMAGE_SETTINGS           // Implement adjustment of image settings
 
     // Image resolution / type  (may not be required?)
       s->set_framesize(s, fsize);                   // FRAME_SIZE_PHOTO , FRAME_SIZE_MOTION
@@ -173,19 +173,19 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
       s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
       s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
-      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
+      s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
       s->set_quality(s, 10);                        // (0 - 63)
-      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+      s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)
       s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
       s->set_lenc(s, 1);                            // lens correction? (1 or 0)
       s->set_saturation(s, 0);                      // (-2 to 2)
       s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
-      s->set_sharpness(s, 0);                       // (-2 to 2)  
+      s->set_sharpness(s, 0);                       // (-2 to 2)
       s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
       s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
       s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
 //       s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
-//       s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1) 
+//       s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
 //       s->set_wb_mode(s, 0);                         // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
 //       s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
 //       s->set_raw_gma(s, 1);                         // (1 or 0)
@@ -198,7 +198,7 @@ bool cameraImageSettings(framesize_t fsize) {
     // capture a frame to ensure settings apply (not sure if this is really needed)
       camera_fb_t *frame_buffer = esp_camera_fb_get();    // capture frame from camera
       esp_camera_fb_return(frame_buffer);                 // return frame so memory can be released
-    
+
     return 1;
 }
 
@@ -208,27 +208,27 @@ bool cameraImageSettings(framesize_t fsize) {
 
 /**
  * Capture image and down-sample in to blocks
- *   this sets all blocks to value zero then goes through each pixel in the greyscale image and adds its value to 
- *   the relevant blocks total.  After this each blocks value is divided by the number of pixels in it 
+ *   this sets all blocks to value zero then goes through each pixel in the greyscale image and adds its value to
+ *   the relevant blocks total.  After this each blocks value is divided by the number of pixels in it
  *   resulting in each blocks value being the average value of all the pixels within it.
  */
 bool capture_still() {
 
-    Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image 
+    Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image
 
     uint32_t TempAveragePix = 0;     // average pixel reading (used for calculating image brightness)
-    uint32_t temp_frame[H][W] = { 0 }; 
+    uint32_t temp_frame[H][W] = { 0 };
 
     cameraImageSettings(FRAME_SIZE_MOTION);                   // apply camera sensor settings
     camera_fb_t *frame_buffer = esp_camera_fb_get();          // capture frame from camera
 
     if (!frame_buffer) {                                      // if there was a problem grabbing a frame try again
-      camera_fb_t *frame_buffer = esp_camera_fb_get();    
+      camera_fb_t *frame_buffer = esp_camera_fb_get();
       if (!frame_buffer)return false;                         // failed to capture image
     }
- 
+
     // down-sample image in to blocks
-      for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
+    for (uint32_t i = 0; i < WIDTH * HEIGHT; i++) {
           const uint16_t x = i % WIDTH;
           const uint16_t y = floor(i / WIDTH);
           const uint8_t block_x = floor(x / BLOCK_SIZE);
@@ -238,15 +238,15 @@ bool capture_still() {
 
       // accumulate all the pixels in each block
           temp_frame[block_y][block_x] += pixel;
-  
-      TempAveragePix += pixel;    // add all pixels together for calculation of image average brightness 
+
+      TempAveragePix += pixel;    // add all pixels together for calculation of image average brightness
     }
     esp_camera_fb_return(frame_buffer);    // return frame so memory can be released
- 
+
     AveragePix = TempAveragePix / (WIDTH * HEIGHT);     // convert to average
-   
-    // average values for all pixels in each block 
-      bool frameChanged = 0;                            // flag if any change since last frame 
+
+    // average values for all pixels in each block
+      bool frameChanged = 0;                            // flag if any change since last frame
       for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             uint16_t currentBlock = temp_frame[y][x] / (BLOCK_SIZE * BLOCK_SIZE);    // average pixel value in block
@@ -275,18 +275,18 @@ bool capture_still() {
  */
 float motion_detect() {
     uint16_t changes = 0;
-    const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
+    //const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE * BLOCK_SIZE);     // total number of blocks in image
 
     // adjust block_threshold for gain setting (to compensate for noise introduced with gain)
     uint16_t tThreshold = Block_threshold + (float)(cameraImageGain * thresholdGainCompensation);
-    
+
     // go through all blocks in current frame and check for changes since previous frame
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             uint16_t current = current_frame[y][x];
             uint16_t prev = prev_frame[y][x];
             uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
-            // float pChange = abs(current - prev) / prev;   // original code 
+            // float pChange = abs(current - prev) / prev;   // original code
             if (pChange >= tThreshold) {                     // if change in block is enough to qualify as changed
                 if (block_active(x,y)) changes += 1;         // if detection mask is enabled for this block increment changed block count
 #if DEBUG_MOTION
@@ -312,7 +312,7 @@ float motion_detect() {
     Serial.println(mask_active * blocksPerMaskUnit);
 #endif
 
-    return changes;                                                 // return number of changed blocks 
+    return changes;                                                 // return number of changed blocks
 }
 
 
@@ -325,12 +325,12 @@ float motion_detect() {
 
 bool block_active(uint16_t x, uint16_t y) {
 
-    // Which mask area is this block in 
+    // Which mask area is this block in
       uint16_t Maskx = floor(x / maskBlockWidth);        // x mask area (0 to 3)
       uint16_t Masky = floor(y / maskBlockHeight);       // y mask area (0 to 2)
-   
+
     return mask_frame[Maskx][Masky];
-      
+
 }
 
 
@@ -340,7 +340,7 @@ bool block_active(uint16_t x, uint16_t y) {
 /**
  * Copy current frame to previous
  */
- 
+
 void update_frame() {
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
