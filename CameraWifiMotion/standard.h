@@ -1,13 +1,15 @@
 /**************************************************************************************************
  *
- *      Procedures (which are likely to be the same between projects) - 17Nov21
+ *      Procedures (which are likely to be the same between projects) - 21Nov21
  *
- *      part of the BasicWebserver sketch but with modified 'header'
+ *      part of the BasicWebserver sketch but with modified 'header', 'footer' and iclusion of spiffs.h
  *
  *      Includes: log_system_message, webheader, webfooter, handleLogpage, handleReboot, WIFIcheck & decodeIP
  *                classes: Led, Button & repeatTimer.
  *
  **************************************************************************************************/
+
+#include <SPIFFS.h>
 
 
 // ----------------------------------------------------------------
@@ -149,7 +151,7 @@ void webfooter(WiFiClient &client) {
       else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
       else if (tstat == timeNotSet) client.print(" | NTP Failed");
 
-     // client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1000 ) );             // if using spiffs
+     client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1024 ) );             // if using spiffs
 
      // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
 
