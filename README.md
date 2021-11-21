@@ -7,7 +7,7 @@ Also it looks like the latest WifiManager has changed yet again and so
       does not work !
       
       
-This is a Arduino IDE sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
+This is a Arduino IDE or PlatformIO sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
 It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
 any changes.  If significant change is detected it captures a higher res image and stores it in internal memory.  
