@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Wifi / NTP Connections using WifiManager - 13Oct21
+ *      Wifi / NTP Connections using Autoconnect - 07Dec21
  *
  *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *
@@ -9,21 +9,20 @@
  *      see:  https://nodemcu.readthedocs.io/en/release/modules/wifi/
  *
  *      Libraries used:
- *                      ESP_Wifimanager - https://github.com/khoih-prog/ESP_WiFiManager
+ *                      Autoconnect - https://hieromon.github.io/AutoConnect
+ *                                    also installs PageBuilder and ArduinoJson
  *                      TimeLib
  *                      ESPmDNS
  *
- *
  **************************************************************************************************/
-
 
 
 // **************************************** S e t t i n g s ****************************************
 
 
-    // Configuration Portal (Wifimanager)
-      String AP_SSID = "ESPPortal";
-      String AP_PASS = "12345678";
+// Configuration Portal (Autoconnect)
+  const String AP_SSID = "ESPcam";
+  const String AP_PASS = "12345678";
 
 
 //     mDNS name
@@ -35,13 +34,16 @@
 // *************************************************************************************************
 
 
+#include <Arduino.h>            // required by PlatformIO
+
+
 // forward declarations
   void startWifiManager();
   String currentTime();
   bool IsBST();
   void sendNTPpacket();
   time_t getNTPTime();
-  String requestWebPage(String, String, int, int);
+  String requestWebPage(String, String, int, int, String, bool);
 
 
 // ----------------------------------------------------------------
@@ -53,24 +55,34 @@
     #include <esp_wifi.h>
     #include <WiFi.h>
     #include <WiFiClient.h>
-    #include <WebServer.h>
+    //#include <WiFiMulti.h>
+    #include <WebServer.h>    // https://github.com/espressif/arduino-esp32/blob/master/libraries/WebServer
     #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
-    WebServer server(ServerPort);
+    WebServer ACserver(80);               // temporary for autoconnect
+    WebServer server(ServerPort);         // allows use of different ports
     //#include <ESPmDNS.h>                // see https://github.com/espressif/arduino-esp32/tree/master/libraries/ESPmDNS
   #elif defined ESP8266
-    #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
+    #include <ESP8266WiFi.h>              // https://github.com/esp8266/Arduino
     //needed for library
     #include <DNSServer.h>
+    //#include <ESP8266WiFiMulti.h>
     #include <ESP8266WebServer.h>
     #define ESP_getChipId()   (ESP.getChipId())
-    ESP8266WebServer server(ServerPort);
+    ESP8266WebServer *ACserver = new ESP8266WebServer(80);     // temporary for autoconnect
+    ESP8266WebServer server(ServerPort);                       // allows use of different ports
     //#include <ESP8266mDNS.h>
   #else
-      #error "This sketch only works with the ESP8266 or ESP32"
+      #error "wifi.h: This sketch only works with ESP8266 or ESP32"
   #endif
 
-  #include <ESP_WiFiManager.h>              //https://github.com/khoih-prog/ESP_WiFiManager
-  ESP_WiFiManager wm;
+// Autoconnect
+  #include <AutoConnect.h>     // https://hieromon.github.io/AutoConnect
+  #if defined ESP32
+    AutoConnect       portal(ACserver);
+  #else
+    AutoConnect       portal(*ACserver);
+  #endif
+  AutoConnectConfig ACconfig;
 
 
 // Time from NTP server
@@ -94,43 +106,30 @@
 
 void startWifiManager() {
 
-//  // erase stored settings with (not tested)
-//    wm.resetSettings();
-//    ESP.restart();
+  // autoconnect settings - see https://hieromon.github.io/AutoConnect/adnetwork.html#change-ssid-and-password-for-softap
+    ACconfig.apid = AP_SSID;                    // portal name
+    ACconfig.psk  = AP_PASS;                    // portal password
+    ACconfig.portalTimeout = 2 * 60 * 1000;     // timeout (ms)
 
-  // Connect to Wifi using WifiManager
-    ESP_WiFiManager ESP_wifiManager("AutoConnectAP");
-    ESP_wifiManager.setConfigPortalTimeout(120);
-    ESP_wifiManager.setDebugOutput(true);
-
-  // get stored wifi settings
-    String Router_SSID = ESP_wifiManager.WiFi_SSID();
-    String Router_Pass = ESP_wifiManager.WiFi_Pass();
-    if (Router_SSID == "") if (serialDebug) Serial.println("There are no wifi settings stored");
-
-  // try connecting to wifi
-    if (serialDebug) Serial.println("Connecting to wifi using WifiManager");
-    WiFi.begin(Router_SSID.c_str(), Router_Pass.c_str());
-
-  // if unable to connect to wifi start config portal
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-      if (serialDebug) Serial.println("Unable to connect to WiFi - starting Wifimanager config portal");
-      if ( !ESP_wifiManager.startConfigPortal(AP_SSID.c_str(), AP_PASS.c_str()) ) {
-        if (serialDebug) Serial.println("Not connected to WiFi - rebooting");
-        delay(1000);
-        ESP.restart();
-        delay(5000);           // restart will fail without this delay
-      }
-    }
-
-  // finished connecting to wifi (it should be connected at this point)
-    if (WiFi.status() == WL_CONNECTED) {
-      if (serialDebug) Serial.print("connected to wifi. Local IP: ");
-      if (serialDebug) Serial.println(WiFi.localIP());
+  // connect to wifi with Autoconnect
+    if (serialDebug) Serial.println("Connecting to wifi...");
+    portal.config(ACconfig);
+    if (portal.begin()) {
+      if (serialDebug) Serial.println("WiFi connected: " + WiFi.localIP().toString());
       wifiok = 1;
     } else {
-      if (serialDebug) Serial.println(ESP_wifiManager.getStatus(WiFi.status()));
+      if (serialDebug) Serial.print("Wifi connection failed so rebooting: ");
+      delay(1000);
+      ESP.restart();
+      delay(5000);           // restart will fail without this delay
     }
+
+// delete temporary Autoconnect webserver
+  #if defined ESP32
+    ACserver.stop();
+  #else
+    delete ACserver;
+  #endif
 
 //  // Set up mDNS responder:
 //    if (serialDebug) Serial.println( MDNS.begin(mDNS_name.c_str()) ? "mDNS responder started ok" : "Error setting up mDNS responder" );
@@ -176,56 +175,45 @@ String currentTime(){
 //-----------------------------------------------------------------------------
 //                           -British Summer Time check
 //-----------------------------------------------------------------------------
-// returns true if it is British Summer time
+// @return  true if it is British Summer time
 // code from https://my-small-projects.blogspot.com/2015/05/arduino-checking-for-british-summer-time.html
 
-boolean IsBST()
-{
+bool IsBST() {
     int imonth = month();
     int iday = day();
     int hr = hour();
 
     //January, february, and november are out.
     if (imonth < 3 || imonth > 10) { return false; }
+
     //April to September are in
     if (imonth > 3 && imonth < 10) { return true; }
 
     // find last sun in mar and oct - quickest way I've found to do it
     // last sunday of march
     int lastMarSunday =  (31 - (5* year() /4 + 4) % 7);
+
     //last sunday of october
     int lastOctSunday = (31 - (5 * year() /4 + 1) % 7);
 
     //In march, we are BST if is the last sunday in the month
     if (imonth == 3) {
-
-      if( iday > lastMarSunday)
-        return true;
-      if( iday < lastMarSunday)
-        return false;
-
-      if (hr < 1)
-        return false;
-
+      if( iday > lastMarSunday) return true;
+      if( iday < lastMarSunday) return false;
+      if (hr < 1) return false;
       return true;
-
     }
+
     //In October we must be before the last sunday to be bst.
     //That means the previous sunday must be before the 1st.
     if (imonth == 10) {
-
-      if( iday < lastOctSunday)
-        return true;
-      if( iday > lastOctSunday)
-        return false;
-
-      if (hr >= 1)
-        return false;
-
+      if( iday < lastOctSunday) return true;
+      if( iday > lastOctSunday) return false;
+      if (hr >= 1) return false;
       return true;
     }
 
-    return true;    // line to stop platformIO complaining ;-)
+    return true;   // this is here just to stop compiler getting upset ;-)
 
 }  // IsBST
 
@@ -331,13 +319,17 @@ time_t getNTPTime() {
 // ----------------------------------------------------------------
 //                        request a web page
 // ----------------------------------------------------------------
-// parameters: ip address, page to request, port to use (usually 80), maximum chars to receive, ignore all in reply before this text
-//     return: web page reply as a string
-//      Usage: requestWebPage("192.168.1.166", "/log", 80, 600, "");
+//   @param    ip           ip address
+//   @param    page         web page to request
+//   @param    port         ip port to use (usually 80)
+//   @param    maxChars     maximum number of chars to receive
+//   @param    cuttoffText  ignore all in reply before this text
+//   @return   the reply as a string
+//   Example usage: requestWebPage("192.168.1.166", "/log", 80, 600, "");
 
 String requestWebPage(String ip, String page, int port, int maxChars, String cuttoffText = ""){
 
-  int maxWaitTime = 3000;                 // max time to wait for reply (ms)
+  uint32_t maxWaitTime = 3000;            // max time to wait for reply (ms)
 
   char received[maxChars + 1];            // temp store for incoming character data
   int received_counter = 0;               // counter of number of characters which have been received
