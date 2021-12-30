@@ -145,7 +145,7 @@
   void saveJpgFrame(String filesName);
   void saveGreyscaleFrame(String filesName);
   void ioDetected(bool iostat);
-  void MotionDetected(uint16_t changes);
+  void uint16_t changes);
   void handleStream();
   void handleTest();
 
@@ -1776,9 +1776,9 @@ void MotionDetected(uint16_t changes) {
     log_system_message("Camera detected motion: " + String(changes));
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
 
-#if EMAIL_ENABLED
-
     int capres = capturePhotoSaveSpiffs(UseFlash);                        // capture an image
+  
+#if EMAIL_ENABLED
 
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours (i.e. Chris's setting)
