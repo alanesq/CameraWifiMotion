@@ -52,18 +52,20 @@
 
   const char* stitle = "CameraWifiMotion";               // title of this sketch
 
-  const char* sversion = "20Nov21";                      // version of this sketch
+  const char* sversion = "31Dec21";                      // version of this sketch
 
   const bool serialDebug = 1;                            // provide debug info on serial port
 
   bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
-  #define EMAIL_ENABLED 1                                // Enable E-mail support
+  #define EMAIL_ENABLED 0                                // Enable E-mail support
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define FTP_ENABLED 0                                  // if ftp uploads are enabled
+
+  #define PHP_ENABLED 1                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
@@ -145,7 +147,7 @@
   void saveJpgFrame(String filesName);
   void saveGreyscaleFrame(String filesName);
   void ioDetected(bool iostat);
-  void uint16_t changes);
+  void MotionDetected(uint16_t changes);
   void handleStream();
   void handleTest();
 
@@ -165,6 +167,7 @@
   uint32_t MaintTiming = millis();           // used for timing maintenance tasks
   bool emailWhenTriggered = 0;               // flag if to send emails when motion detection triggers
   bool ftpImages = 0;                        // if to FTP images up to server
+  bool PHPImages = 0;                        // if to send images via PHP script
   bool ReqLEDStatus = 0;                     // desired status of the illuminator led (i.e. should it be on or off when not being used as a flash)
   const bool ledON = HIGH;                   // Status LED control
   const bool ledOFF = LOW;
@@ -209,6 +212,10 @@ Led statusLed1(onboardLED, LOW);        // set up onboard LED as led1 (LOW = on)
 
 #if FTP_ENABLED
   #include "ftp.h"                           // Include ftp.h file for the ftp of captured images
+#endif
+
+#if PHP_ENABLED
+  #include "php.h"                           // Include php.h file for sending images via a php script
 #endif
 
 // ---------------------------------------------------------------
@@ -541,6 +548,12 @@ void LoadSettingsSpiffs() {
       else if (tnum == 1) ftpImages = 1;
       else log_system_message("Invalid FTP in settings: " + line);
 
+      // line 15 - PHPImages
+        ReadLineSpiffs(&file, &line, &tnum);
+        if (tnum == 0) PHPImages = 0;
+        else if (tnum == 1) PHPImages = 1;
+        else log_system_message("Invalid PHP in settings: " + line);
+
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -591,6 +604,7 @@ void SaveSettingsSpiffs() {
         file.println(String(cameraImageGain));
         file.println(String(tCounterTrigger));
         file.println(String(ftpImages));
+        file.println(String(PHPImages));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -643,6 +657,7 @@ void handleDefault() {
       cameraImageGain = 0;
       tCounterTrigger = 1;
       ftpImages = 0;
+      PHPImages = 0;
 
       // Detection mask grid
         for (int y = 0; y < mask_rows; y++)
@@ -781,6 +796,11 @@ void handleRoot() {
       client.write("<input style='height: 30px;' name='ftp' value='ftp' title='FTP images when motion detected enable/disable' type='submit'> \n");
 #endif
 
+#if PHP_ENABLED
+    // toggle PHP
+      client.write("<input style='height: 30px;' name='php' value='php' title='Send images via PHP script when motion detected enable/disable' type='submit'> \n");
+#endif
+
     // Clear images in spiffs
       client.write("<input style='height: 30px;' name='wipeS' value='Wipe Store' title='Delete all images stored in Spiffs' type='submit'> \n");
 
@@ -824,6 +844,18 @@ void rootButtons() {
         }
         SaveSettingsSpiffs();     // save settings in Spiffs
       }
+
+      // PHP was clicked -  send images via a php script
+        if (server.hasArg("php")) {
+          if (!PHPImages) {
+                log_system_message("PHP when motion detected enabled");
+                PHPImages = 1;
+          } else {
+            log_system_message("PHP when motion detected disabled");
+            PHPImages = 0;
+          }
+          SaveSettingsSpiffs();     // save settings in Spiffs
+        }
 
    // if wipeS was entered  - clear Spiffs
       if (server.hasArg("wipeS")) WipeSpiffs();        // format Spiffs
@@ -1102,6 +1134,11 @@ void handleData(){
   // FTP status
     #if FTP_ENABLED
       if (ftpImages) client.write(" {FTP enabled}&ensp;");
+    #endif
+
+  // PHP status
+    #if PHP_ENABLED
+      if (PHPImages) client.write(" {PHP enabled}&ensp;");
     #endif
 
   // email status
@@ -1685,6 +1722,11 @@ void saveJpgFrame(String filesName) {
         if (ftpImages) uploadImageByFTP(fb->buf, fb->len, FTPfilename);
       #endif
 
+      #if PHP_ENABLED
+        delay(500);   // required to stop server rejecting so soon after last one
+        if (PHPImages) sendPHP(fb->buf, fb->len, "cwm-l");
+      #endif
+
     } else Serial.println("Capture of image failed");
 
   esp_camera_fb_return(fb);    // return frame so memory can be released
@@ -1742,6 +1784,10 @@ void saveGreyscaleFrame(String filesName) {
       if (ftpImages) uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime() + "-S");
     #endif
 
+    #if PHP_ENABLED
+      if (PHPImages) sendPHP(_jpg_buf, _jpg_buf_len, "cwm-s");
+    #endif
+
   esp_camera_fb_return(fb);    // return frame so memory can be released
 
 }
@@ -1776,10 +1822,9 @@ void MotionDetected(uint16_t changes) {
     log_system_message("Camera detected motion: " + String(changes));
     TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
 
-    int capres = capturePhotoSaveSpiffs(UseFlash);                        // capture an image
-  
-#if EMAIL_ENABLED
+    int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
+#if EMAIL_ENABLED
     // send email if long enough since last motion detection (or if this is the first one)
     if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours (i.e. Chris's setting)
         unsigned long currentMillis = millis();        // get current time
