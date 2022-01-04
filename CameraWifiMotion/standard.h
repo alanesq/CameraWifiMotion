@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Procedures (which are likely to be the same between projects) - 21Nov21
+ *      Procedures (which are likely to be the same between projects) - 04Jan22
  *
  *      part of the BasicWebserver sketch but with modified 'header', 'footer' and iclusion of spiffs.h
  *
@@ -35,12 +35,9 @@
 
 String decodeIP(String IPadrs) {
 
-    if (IPadrs == "192.168.1.176") IPadrs = "HA server";
-    else if (IPadrs == "192.168.1.103") IPadrs = "Parlour laptop";
-    else if (IPadrs == "192.168.1.101") IPadrs = "Bedroom laptop";
-    else if (IPadrs == "192.168.1.169") IPadrs = "Linda's laptop";
-    else if (IPadrs == "192.168.1.170") IPadrs = "Shed 1 laptop";
-    else if (IPadrs == "192.168.1.143") IPadrs = "Shed 2 laptop";
+    if (IPadrs == "192.168.1.100") IPadrs = "Phone";
+    else if (IPadrs == "192.168.1.101") IPadrs = "Parlour laptop";
+    else if (IPadrs == "192.168.1.102") IPadrs = "Bedroom laptop";
 
     // log last IP client connected
       if (IPadrs != lastClient) {
@@ -154,6 +151,11 @@ void webfooter(WiFiClient &client) {
      client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1024 ) );             // if using spiffs
 
      // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
+
+     // free PSRAM
+       if (psramFound()) {
+         client.printf(" | PSram: %dK", heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024 );
+       }
 
      client.printf("%s </small>\n", colEnd);
      client.write("</div>\n");
