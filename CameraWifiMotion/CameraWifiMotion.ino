@@ -1976,6 +1976,9 @@ void MotionDetected(uint16_t changes) {
 void handleStream(){
 
   WiFiClient client = server.client();          // open link with client
+  char buf[32];
+  int s;
+  camera_fb_t * fb = NULL;
 
   // log page request including clients IP address
       IPAddress cip = client.remoteIP();
@@ -1990,11 +1993,6 @@ void handleStream(){
   const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
   const int bdrLen = strlen(BOUNDARY);
   const int cntLen = strlen(CTNTTYPE);
-
-  // temp stores
-    char buf[32];
-    int s;
-    camera_fb_t * fb = NULL;
 
   if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while streaming (not required with single core esp32?)
 
@@ -2020,9 +2018,10 @@ void handleStream(){
     esp_camera_fb_return(fb);                   // return frame so memory can be released
   }
 
-  log_system_message("Video stream stopped");
-  delay(3);
-  client.stop();
+  // close client connection
+    log_system_message("Video stream stopped");
+    delay(3);
+    client.stop();
 
   RestartCamera(PIXFORMAT_GRAYSCALE);                    // restart camera back to greyscale mode for motion detection
   cameraImageSettings(FRAME_SIZE_MOTION);                // apply camera sensor settings
@@ -2035,60 +2034,44 @@ void handleStream(){
 // ----------------------------------------------------------------
 // -show motion detection frame as a JPG      i.e. http://x.x.x.x/jpg
 // ----------------------------------------------------------------
-// work in progress
 
 void handleJPG() {
 
   WiFiClient client = server.client();          // open link with client
+  char buf[32];
+  uint8_t * jpg_buf;
+  size_t jpg_size = 0;
 
   // capture a frame (greyscale)
     camera_fb_t * fb = NULL;                                                                                  // store time that image capture started
     fb = esp_camera_fb_get();
     if (!fb) {
-      log_system_message("error: failed to capture image (JPG)");
+      log_system_message("error: failed to capture image");
       return;
     }
 
-  uint8_t * jpg_buf;    // buffer to store the jpg in
-  size_t jpg_size = 0;
+  // convert greyscale to JPG
+    fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, 31, &jpg_buf, &jpg_size);
+    if (serialDebug) Serial.printf("Converted JPG size: %d bytes \n", jpg_size);
 
-  // convert buffer to JPG
-    if(jpg_buf == NULL){
-      Serial.println("Malloc failed to allocate buffer for JPG");
-    }else{
-      fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, 31, &jpg_buf, &jpg_size);
-      Serial.printf("Converted JPG size: %d bytes \n", jpg_size);
-    }
-
-
-  // html
-     const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
-                           "Access-Control-Allow-Origin: *\r\n" \
-                           "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
-     const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
-     const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
+  // build and send html
+     const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
+     const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
      const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
-     const int bdrLen = strlen(BOUNDARY);
      const int cntLen = strlen(CTNTTYPE);
+     client.write(HEADER, hdrLen);
+     client.write(CTNTTYPE, cntLen);
 
-     // temp stores
-       char buf[32];
-       int s;
+   // put some text in to 'buf' char array and send
+     sprintf( buf, "%d\r\n\r\n", jpg_size);
+     client.write(buf, strlen(buf));
 
-     // send html header
-       client.write(HEADER, hdrLen);
-       client.write(BOUNDARY, bdrLen);
+   // send the jpg data
+     client.write((char *)jpg_buf, jpg_size);
 
-     // send jpg
-       s = jpg_size;                               // store size of image (i.e. buffer length)
-       client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-       sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
-       client.write(buf, strlen(buf));             // send result (image size)
-       client.write((char *)jpg_buf, s);           // send the image data
-       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-
+  // close connection
      delay(3);
-     client.stop();                                // close html link
+     client.stop();
 
    heap_caps_free(jpg_buf);                        // return jpg buffer memory
    esp_camera_fb_return(fb);                       // return greyscale buffer
@@ -2132,22 +2115,6 @@ void handleTest(){
 
 
 
-
-  uint8_t * jpg_buf;   // = (uint8_t *) heap_caps_malloc(20000, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-  // capture a frame (greyscale)
-    camera_fb_t * fb = NULL;                                                                                  // store time that image capture started
-    fb = esp_camera_fb_get();
-    if (!fb) {
-      log_system_message("error: failed to capture image (JPG)");
-      return;
-    }
-
-  size_t jpg_size = 0;
-  fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, 31, &jpg_buf, &jpg_size);
-
-  heap_caps_free(jpg_buf);                        // return jpg buffer memory
-  esp_camera_fb_return(fb);                       // return greyscale buffer
 
 
 
