@@ -726,7 +726,7 @@ void handleRoot() {
 
   // build the HTML code
 
-    client.write("<FORM action='/' method='post'>\n");                 // used by the buttons (action = the page send it to)
+    client.print("<FORM action='" + HomeLink + "' method='post'>\n");  // used by the buttons (action = the page send it to)
     client.write("<P>");                                               // start of section
 
   // insert an iFrame containing changing data in to the page
