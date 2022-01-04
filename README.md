@@ -124,6 +124,7 @@ It also has the following URLs you can use:
                                        for smaller pre capture images add 100 to x.
                                 /stream - Shows a live video stream 
                                         Thanks to Uwe Gerlach for sending me the code showing how to do this 
+                                /jpg - display the greyscale image the motion detecting is using
 
 -----------------
 
