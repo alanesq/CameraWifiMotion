@@ -1,6 +1,6 @@
 /*******************************************************************************************************************
  *
- *        CameraWifiMotion - v2.2
+ *        CameraWifiMotion - v2.3
  *
  *        ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE
  *
@@ -52,9 +52,9 @@
 
   const char* stitle = "CameraWifiMotion";               // title of this sketch (CameraWifiMotion)
 
-  const char* sversion = "03Jan22";                      // version of this sketch
+  const char* sversion = "04Jan22";                      // version of this sketch
 
-  const bool serialDebug = 0;                            // provide debug info on serial port
+  const bool serialDebug = 1;                            // provide debug info on serial port
 
   bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
@@ -65,7 +65,7 @@
 
   #define FTP_ENABLED 0                                  // if ftp uploads are enabled
 
-  #define PHP_ENABLED 1                                  // if PHP uploads are enabled
+  #define PHP_ENABLED 0                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
@@ -1858,6 +1858,10 @@ void saveGreyscaleFrame(String filesName) {
     camera_fb_t * fb = NULL;    // pointer
     cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
     fb = esp_camera_fb_get();
+    if (!fb) {                                   // if failed to capture frame
+      log_system_message("error: failed to capture greyscale image");
+      return;
+    }
 
   // convert greyscale to jpg
     bool jpeg_converted = frame2jpg(fb, 80, &_jpg_buf, &_jpg_buf_len);
@@ -1902,6 +1906,7 @@ void saveGreyscaleFrame(String filesName) {
     #endif
 
   esp_camera_fb_return(fb);    // return frame so memory can be released
+  heap_caps_free(_jpg_buf);                        // return jpg buffer memory
 
 }
 
@@ -2035,7 +2040,6 @@ void handleStream(){
 void handleJPG() {
 
   WiFiClient client = server.client();          // open link with client
-  size_t jpg_size = 0;
 
   // capture a frame (greyscale)
     camera_fb_t * fb = NULL;                                                                                  // store time that image capture started
@@ -2045,9 +2049,10 @@ void handleJPG() {
       return;
     }
 
+  uint8_t * jpg_buf;    // buffer to store the jpg in
+  size_t jpg_size = 0;
+
   // convert buffer to JPG
-    // Create a buffer for the JPG in psram (30000 = 20k)
-      uint8_t * jpg_buf = (uint8_t *) heap_caps_malloc(20000, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if(jpg_buf == NULL){
       Serial.println("Malloc failed to allocate buffer for JPG");
     }else{
@@ -2085,8 +2090,8 @@ void handleJPG() {
      delay(3);
      client.stop();                                // close html link
 
-   esp_camera_fb_return(fb);                       // return greyscale buffer
    heap_caps_free(jpg_buf);                        // return jpg buffer memory
+   esp_camera_fb_return(fb);                       // return greyscale buffer
 }
 
 
@@ -2126,6 +2131,23 @@ void handleTest(){
 //    requestWebPageGSM("alanesq.eu5.net", "/temp/q.txt", 80);
 
 
+
+
+  uint8_t * jpg_buf;   // = (uint8_t *) heap_caps_malloc(20000, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
+  // capture a frame (greyscale)
+    camera_fb_t * fb = NULL;                                                                                  // store time that image capture started
+    fb = esp_camera_fb_get();
+    if (!fb) {
+      log_system_message("error: failed to capture image (JPG)");
+      return;
+    }
+
+  size_t jpg_size = 0;
+  fmt2jpg(fb->buf, fb->len, fb->width, fb->height, fb->format, 31, &jpg_buf, &jpg_size);
+
+  heap_caps_free(jpg_buf);                        // return jpg buffer memory
+  esp_camera_fb_return(fb);                       // return greyscale buffer
 
 
 
