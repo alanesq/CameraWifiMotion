@@ -145,33 +145,34 @@ void startWifiManager() {
 // ----------------------------------------------------------------
 //          -Return current time and date as a string
 // ----------------------------------------------------------------
+// Note: in this format so it can be sorted by date order if stored on sd card etc.
 
 String currentTime(){
 
    time_t t=now();     // get current time
-
-   if (year(t) < 2022) return "Time Unknown";
-
-   if (IsBST()) t+=3600;     // add one hour if it is UK Summer Time
-
    String ttime;
+   int tstore;
 
-   ttime += DoW[weekday(t)-1] + "-";               // day of week
-   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t));     // date
+   if (year(t) < 2021) return "Time Unknown";
 
-   ttime += "_";
-   int thr = hour(t);
-   if (thr < 10) ttime += "0";                     // hours
-   ttime += String(thr) + "-";
+   if (IsBST()) t+=3600;     // add one hour if it is Summer Time
 
-   int tmin = minute(t);
-   if (tmin < 10) ttime += "0";                    // minutes
-   ttime += String(tmin) + "-";
+   // date
+   ttime += String(year(t));
+   tstore = month(t);   if (tstore<10) ttime+="0";
+   ttime += String(tstore);
+   tstore = day(t);   if (tstore<10) ttime+="0";
+   ttime += String(tstore) + "_";
 
-   int tsec = second(t);
-   if (tsec < 10) ttime += "0";                    // seconds
-   ttime += String(tsec);
-  
+   // time
+   tstore = hour(t);   if (tstore<10) ttime+="0";
+   ttime += String(tstore);
+   tstore = minute(t);   if (tstore<10) ttime+="0";
+   ttime += String(tstore);
+   tstore = second(t);   if (tstore<10) ttime+="0";
+   ttime += String(tstore);
+   ttime += "_" + DoW[weekday(t)-1];
+
    return ttime;
 
 }  // currentTime
