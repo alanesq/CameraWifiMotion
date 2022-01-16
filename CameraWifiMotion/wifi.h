@@ -150,23 +150,28 @@ String currentTime(){
 
    time_t t=now();     // get current time
 
-   if (year(t) < 2021) return "Time Unknown";
+   if (year(t) < 2022) return "Time Unknown";
 
-   if (IsBST()) t+=3600;     // add one hour if it is Summer Time
+   if (IsBST()) t+=3600;     // add one hour if it is UK Summer Time
 
-   String ttime = String(hour(t)) + ":" ;          // hours
+   String ttime;
+
+   ttime += DoW[weekday(t)-1] + "-";               // day of week
+   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t));     // date
+
+   ttime += "_";
+   int thr = hour(t);
+   if (thr < 10) ttime += "0";                     // hours
+   ttime += String(thr) + "-";
 
    int tmin = minute(t);
    if (tmin < 10) ttime += "0";                    // minutes
-   ttime += String(tmin) + ":";
+   ttime += String(tmin) + "-";
 
    int tsec = second(t);
    if (tsec < 10) ttime += "0";                    // seconds
    ttime += String(tsec);
-
-   ttime += " " + DoW[weekday(t)-1] + "_";                                            // day of week
-   ttime += String(day(t)) + "-" + String(month(t)) + "-" + String(year(t)) + " ";    // date
-
+  
    return ttime;
 
 }  // currentTime
