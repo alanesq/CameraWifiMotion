@@ -737,8 +737,6 @@ void handleRoot() {
 
   rootButtons();                                                    // handle any user input from page
 
-  latestChanges = 0;                                                // reset stored motion values as could be out of date
-
   // build the HTML code
 
     client.print("<FORM action='" + HomeLink + "' method='post'>\n");  // used by the buttons (action = the page send it to)
@@ -1244,6 +1242,7 @@ void handleData(){
       } else {
         reply += "<font color='#6F0000'>Motion detection disabled</font>";
       }
+      latestChanges = 0;           // reset stored motion values
       reply += ",";
 
    // time
