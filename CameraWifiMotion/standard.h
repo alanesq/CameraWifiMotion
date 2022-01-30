@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Procedures (which are likely to be the same between projects) - 04Jan22
+ *      Procedures (which are likely to be the same between projects) - 30Jan22
  *
  *      part of the BasicWebserver sketch but with modified 'header', 'footer' and iclusion of spiffs.h
  *
@@ -11,7 +11,6 @@
 
 #include <SPIFFS.h>
 
-
 // ----------------------------------------------------------------
 //                              -Startup
 // ----------------------------------------------------------------
@@ -21,6 +20,7 @@
   const char colGreen[] = "<font color='#006F00'>";         // green text
   const char colBlue[] = "<font color='#0000FF'>";          // blue text
   const char colEnd[] = "</font>";                          // end coloured text
+  const char htmlSpace[] = "&ensp;";                        // leave a space
 
 // misc variables
   String lastClient = "n/a";                  // IP address of most recent client connected
@@ -35,9 +35,12 @@
 
 String decodeIP(String IPadrs) {
 
-    if (IPadrs == "192.168.1.100") IPadrs = "Phone";
-    else if (IPadrs == "192.168.1.101") IPadrs = "Parlour laptop";
-    else if (IPadrs == "192.168.1.102") IPadrs = "Bedroom laptop";
+    if (IPadrs == "192.168.1.176") IPadrs = "HA server";
+    else if (IPadrs == "192.168.1.103") IPadrs = "Parlour laptop";
+    else if (IPadrs == "192.168.1.101") IPadrs = "Bedroom laptop";
+    else if (IPadrs == "192.168.1.169") IPadrs = "Linda's laptop";
+    else if (IPadrs == "192.168.1.170") IPadrs = "Shed 1 laptop";
+    else if (IPadrs == "192.168.1.143") IPadrs = "Shed 2 laptop";
 
     // log last IP client connected
       if (IPadrs != lastClient) {
@@ -60,7 +63,7 @@ void log_system_message(String smes) {
     if (system_message_pointer >= LogNumber) system_message_pointer = 0;
 
   // add the new message to log
-    system_message[system_message_pointer] = currentTime() + " - " + smes;
+    system_message[system_message_pointer] = currentTime(1) + " - " + smes;
 
   // also send the message to serial
     if (serialDebug) Serial.println("Log:" + system_message[system_message_pointer]);
@@ -73,9 +76,9 @@ void log_system_message(String smes) {
 // HTML at the top of each web page
 //    additional style settings can be included and auto page refresh rate
 
-void webheader(WiFiClient &client, String adnlStyle = " ", int refresh = 0) {
+void webheader(WiFiClient &client, char* adnlStyle = " ", int refresh = 0) {
 
-  // html header
+  // start html page
     client.write("HTTP/1.1 200 OK\r\n");
     client.write("Content-Type: text/html\r\n");
     client.write("Connection: close\r\n");
@@ -83,38 +86,45 @@ void webheader(WiFiClient &client, String adnlStyle = " ", int refresh = 0) {
     client.write("<!DOCTYPE HTML>\n");
     client.write("<html lang='en'>\n");
     client.write("<head>\n");
-    client.write("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
-
+    client.write("  <meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
   // page refresh
-    if (refresh > 0) client.print( "<meta http-equiv='refresh' content='" + String(refresh) + "'>\n");
+    if (refresh > 0) client.printf("  <meta http-equiv='refresh' content='%c'>\n", refresh);
 
-  // page title
-    client.printf("<title> %s </title>\n", stitle);
+  // HTML / CSS
 
-  // CSS
-    client.write("<style>\n");
-    client.write("ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);}\n");
-    client.write("li {float: left;}\n");
-    client.write("li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}\n");
-    client.write("li a:hover { background-color: rgb(100, 0, 0);}\n");
-    client.print(adnlStyle);                                // insert aditional style if supplied
-    client.write("</style>\n");
+    // This is the below code compacted via https://www.textfixer.com/html/compress-html-compression.php
+    client.printf(R"=====( <title>%s</title> <style> body { color: black; background-color: #FFFF00; text-align: center; } ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);} li {float: left;} li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;} li a:hover { background-color: rgb(100, 0, 0);} %s </style> </head> <body> <ul> <li><a href='%s'>Home</a></li> <li><a href='/log'>Log</a></li> <li><a href='/bootlog'>BootLog</a></li> <li><a href='/stream'>Live Video</a></li> <li><a href='/images'>Stored Images</a></li> <li><a href='/live'>Capture Image</a></li> <li><a href='/imagedata'>Raw Data</a></li> <h1> <font color='#FF0000'>%s</h1></font> </ul>)=====", stitle, adnlStyle, HomeLink, stitle);
 
-  client.write("</head>\n");
-  client.write("<body style='color: rgb(0, 0, 0); background-color: yellow; text-align: center;'>\n");
+  /*
+    client.printf(R"=====(
+        <title>%s</title>
+        <style>
+          body {
+            color: black;
+            background-color: #FFFF00;
+            text-align: center;
+          }
+          ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);}
+          li {float: left;}
+          li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;}
+          li a:hover { background-color: rgb(100, 0, 0);}
+          %s
+        </style>
+      </head>
+      <body>
+        <ul>
+          <li><a href='%s'>Home</a></li>
+          <li><a href='/log'>Log</a></li>
+          <li><a href='/bootlog'>BootLog</a></li>
+          <li><a href='/stream'>Live Video</a></li>
+          <li><a href='/images'>Stored Images</a></li>
+          <li><a href='/live'>Capture Image</a></li>
+          <li><a href='/imagedata'>Raw Data</a></li>
+          <h1> <font color='#FF0000'>%s</h1></font>
+        </ul>
+    )=====", stitle, adnlStyle, HomeLink, stitle);
+*/
 
-  // menu (custom for CameraWifiMotion)
-    client.println("<ul>");
-    client.println("<li><a href='" + HomeLink + "'>Home</a></li>");  // home menu button
-    client.println("<li><a href='/log'>Log</a></li>");               // log menu button
-    client.println("<li><a href='/bootlog'>BootLog</a></li>");       // boot log menu button
-    client.println("<li><a href='/stream'>Live Video</a></li>");     // stream live video
-    client.println("<li><a href='/images'>Stored Images</a></li>");  // last menu button
-    client.println("<li><a href='/live'>Capture Image</a></li>");    // capture image menu button
-    client.println("<li><a href='/imagedata'>Raw Data</a></li>");    // raw data menu button
-
-    client.printf("<h1> <font color='#FF0000'>%s</h1></font>\n", stitle);           // sketch title
-    client.println("</ul>");
 }
 
 
@@ -149,7 +159,7 @@ void webfooter(WiFiClient &client) {
       else if (tstat == timeNotSet) client.print(" | NTP Failed");
 
      // free space on spiffs
-       client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() ) / 1024  );    
+       client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() ) / 1024  );             // if using spiffs
 
      // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
 
