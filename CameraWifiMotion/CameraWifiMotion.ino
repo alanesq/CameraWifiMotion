@@ -54,18 +54,18 @@
 
   const char* sversion = "30Jan22";                      // version of this sketch
 
-  const bool serialDebug = 1;                            // provide debug info on serial port
+  const bool serialDebug = 0;                            // provide debug info on serial port
 
   bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
-  #define EMAIL_ENABLED 0                                // Enable E-mail support
+  #define EMAIL_ENABLED 1                                // Enable E-mail support
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
   const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define FTP_ENABLED 0                                  // if ftp uploads are enabled
 
-  #define PHP_ENABLED 0                                  // if PHP uploads are enabled
+  #define PHP_ENABLED 1                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
@@ -93,7 +93,7 @@
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 1;                              // 1=take picture using flash when dark, 2=use flash every time, 3=flash after capturing the image as display only
+  const byte flashMode = 2;                              // 1=take picture using flash when dark, 2=use flash every time, 3=flash after capturing the image as display only
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input)
 
@@ -745,28 +745,20 @@ void handleRoot() {
     // ---------------------------------------------------------------------------------------------
     //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
-      // motion last detected
-        client.println("Motion detection last triggered: <span id='uLastDetection'></span>");
+      // empty lines which are periodically populated via vbscript with live data from http://x.x.x.x/data
+        client.println("<span id='uline0'></span>");
+        client.println("<br><span id='uline1'></span>");
+        client.println("<br><span id='uline2'></span>");
+        client.println("<br><span id='uline3'></span>");
+        client.println("<br><span id='uline4'></span>");
+        client.println("<br><span id='uline5'></span>");
 
-      // detection level
-          client.println("<BR><span id='uDetection'></span>");
+      // Javascript - to periodically update the above info lines from http://x.x.x.x/data
 
-      // time
-        client.println("<BR>Current time: <span id='uTime'></span>");
+      // This is the below code compacted via https://www.textfixer.com/html/compress-html-compression.php
+      client.printf(R"=====(<script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); document.getElementById('uline0').innerHTML = receivedArr[0]; document.getElementById('uline1').innerHTML = receivedArr[1]; document.getElementById('uline2').innerHTML = receivedArr[2]; document.getElementById('uline3').innerHTML = receivedArr[3]; document.getElementById('uline4').innerHTML = receivedArr[4]; document.getElementById('uline5').innerHTML = receivedArr[5]; } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
 
-      // image settings
-        client.println("<BR>Image brightness: <span id='uBrightness'></span>, Exposure: <span id='uExposure'></span>, Gain: <span id='uGain'></span>");
-
-      // sd card
-        if (SD_Present) {
-          client.println("<BR>SD Card: <span id='uSDspace'></span>MB free");
-        }
-
-      // misc info
-        client.println("<BR><BR><span id='uAdnlInfo'></span>");
-
-
-      // Javascript - to periodically update above getting info from http://x.x.x.x/data
+/*
         client.printf(R"=====(
            <script>
               function getData() {
@@ -774,14 +766,12 @@ void handleRoot() {
                 xhttp.onreadystatechange = function() {
                 if (this.readyState == 4 && this.status == 200) {
                   var receivedArr = this.responseText.split(',');
-                  document.getElementById('uLastDetection').innerHTML = receivedArr[0];
-                  document.getElementById('uDetection').innerHTML = receivedArr[1];
-                  document.getElementById('uTime').innerHTML = receivedArr[2];
-                  document.getElementById('uBrightness').innerHTML = receivedArr[3];
-                  document.getElementById('uExposure').innerHTML = receivedArr[4];
-                  document.getElementById('uGain').innerHTML = receivedArr[5];
-                  document.getElementById('uSDspace').innerHTML = receivedArr[6];
-                  document.getElementById('uAdnlInfo').innerHTML = receivedArr[7];
+                  document.getElementById('uline0').innerHTML = receivedArr[0];
+                  document.getElementById('uline1').innerHTML = receivedArr[1];
+                  document.getElementById('uline2').innerHTML = receivedArr[2];
+                  document.getElementById('uline3').innerHTML = receivedArr[3];
+                  document.getElementById('uline4').innerHTML = receivedArr[4];
+                  document.getElementById('uline5').innerHTML = receivedArr[5];
                 }
               };
               xhttp.open('GET', 'data', true);
@@ -790,6 +780,8 @@ void handleRoot() {
               setInterval(function() { getData(); }, %d);
            </script>
         )=====", dataRefresh * 1000);
+ */
+
 
     // ---------------------------------------------------------------------------------------------
 
@@ -797,7 +789,11 @@ void handleRoot() {
       client.write("<br><br><a href='/jpg'>");         // make it a link
       client.write("<img id='image1' src='/jpg' width='320' height='240' /> </a>");     // show image from http://x.x.x.x/jpg
 
-    // javascript to refresh the image periodically
+      // This is the below code compacted via https://www.textfixer.com/html/compress-html-compression.php
+      client.printf(R"=====(<script> function refreshImage(){ var timestamp = new Date().getTime(); var el = document.getElementById('image1'); var queryString = '?t=' + timestamp; el.src = '/jpg' + queryString; } setInterval(function() { refreshImage(); }, %d); </script>)=====", (dataRefresh * 1000) + 42);
+
+ /*
+      // javascript to refresh the image periodically
       client.printf(R"=====(
          <script>
            function refreshImage(){
@@ -809,6 +805,9 @@ void handleRoot() {
            setInterval(function() { refreshImage(); }, %d);
          </script>
       )=====", (dataRefresh * 1000) + 42);
+
+ */
+
 
     // detection mask check grid (right of screen)
       client.write( "<div style='float: right;'>Detection Mask<br>");
@@ -839,7 +838,7 @@ void handleRoot() {
 
     #if IMAGE_SETTINGS      // Implement adjustment of image settings
       client.write("<br>Set image exposure <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n");
-      client.write(" Gain <input type='number' style='width: 30px' name='gain' min='0' max='30' value=''>\n");
+      client.write(" gain <input type='number' style='width: 30px' name='gain' min='0' max='30' value=''>\n");
 
     // Target brightness brightness cuttoff point
       client.write("<BR>Auto image adjustment, target image brightness ");
@@ -1232,46 +1231,43 @@ void handleData(){
 
    String reply = "";
 
-   // motion last detected
-      reply += String(TriggerTime);
-      reply += ",";
-
-   // detection level
+   // line0 - detection status
       if (DetectionEnabled) {
         reply += "Motion detection enabled: current motion detected is  " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
       } else {
-        reply += "<font color='#6F0000'>Motion detection disabled</font>";
+        reply += "<font color='#FF0000'>Motion detection disabled</font>";
       }
-      latestChanges = 0;           // reset stored motion values
+      latestChanges = 0;        // reset stored motion values
       reply += ",";
 
-   // time
-      reply += currentTime(1);
+   // line1 - motion last detected
+      reply += "Motion detection last triggered: " + String(TriggerTime);
       reply += ",";
 
-   // image settings
-     reply += String(AveragePix);
-     reply += ",";
-     reply += String((int)cameraImageExposure);
-     reply += ",";
-     reply += String((int)cameraImageGain);
+   // line2 - time/date
+      reply += "Current time: " + currentTime(1);
+      reply += ",";
+
+   // line3 - image settings
+     reply += "Image brightness: " + String(AveragePix);
+     reply += " - Exposure: " + String((int)cameraImageExposure);
+     reply += " - Gain: " +String((int)cameraImageGain);
      reply += ",";
 
-   // sd card
+   // line4 - sd card
      if (SD_Present) {
-       reply += String(SDfreeSpace);
+       reply += "SD Crad: " + String(SDfreeSpace);
      }
      reply += ",";
 
-   // misc info
-
+   // line5 - misc info
      // Illumination LED / flash enabled
-       if (digitalRead(Illumination_led) == ledON) reply += " {<font color='#6F0000'>Illumination LED is On</font>}&ensp;";
-       if (UseFlash) reply += " {<font color='#6F0000'>Flash Enabled</font>}&ensp;";
+       if (digitalRead(Illumination_led) == ledON) reply += " {<font color='#FF0000'>Illumination LED is On</font>}&ensp;";
+       if (UseFlash) reply += " {<font color='#FF0000'>Flash Enabled</font>}&ensp;";
 
      // OTA status
        #if ENABLE_OTA
-         if (OTAEnabled) reply += " {<font color='#6F0000'>OTA updates enabled</font>}&ensp;";
+         if (OTAEnabled) reply += " {<font color='#FF0000'>OTA updates enabled</font>}&ensp;";
        #endif
 
      // FTP status
@@ -1286,11 +1282,11 @@ void handleData(){
 
      // email status
        #if EMAIL_ENABLED
-           if (emailWhenTriggered) reply += " {<font color='#6F0000'>Email sending enabled</font>}&ensp;";
+           if (emailWhenTriggered) reply += " {<font color='#FF0000'>Email sending enabled</font>}&ensp;";
        #endif
 
      //  if system disabled
-       if (disableAllFunctions) reply += " {<font color='#6F0000'>ALL FUNCTIONS DISABLED</font>}&ensp;";
+       if (disableAllFunctions) reply += " {<font color='#FF0000'>ALL FUNCTIONS DISABLED</font>}&ensp;";
 
 
    server.send(200, "text/plane", reply); //Send millis value only to client ajax request
