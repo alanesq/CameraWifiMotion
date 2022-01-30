@@ -1,6 +1,6 @@
 /*******************************************************************************************************************
  *
- *        CameraWifiMotion - v2.3
+ *        CameraWifiMotion - v2.4
  *
  *        ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE
  *
@@ -52,7 +52,7 @@
 
   const char* stitle = "CameraWifiMotion";               // title of this sketch (CameraWifiMotion)
 
-  const char* sversion = "04Jan22";                      // version of this sketch
+  const char* sversion = "30Jan22";                      // version of this sketch
 
   const bool serialDebug = 1;                            // provide debug info on serial port
 
@@ -68,9 +68,6 @@
   #define PHP_ENABLED 0                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
-
-  const char datarefresh[] = "2500";                     // Refresh rate of the updating data on web page (ms)
-  const char JavaRefreshTime[] = "400";                  // time delay when loading url in web pages via Javascript (ms)
 
   const byte LogNumber = 30;                             // number of entries in the system log
 
@@ -90,13 +87,13 @@
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  const int8_t MaxSpiffsImages = 10;                     // number of images to store in camera (Spiffs)
+  const int8_t MaxSpiffsImages = 6;                      // number of images to store in camera (Spiffs)
 
   const uint32_t maxCamStreamTime = 60;                  // max camera stream can run for (seconds)
 
   const uint16_t Illumination_led = 4;                   // illumination LED pin
 
-  const byte flashMode = 1;                              // 1=take picture using flash, 2=flash after taking picture
+  const byte flashMode = 1;                              // 1=take picture using flash when dark, 2=use flash every time, 3=flash after capturing the image as display only
 
   const byte gioPin = 13;                                // I/O pin (for external sensor input)
 
@@ -155,8 +152,9 @@
 
 
 // global variables / constants
-  bool cameraImageInvert = 0;                // flip image  (i.e. upside down)
   bool wifiok = 0;                           // Flag if wifi is connected ok
+  uint16_t dataRefresh = 5;                  // How often the updating info. on root page refreshes (seconds)
+  bool cameraImageInvert = 0;                // flip image  (i.e. upside down)
   float cameraImageExposure = 0;             // Camera exposure (loaded from spiffs)
   float cameraImageGain = 0;                 // Image gain (loaded from spiffs)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
@@ -259,7 +257,7 @@ void setup() {
         if (cardType == CARD_NONE) {                // if no sd card found
             log_system_message("SD Card type detection failed");
         } else {
-          uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
+          uint32_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
           log_system_message("SD Card found, free space = " + String(SDfreeSpace) + "MB");
           SD_Present = 1;                           // flag working sd card found
         }
@@ -278,6 +276,16 @@ void setup() {
   // configure ondoard indicator led
     pinMode(onboardLED, OUTPUT);
     digitalWrite(onboardLED, HIGH);   // off
+
+  // set up camera
+    bool tRes = setupCameraHardware();
+    if (!tRes) {      // reboot camera
+      if (serialDebug) Serial.println("Problem starting camera - rebooting it");
+      RestartCamera(PIXFORMAT_GRAYSCALE);                    // restart camera back to greyscale mode for motion detection
+      cameraImageSettings(FRAME_SIZE_MOTION);                // apply camera sensor settings
+    } else {
+      if (serialDebug) Serial.print(("Camera initialised ok"));
+    }
 
   startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
 
@@ -317,13 +325,6 @@ void setup() {
   // Finished connecting to network
     BlinkLed(2);                             // flash the led twice
     log_system_message(String(stitle) + " Started");
-
-  // set up camera
-    bool tRes = setupCameraHardware();
-    if (serialDebug) {
-      Serial.print(("Initialising camera: "));
-      Serial.println((tRes==1) ? "OK" : "ERR INIT");
-    }
 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);       // Turn-off the 'brownout detector'
 
@@ -581,6 +582,11 @@ void LoadSettingsSpiffs() {
       else if (tnum == 1) cameraImageInvert = 1;
       else log_system_message("Invalid cameraImageInvert in settings: " + line);
 
+    // line 17 - dataRefresh
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum < 1 || tnum > 600) log_system_message("invalid dataRefresh in settings");
+      else dataRefresh = tnum;
+
     // Detection mask grid
       bool gerr = 0;
       mask_active = 0;
@@ -616,7 +622,7 @@ void SaveSettingsSpiffs() {
     }
 
     // save settings in to file
-        file.println("CameraWifiMotion settings file " + currentTime());   // title
+        file.println("CameraWifiMotion settings file " + currentTime(1));   // title
         file.println(String(Block_threshold));
         file.println(String(Image_thresholdL));
         file.println(String(Image_thresholdH));
@@ -633,6 +639,7 @@ void SaveSettingsSpiffs() {
         file.println(String(ftpImages));
         file.println(String(PHPImages));
         file.println(String(cameraImageInvert));
+        file.println(String(dataRefresh));
 
        // Detection mask grid
           for (int y = 0; y < mask_rows; y++) {
@@ -658,7 +665,7 @@ void UpdateBootlogSpiffs(String Info) {
     if (!file || file.isDirectory()) {
       log_system_message("Error: Unable to open boot log in Spiffs");
     } else {
-      file.println(currentTime() + " - " + Info);       // add entry to log file
+      file.println(currentTime(1) + " - " + Info);       // add entry to log file
       file.close();
     }
 }
@@ -670,6 +677,13 @@ void UpdateBootlogSpiffs(String Info) {
 // sets all settings to a standard default
 
 void handleDefault() {
+
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Test page requested from: " + clientIP);
 
   // default settings
     emailWhenTriggered = 0;
@@ -696,7 +710,6 @@ void handleDefault() {
     SaveSettingsSpiffs();                      // save settings in Spiffs
     TRIGGERtimer = millis();                   // reset last image captured timer (to prevent instant trigger)
 
-    log_system_message("Defauls web page request");
     String message = "reset to default";
 
     server.send(404, "text/plain", message);   // send reply as plain text
@@ -715,10 +728,12 @@ void handleRoot() {
   String tstr;                                                                                // temp store for building line of html
   webheader(client, "#stdLink:hover { background-color: rgb(180, 180, 0);}");                 // html page header  (with extra formatting)
 
-
+/*
   // log page request including clients IP address
-      IPAddress cip = client.remoteIP();
-      // log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+*/
 
   rootButtons();                                                    // handle any user input from page
 
@@ -729,16 +744,73 @@ void handleRoot() {
     client.print("<FORM action='" + HomeLink + "' method='post'>\n");  // used by the buttons (action = the page send it to)
     client.write("<P>");                                               // start of section
 
-  // insert an iFrame containing changing data in to the page
-    uint16_t frameHeight = 160 + 240;
-    client.printf("<BR><iframe id='dataframe' height=%d width=600 frameborder='0'></iframe>\n", frameHeight);
+    // ---------------------------------------------------------------------------------------------
+    //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
-  // javascript to refresh the iFrame every few seconds
-  //      also refreshes after short delay (bug fix as it often rejects the first request)
-    client.println("<script>");
-    client.println("  window.setTimeout(function() {document.getElementById('dataframe').src='/data';}, " + String(JavaRefreshTime) + ");");
-    client.println("  window.setInterval(function() {document.getElementById('dataframe').src='/data';}, " + String(datarefresh) + ");");
-    client.println("</script>");
+      // motion last detected
+        client.println("Motion detection last triggered: <span id='uLastDetection'></span>");
+
+      // detection level
+          client.println("<BR><span id='uDetection'></span>");
+
+      // time
+        client.println("<BR>Current time: <span id='uTime'></span>");
+
+      // image settings
+        client.println("<BR>Image brightness: <span id='uBrightness'></span>, Exposure: <span id='uExposure'></span>, Gain: <span id='uGain'></span>");
+
+      // sd card
+        if (SD_Present) {
+          client.println("<BR>SD Card: <span id='uSDspace'></span>MB free");
+        }
+
+      // misc info
+        client.println("<BR><BR><span id='uAdnlInfo'></span>");
+
+
+      // Javascript - to periodically update above getting info from http://x.x.x.x/data
+        client.printf(R"=====(
+           <script>
+              function getData() {
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                  var receivedArr = this.responseText.split(',');
+                  document.getElementById('uLastDetection').innerHTML = receivedArr[0];
+                  document.getElementById('uDetection').innerHTML = receivedArr[1];
+                  document.getElementById('uTime').innerHTML = receivedArr[2];
+                  document.getElementById('uBrightness').innerHTML = receivedArr[3];
+                  document.getElementById('uExposure').innerHTML = receivedArr[4];
+                  document.getElementById('uGain').innerHTML = receivedArr[5];
+                  document.getElementById('uSDspace').innerHTML = receivedArr[6];
+                  document.getElementById('uAdnlInfo').innerHTML = receivedArr[7];
+                }
+              };
+              xhttp.open('GET', 'data', true);
+              xhttp.send();}
+              getData();
+              setInterval(function() { getData(); }, %d);
+           </script>
+        )=====", dataRefresh * 1000);
+
+    // ---------------------------------------------------------------------------------------------
+
+    // capture and show a jpg image
+      client.write("<br><br><a href='/jpg'>");         // make it a link
+      client.write("<img id='image1' src='/jpg' width='320' height='240' /> </a>");     // show image from http://x.x.x.x/jpg
+
+    // javascript to refresh the image periodically
+      client.printf(R"=====(
+         <script>
+           function refreshImage(){
+               var timestamp = new Date().getTime();
+               var el = document.getElementById('image1');
+               var queryString = '?t=' + timestamp;
+               el.src = '/jpg' + queryString;
+           }
+           setInterval(function() { refreshImage(); }, %d);
+         </script>
+      )=====", (dataRefresh * 1000) + 42);
 
     // detection mask check grid (right of screen)
       client.write( "<div style='float: right;'>Detection Mask<br>");
@@ -759,16 +831,20 @@ void handleRoot() {
     //  client.print(tstr);
 
     // link to help/instructions page on github
-      client.printf(" %s<a href='https://github.com/alanesq/CameraWifiMotion/blob/master/README.md'>INSTRUCTIONS</a>%s\n", colBlue, colEnd);
+      client.printf("%s<a href='https://github.com/alanesq/CameraWifiMotion/blob/master/README.md'>INSTRUCTIONS</a>%s\n", colBlue, colEnd);
       // <a href='#' id='stdLink' target='popup' onclick=\"window.open('https://github.com/alanesq/CameraWifiMotion/blob/master/readme.txt' ,'popup', 'width=600,height=480'); return false; \">INSTRUCTIONS</a>" + endcolour + " \n";
 
+    // refresh rate of the data frame
+      client.write(", Above refreshes every ");
+      client.write("<input type='number' style='width: 40px' name='refreshRate' title='Delay between data refresh on this page (in seconds)'");
+      client.printf(" min='1' max='600' value='%d'>seconds\n", dataRefresh);
+
     #if IMAGE_SETTINGS      // Implement adjustment of image settings
-      client.write("<BR>");
-      client.write("Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n");
-      client.write(" Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value=''>\n");
+      client.write("<br>Set image exposure <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n");
+      client.write(" Gain <input type='number' style='width: 30px' name='gain' min='0' max='30' value=''>\n");
 
     // Target brightness brightness cuttoff point
-      client.write("<BR>Auto image adjustment, target image brightness: ");
+      client.write("<BR>Auto image adjustment, target image brightness ");
       client.write("<input type='number' style='width: 40px' name='daynight' title='Brightness level system aims to maintain' min='0' max='255' ");
       client.printf("value='%d'>(0 = disabled)\n", targetBrightness);
     #else
@@ -776,12 +852,12 @@ void handleRoot() {
     #endif
 
     // minimum seconds between triggers
-      client.write("<BR>Minimum time between triggers:");
-      client.printf("<input type='number' style='width: 50px' name='triggertime' min='1' max='3600' value='%d'>seconds \n", TriggerLimitTime);
+      client.write("<BR>Minimum time between triggers ");
+      client.printf("<input type='number' style='width: 40px' name='triggertime' min='1' max='3600' value='%d'>seconds \n", TriggerLimitTime);
 
     // consecutive detections required
-      client.write(", Consecutive detections required to trigger:");
-      client.write("<input type='number' style='width: 40px' name='consec' title='The number of changed images detected in a row required to trigger ");
+      client.write(", Consecutive detections required to trigger ");
+      client.write("<input type='number' style='width: 30px' name='consec' title='The number of changed images detected in a row required to trigger ");
       client.printf("motion detected' min='1' max='100' value='%d'>\n", tCounterTrigger);
 
     #if EMAIL_ENABLED
@@ -794,9 +870,9 @@ void handleRoot() {
 
     // detection parameters
       if (Image_thresholdH > (mask_active * blocksPerMaskUnit)) Image_thresholdH = (mask_active * blocksPerMaskUnit);    // make sure high threshold is not greater than max possible
-      client.write("<BR>Detection threshold: <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required ");
+      client.write("<BR>Detection threshold <input type='number' style='width: 40px' name='dblockt' title='Brightness variation in block required ");
       client.printf("to count as changed (0-255)' min='1' max='255' value='%d'>, \n", Block_threshold);
-      client.write("Trigger when between<input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count ");
+      client.write("Trigger when between <input type='number' style='width: 40px' name='dimagetl' title='Minimum changed blocks in image required to count ");
       client.printf("as motion detected' min='0' max='%d' value='%d'> \n", (mask_active * blocksPerMaskUnit), Image_thresholdL);
       client.write(" and <input type='number' style='width: 40px' name='dimageth' title='Maximum changed blocks in image required to count as motion ");
       client.printf("detected' min='1' max='%d' value='%d'> blocks changed", (mask_active * blocksPerMaskUnit), Image_thresholdH);
@@ -808,7 +884,7 @@ void handleRoot() {
       client.write(">\n");
 
     // input submit button
-      client.write("<BR><BR><input type='submit' name='submit'><BR><BR>\n");
+      client.write("&ensp; <input type='submit' name='submit'><BR>\n");
 
     // Toggle illuminator LED button
       client.write("<input style='height: 30px;' name='illuminator' title='Toggle the Illumination LED On/Off' value='Light' type='submit'> \n");
@@ -891,7 +967,9 @@ void rootButtons() {
         }
 
    // if wipeS was entered  - clear Spiffs
-      if (server.hasArg("wipeS")) WipeSpiffs();        // format Spiffs
+      if (server.hasArg("wipeS")) {
+        WipeSpiffs();        // format Spiffs
+      }
 
 //    // if wipeSD was entered  - clear all stored images on SD Card    (I do not know how to do this)
 //      if (server.hasArg("wipeSD")) {
@@ -973,6 +1051,20 @@ void rootButtons() {
             }
          }
     #endif
+
+    // updating info refresh rate - dataRefresh
+      if (server.hasArg("refreshRate")) {
+        String Tvalue = server.arg("refreshRate");   // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val > 0 && val <= 600 && val != dataRefresh) {
+              log_system_message("Date refresh rate changed to " + Tvalue );
+              dataRefresh = val;
+              SaveSettingsSpiffs();        // save settings in Spiffs
+              TRIGGERtimer = millis();     // reset last image captured timer (to prevent instant trigger)
+            }
+          }
+       }
 
 //    // if image brightness was adjusted - cameraImageBrightness
 //      if (server.hasArg("bright")) {
@@ -1130,99 +1222,79 @@ void rootButtons() {
 
 void handleData(){
 
-  String tstr = "";
-
-  WiFiClient client = server.client();          // open link with client
-
-  // HTML header
-    client.write("HTTP/1.1 200 OK\r\n");
-    client.write("Content-Type: text/html\r\n");
-    client.write("Connection: close\r\n");
-    client.write("\r\n");
-    client.write("<!DOCTYPE HTML>\n");
-    client.write("<html lang='en'><head><title>Data</title></head><body>\n");
-    client.write("<html lang='en'><head><title>Data</title></head><body>\n");
-    client.write("<center>");
-
-  // Motion detection
-    tstr = "Motion detection last triggered: " + TriggerTime + "\n";
-    client.print(tstr);
-
-  // display adnl info if detection is enabled
-    if (DetectionEnabled == 1) {
-        client.printf("<BR>Current detection level: %d, changed blocks out of %d", latestChanges, (mask_active * blocksPerMaskUnit));
-        latestChanges = 0;           // reset stored values once displayed
-    }
-
-  // show current time and current day/night mode
-    tstr = "<BR>Current time: " + currentTime() +"\n";
-    client.print(tstr);
-
-  // show image adjustments
-    client.printf("<BR>Image brightness: %d", AveragePix);
-    client.printf(", Exposure: %d", (int)cameraImageExposure);
-    client.printf(", Gain: %d", (int)cameraImageGain);
-
-  client.write("<BR><BR>");
-
-  // Motion detection
-    if (DetectionEnabled == 1) {
-      client.printf(" {%sDetection enabled%s}&ensp;", colGreen, colEnd);
-    } else {
-      client.printf(" {%sDetection disabled%s}&ensp;", colRed, colEnd);
-    }
-
-  // Illumination LED / flash enabled
-    if (digitalRead(Illumination_led) == ledON) client.printf(" {%sIllumination LED is On%s}&ensp;", colRed, colEnd);
-    if (UseFlash) client.write(" {Flash enabled}&ensp;");
-
-  // OTA status
-    #if ENABLE_OTA
-      if (OTAEnabled) client.printf(" {%sOTA UPDATES ENABLED%s}&ensp;", colRed, colEnd);
-    #endif
-
-  // FTP status
-    #if FTP_ENABLED
-      if (ftpImages) client.write(" {FTP enabled}&ensp;");
-    #endif
-
-  // PHP status
-    #if PHP_ENABLED
-      if (PHPImages) client.write(" {PHP enabled}&ensp;");
-    #endif
-
-  // email status
-    #if EMAIL_ENABLED
-        if (emailWhenTriggered) client.printf(" {%sEmail sending enabled%s}&ensp;", colRed, colEnd);
-    #endif
-
-  //  if system disabled
-    if (disableAllFunctions) client.printf("%s{ALL FUNCTIONS ARE DISABLED!}%s&ensp;", colRed, colEnd);
-
-//  // show io pin status
-//    if (digitalRead(gioPin)) {
-//        tstr = " {IO pin " + red + "High" + endcolour + "}&ensp;";
-//        client.print(tstr);
-//    }
-//    else {
-//          tstr = " {IO pin " + green + "Low" + endcolour + "}&ensp;";
-//          client.print(tstr);
-//    }
-
-  // show if a sd card is present
+  // sd sdcard
+    uint32_t SDusedSpace = 0;
+    uint32_t SDtotalSpace = 0;
+    uint32_t SDfreeSpace = 0;
     if (SD_Present) {
-      uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-      client.printf("<BR>SD-Card present - free space = %dMB", SDfreeSpace);
+      SDusedSpace = SD_MMC.usedBytes() / (1024 * 1024);
+      SDtotalSpace = SD_MMC.totalBytes() / (1024 * 1024);
+      SDfreeSpace = SDtotalSpace - SDusedSpace;
     }
 
-  // show greyscale image
-    client.write("<br><br><img src='/jpg' /> \n");
+   String reply = "";
 
-  // close html page
-    client.write("</body></htlm>\n");
-    delay(3);
-    client.stop();
+   // motion last detected
+      reply += String(TriggerTime);
+      reply += ",";
 
+   // detection level
+      if (DetectionEnabled) {
+        reply += "Motion detection enabled: current motion detected is  " + String(latestChanges) + " changed blocks out of " + String(mask_active * blocksPerMaskUnit);
+      } else {
+        reply += "<font color='#6F0000'>Motion detection disabled</font>";
+      }
+      reply += ",";
+
+   // time
+      reply += currentTime(1);
+      reply += ",";
+
+   // image settings
+     reply += String(AveragePix);
+     reply += ",";
+     reply += String((int)cameraImageExposure);
+     reply += ",";
+     reply += String((int)cameraImageGain);
+     reply += ",";
+
+   // sd card
+     if (SD_Present) {
+       reply += String(SDfreeSpace);
+     }
+     reply += ",";
+
+   // misc info
+
+     // Illumination LED / flash enabled
+       if (digitalRead(Illumination_led) == ledON) reply += " {<font color='#6F0000'>Illumination LED is On</font>}&ensp;";
+       if (UseFlash) reply += " {<font color='#6F0000'>Flash Enabled</font>}&ensp;";
+
+     // OTA status
+       #if ENABLE_OTA
+         if (OTAEnabled) reply += " {<font color='#6F0000'>OTA updates enabled</font>}&ensp;";
+       #endif
+
+     // FTP status
+       #if FTP_ENABLED
+         if (ftpImages) reply += " {FTP enabled}&ensp;";
+       #endif
+
+     // PHP status
+       #if PHP_ENABLED
+         if (PHPImages) reply += " {PHP enabled}&ensp;";
+       #endif
+
+     // email status
+       #if EMAIL_ENABLED
+           if (emailWhenTriggered) reply += " {<font color='#6F0000'>Email sending enabled</font>}&ensp;";
+       #endif
+
+     //  if system disabled
+       if (disableAllFunctions) reply += " {<font color='#6F0000'>ALL FUNCTIONS DISABLED</font>}&ensp;";
+
+
+   server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
 
 
@@ -1232,7 +1304,15 @@ void handleData(){
 
 void handlePing(){
 
-  log_system_message("ping web page requested");
+  WiFiClient client = server.client();          // open link with client
+
+/*
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Ping web page requested from: " + clientIP);
+*/
+
   String message = "ok";
   server.send(404, "text/plain", message);   // send reply as plain text
 
@@ -1246,7 +1326,12 @@ void handlePing(){
 
 void handleLive(){
 
-  log_system_message("Live page requested");
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Live page requested from: " + clientIP);
 
   capturePhotoSaveSpiffs(UseFlash);          // capture an image from camera
 
@@ -1263,7 +1348,12 @@ void handleLive(){
 
 void handleCapture(){
 
-  log_system_message("Capture image page requested");
+  WiFiClient client = server.client();          // open link with client
+
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Capture image page requested from: " + clientIP);
 
   server.send(404, "text/plain", "capturing live image");   // send reply as plain text
 
@@ -1279,13 +1369,15 @@ void handleCapture(){
 
 void handleImages(){
 
-  WiFiClient client = server.client();                                                        // open link with client
-  webheader(client, "#stdLink:hover { background-color: rgb(180, 180, 0);}");                 // html page header  (with extra formatting)
-  String tstr;                                                                                // temp store for building lines of html
+  WiFiClient client = server.client();
 
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    log_system_message("Stored image page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Stored image page requested from: " + clientIP);
+                                                    // open link with client
+  webheader(client, "#stdLink:hover { background-color: rgb(180, 180, 0);}");                 // html page header  (with extra formatting)
+  String tstr;                                                                                // temp store for building lines of html
 
   uint16_t ImageToShow = SpiffsFileCounter;          // set current image to display when /img called
   uint16_t ImageWidthSetting = 90;                   // percentage of screen width to use for displaying the image
@@ -1342,13 +1434,6 @@ void handleImages(){
   // insert image in to html
     client.printf("<BR><img id='img' alt='Camera Image' onerror='QpageRefresh();' width='%d%s' src='/img?pic=%d'>\n", ImageWidthSetting, "%", ImageToShow);
 
-  // javascript to refresh the image if it fails to load (bug fix as it often rejects the request otherwise - may no longer be required?)
-    client.write("<script>\n");
-    client.write("  function QpageRefresh() {\n");
-    client.printf("    setTimeout(function(){ document.getElementById('img').src='/img?pic=%d'; }, %s);\n", ImageToShow, JavaRefreshTime);
-    client.write("  }\n");
-    client.write("</script>\n");
-
   // close html page
     client.write("</form>");                            // buttons
     webfooter(client);                                  // html page footer
@@ -1365,13 +1450,12 @@ void handleDisable(){
 
   WiFiClient client = server.client();          // open link with client
 
-  disableAllFunctions = 1;
-
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-    clientIP = decodeIP(clientIP);               // check for known IP addresses
-    log_system_message("Disable page requested from: " + clientIP);
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("all functions disabled by: " + clientIP);
+
+  disableAllFunctions = 1;
 
   String message = "disabled!";
   server.send(404, "text/plain", message);   // send reply as plain text
@@ -1390,70 +1474,69 @@ void handleImagedata() {
 
     // log page request including clients IP address
       IPAddress cip = client.remoteIP();
-      String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-      clientIP = decodeIP(clientIP);               // check for known IP addresses
-      log_system_message("Image data page requested from: " + clientIP);
+      String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+      log_system_message("Raw data page requested from: " + clientIP);
 
-      capture_still();         // capture current image
+    capture_still();         // capture current image
 
-      webheader(client, "td {border: 1px solid grey; width: 30px; color: red;}");                // add the standard html header with some adnl style
+    webheader(client, "td {border: 1px solid grey; width: 30px; color: red;}");                // add the standard html header with some adnl style
 
-      client.write("<P>\n");                // start of section
+    client.write("<P>\n");                // start of section
 
-      client.write("<br>RAW IMAGE DATA (Blocks) - Detection is ");
-      client.write(DetectionEnabled ? "enabled" : "disabled");
+    client.write("<br>RAW IMAGE DATA (Blocks) - Detection is ");
+    client.write(DetectionEnabled ? "enabled" : "disabled");
 
-      // show raw image data in html tables
+    // show raw image data in html tables
 
-      // difference between images table
-      client.write("<BR><center>Difference<BR><table>\n");
-      for (int y = 0; y < H; y++) {
-        client.write("<tr>");
-        for (int x = 0; x < W; x++) {
-          uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
-          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1) - "block_active" is in motion.h
-          client.write(generateTD(timg,mactive).c_str());
-        }
-        client.write("</tr>\n");
+    // difference between images table
+    client.write("<BR><center>Difference<BR><table>\n");
+    for (int y = 0; y < H; y++) {
+      client.write("<tr>");
+      for (int x = 0; x < W; x++) {
+        uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
+        bool mactive = block_active(x,y);    // is it active in the mask (0 or 1) - "block_active" is in motion.h
+        client.write(generateTD(timg,mactive).c_str());
       }
-      client.write("</table>");
+      client.write("</tr>\n");
+    }
+    client.write("</table>");
 
-      // current image table
-      client.write("<BR><BR>Current Frame<BR><table>\n");
-      for (int y = 0; y < H; y++) {
-        client.write("<tr>");
-        for (int x = 0; x < W; x++) {
-          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
-          client.write(generateTD(current_frame[y][x],mactive).c_str());
-        }
-        client.write("</tr>\n");
+    // current image table
+    client.write("<BR><BR>Current Frame<BR><table>\n");
+    for (int y = 0; y < H; y++) {
+      client.write("<tr>");
+      for (int x = 0; x < W; x++) {
+        bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
+        client.write(generateTD(current_frame[y][x],mactive).c_str());
       }
-      client.write("</table>");
+      client.write("</tr>\n");
+    }
+    client.write("</table>");
 
-      // previous image table
-      client.write("<BR><BR>Previous Frame<BR><table>\n");
-      for (int y = 0; y < H; y++) {
-        client.write("<tr>");
-        for (int x = 0; x < W; x++) {
-          bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
-          client.write(generateTD(prev_frame[y][x],mactive).c_str());
-        }
-        client.write("</tr>\n");
+    // previous image table
+    client.write("<BR><BR>Previous Frame<BR><table>\n");
+    for (int y = 0; y < H; y++) {
+      client.write("<tr>");
+      for (int x = 0; x < W; x++) {
+        bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
+        client.write(generateTD(prev_frame[y][x],mactive).c_str());
       }
-      client.write("</table></center>\n");
+      client.write("</tr>\n");
+    }
+    client.write("</table></center>\n");
 
-      client.write("<BR>If detection is disabled the previous frame only updates when this page is refreshed, ");
-      client.write("otherwise it automatically refreshes around twice a second\n");
-      client.write("<BR>Each block shown here is the average reading from 16x12 pixels on the camera image, ");
-      client.write("The detection mask selection works on 4x4 groups of blocks\n");
+    client.write("<BR>If detection is disabled the previous frame only updates when this page is refreshed, ");
+    client.write("otherwise it automatically refreshes around twice a second\n");
+    client.write("<BR>Each block shown here is the average reading from 16x12 pixels on the camera image, ");
+    client.write("The detection mask selection works on 4x4 groups of blocks\n");
 
-      client.write("<BR>\n");
-      webfooter(client);                        // add standard footer html
+    client.write("<BR>\n");
+    webfooter(client);                        // add standard footer html
 
-    delay(3);
-    client.stop();
+  delay(3);
+  client.stop();
 
-    if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous
+  if (!DetectionEnabled) update_frame();     // if detection disabled copy this frame to previous
 
 }
 
@@ -1490,10 +1573,8 @@ void handleBootLog() {
 
     // log page request including clients IP address
       IPAddress cip = client.remoteIP();
-      String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-      clientIP = decodeIP(clientIP);               // check for known IP addresses
-      log_system_message("Boot log page requested from: " + clientIP);
-
+      String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+      log_system_message("Boot log web page requested from: " + clientIP);
 
     // build the html for /bootlog page
 
@@ -1553,7 +1634,9 @@ void handleImg(){
     if (ImageToShow == (MaxSpiffsImages + 1)) {           // live greyscale image requested ("grey");                         // capture live greyscale image
       saveGreyscaleFrame("grey");                         // capture live greyscale image
       TFileName = "/grey.jpg";
-    } else log_system_message("display stored image requested: " + String(ImageToShow));
+    } else {
+      log_system_message("Displaying stored image: " + String(ImageToShow));
+    }
 
     // send image file
       File f = SPIFFS.open(TFileName, "r");                         // read file from spiffs
@@ -1638,30 +1721,22 @@ bool capturePhotoSaveSpiffs(bool Flash) {
 void RestartCamera(pixformat_t format) {
 
     esp_camera_deinit();
-    if (format == PIXFORMAT_JPEG) {
-      config.frame_size = FRAME_SIZE_PHOTO;
-    } else if (format == PIXFORMAT_GRAYSCALE) {
-      config.frame_size = FRAME_SIZE_MOTION;
-    } else {
-      if (serialDebug) {
-        Serial.println("ERROR: Invalid image format");
-      }
+    if (format == PIXFORMAT_JPEG) config.frame_size = FRAME_SIZE_PHOTO;
+    else if (format == PIXFORMAT_GRAYSCALE) config.frame_size = FRAME_SIZE_MOTION;
+    else {
+      if (serialDebug) Serial.println("ERROR: Invalid image format");
     }
     config.pixel_format = format;
     bool ok = esp_camera_init(&config);
     if (ok == ESP_OK) {
-      if (serialDebug) {
-        Serial.println("Camera mode switched ok");
-      }
+      if (serialDebug) Serial.println("Camera mode switched ok");
     } else {
       // failed so try again
         esp_camera_deinit();
         delay(50);
         ok = esp_camera_init(&config);
         if (ok == ESP_OK) {
-          if (serialDebug) {
-            Serial.println("Camera mode switched ok - 2nd attempt");
-          }
+          if (serialDebug) Serial.println("Camera mode switched ok - 2nd attempt");
         } else {
           UpdateBootlogSpiffs("Camera failed to restart so rebooting camera");        // store in bootlog
           RebootCamera(format);
@@ -1728,11 +1803,14 @@ void saveJpgFrame(String filesName) {
     // file names to use
       String IFileName = "/" + String(SpiffsFileCounter) + ".jpg";      // file name for Spiffs
       String TFileName = "/" + String(SpiffsFileCounter) + ".txt";
-      String SDfilename = "/" + currentTime() + ".jpg";                 // file name for sd card
-      String FTPfilename = currentTime() + "-L";                        // file name for FTP
+      String SDfilename = "/" + currentTime(0) + ".jpg";                 // file name for sd card
+      String FTPfilename = currentTime(0) + "-L";                        // file name for FTP
 
-    // turn flah on if required (i.e. it is dark, UseFlash set to on and flashMode = 1)
-      if (UseFlash == 1 && flashMode == 1 && cameraImageGain > 0)  digitalWrite(Illumination_led, ledON);
+    // turn flash on if required
+      if (UseFlash == 1) {
+        if (flashMode == 1 && cameraImageGain > 0) digitalWrite(Illumination_led, ledON);    // only if dark
+        if (flashMode == 2) digitalWrite(Illumination_led, ledON);
+      }
 
     // grab frame
       cameraImageSettings(FRAME_SIZE_PHOTO);            // apply camera sensor settings
@@ -1746,16 +1824,13 @@ void saveJpgFrame(String filesName) {
         fb = esp_camera_fb_get();                       // try again to capture frame
       }
 
-    // flash after taking photo (i.e. if flashmode=2)
-      if (UseFlash == 1 && flashMode == 2 && cameraImageGain > 0 && ReqLEDStatus == 0)  {
+    // flash after taking photo (i.e. if flashmode=3)
+      if (UseFlash == 1 && flashMode == 3)  {
         digitalWrite(Illumination_led, ledON);
-        delay(700);
       }
 
-    // turn flash off
-      if (ReqLEDStatus == 0) digitalWrite(Illumination_led, ledOFF);
-
-
+    // turn flash off (if flashmode 3 do this after saving to spiffs to give a delay)
+      if (ReqLEDStatus == 0 && flashMode != 3) digitalWrite(Illumination_led, ledOFF);
 
    if (fb) {        // only attempt to save the new images if one was captured ok
 
@@ -1793,9 +1868,14 @@ void saveJpgFrame(String filesName) {
         if (!file) {
           log_system_message("Error: Failed to create date file in spiffs");
         } else {
-          file.println(currentTime());
+          file.println(currentTime(1));
         }
         file.close();
+
+
+      // turn flash off if using mode 3
+        if (ReqLEDStatus == 0 && flashMode == 3) digitalWrite(Illumination_led, ledOFF);
+
 
       // ------------------- save image to SD Card -------------------
 
@@ -1850,7 +1930,7 @@ void saveGreyscaleFrame(String filesName) {
 
   // filenames to use
     String IFileName = "/" + filesName +".jpg";              // file name in spiffs
-    String SDFileName = "/" + currentTime() + "-S.jpg";      // file name on sd card
+    String SDFileName = "/" + currentTime(0) + "-S.jpg";      // file name on sd card
 
   // grab greyscale frame
     uint8_t * _jpg_buf;
@@ -1898,7 +1978,7 @@ void saveGreyscaleFrame(String filesName) {
 
   // ftp to server
     #if FTP_ENABLED
-      if (ftpImages) uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime() + "-S");
+      if (ftpImages) uploadImageByFTP(_jpg_buf, _jpg_buf_len, currentTime(0) + "-S");
     #endif
 
     #if PHP_ENABLED
@@ -1938,7 +2018,7 @@ void MotionDetected(uint16_t changes) {
   if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (not required with single core esp32?)
 
     log_system_message("Camera detected motion: " + String(changes));
-    TriggerTime = currentTime() + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
+    TriggerTime = currentTime(1) + " - " + String(changes) + " out of " + String(mask_active * blocksPerMaskUnit);    // store time of trigger and motion detected
 
     int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
@@ -1954,7 +2034,7 @@ void MotionDetected(uint16_t changes) {
               _message[0]=0; _subject[0]=0;          // clear any existing text
               strcat(_subject,"ESPcamera");
               strcat(_message,"Camera triggered at ");
-              String tt=currentTime();
+              String tt=currentTime(1);
               strcat(_message, tt.c_str());
               if (!capres) strcat(_message, "\nNote: there was a problem detected when capturing an image");
               sendEmail(_emailReceiver, _subject, _message);
@@ -1981,8 +2061,9 @@ void handleStream(){
   camera_fb_t * fb = NULL;
 
   // log page request including clients IP address
-      IPAddress cip = client.remoteIP();
-      log_system_message("Video stream requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+    IPAddress cip = client.remoteIP();
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
+    log_system_message("Live stream page requested from: " + clientIP);
 
   // HTML used in the web page
   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
@@ -2043,10 +2124,10 @@ void handleJPG() {
   size_t jpg_size = 0;
 
   // capture a frame (greyscale)
-    camera_fb_t * fb = NULL;                                                                                  // store time that image capture started
-    fb = esp_camera_fb_get();
+    camera_fb_t *fb = esp_camera_fb_get();   // capture frame
     if (!fb) {
       log_system_message("error: failed to capture image");
+      //RebootCamera(PIXFORMAT_GRAYSCALE);
       return;
     }
 
@@ -2088,8 +2169,7 @@ void handleTest(){
 
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    String clientIP = decodeIP(cip.toString());   // get ip address and check if it is known
     log_system_message("Test page requested from: " + clientIP);
 
   webheader(client);                 // add the standard html header
@@ -2112,6 +2192,16 @@ void handleTest(){
 
 //  // demo of how to request a web page over GSM
 //    requestWebPageGSM("alanesq.eu5.net", "/temp/q.txt", 80);
+
+
+#if EMAIL_ENABLED
+  client.write("<br>Sending test email<br>\n");
+  // send a test email
+    _message[0]=0; _subject[0]=0;          // clear any existing text
+    strcat(_subject, stitle);
+    strcat(_message, "test email");
+    sendEmail(_emailReceiver, _subject, _message);
+#endif
 
 
 
