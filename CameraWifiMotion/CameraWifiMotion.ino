@@ -2112,6 +2112,8 @@ void handleStream(){
 // ----------------------------------------------------------------
 
 void handleJPG() {
+  
+  if (DetectionEnabled == 2) return;            // if detection is paused another process may be using camera
 
   WiFiClient client = server.client();          // open link with client
   char buf[32];
