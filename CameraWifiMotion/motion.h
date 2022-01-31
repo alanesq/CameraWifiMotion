@@ -213,6 +213,8 @@ bool cameraImageSettings(framesize_t fsize) {
  *   resulting in each blocks value being the average value of all the pixels within it.
  */
 bool capture_still() {
+  
+    if (DetectionEnabled == 2) return;            // if detection is paused another process may be using camera
 
     Serial.flush();   // wait for serial data to be sent first as I suspect this can cause problems capturing an image
 
