@@ -26,7 +26,7 @@
 
 // Image Settings
   #define FRAME_SIZE_MOTION FRAMESIZE_QVGA     // FRAMESIZE_ + QVGA|CIF|VGA|SVGA|XGA|SXGA|UXGA - Do not use sizes above QVGA when not JPEG
-  #define FRAME_SIZE_PHOTO FRAMESIZE_SVGA      // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  #define FRAME_SIZE_PHOTO FRAMESIZE_XGA       // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
   #define BLOCK_SIZE 20                        // size of image blocks used for motion sensing (20)
 
 // camera type settings (CAMERA_MODEL_AI_THINKER)
