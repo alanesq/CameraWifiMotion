@@ -1,14 +1,5 @@
 <p align="center"><img src="/Images/CameraWifiMotion.jpg" width="90%"/></p>
-      
-
-NOTE: may reboot if no sd card present with latest esp32 addin for ArduinoIDE, plus other issues so I am still using the 
-older version.  I have had no problem when using PlatformIO though.
-      known bug: https://github.com/espressif/arduino-esp32/issues/5195
-Also it looks like the latest WifiManager has changed yet again and so 
-      I have changed over to using Autoconnect which seems much easier 
-      to use and more reliable.
-      
-      
+           
 This is a Arduino IDE or PlatformIO sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
 It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
