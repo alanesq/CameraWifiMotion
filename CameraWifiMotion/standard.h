@@ -1,26 +1,27 @@
 /**************************************************************************************************
  *
- *      Procedures (which are likely to be the same between projects) - 30Jan22
+ *      Procedures (which are likely to be the same for all projects) - 17May22
  *
- *      part of the BasicWebserver sketch but with modified 'header', 'footer' and iclusion of spiffs.h
+ *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *
  *      Includes: log_system_message, webheader, webfooter, handleLogpage, handleReboot, WIFIcheck & decodeIP
  *                classes: Led, Button & repeatTimer.
  *
  **************************************************************************************************/
 
-#include <SPIFFS.h>
+#include <Arduino.h>                      // required by PlatformIO
+
 
 // ----------------------------------------------------------------
 //                              -Startup
 // ----------------------------------------------------------------
 
-// html text colour codes (obsolete html now and should really use CSS)
-  const char colRed[] = "<font color='#FF0000'>";           // red text
-  const char colGreen[] = "<font color='#006F00'>";         // green text
-  const char colBlue[] = "<font color='#0000FF'>";          // blue text
-  const char colEnd[] = "</font>";                          // end coloured text
-  const char htmlSpace[] = "&ensp;";                        // leave a space
+// some useful html/css 
+  const char colRed[] = "<span style='color:red;'>";        // red text
+  const char colGreen[] = "<span style='color:green;'>";    // green text
+  const char colBlue[] = "<span style='color:blue;'>";      // blue text
+  const char colEnd[] = "</span>";                          // end coloured text
+  const char htmlSpace[] = "&ensp;";                        // leave a space  (see 'HTML entity')
 
 // misc variables
   String lastClient = "n/a";                  // IP address of most recent client connected
@@ -63,10 +64,16 @@ void log_system_message(String smes) {
     if (system_message_pointer >= LogNumber) system_message_pointer = 0;
 
   // add the new message to log
-    system_message[system_message_pointer] = currentTime(1) + " - " + smes;
+    system_message[system_message_pointer] = currentTime() + " - " + smes;
 
   // also send the message to serial
     if (serialDebug) Serial.println("Log:" + system_message[system_message_pointer]);
+
+  // also send message to oled if debug is enabled
+    #if ENABLE_OLED_MENU
+      if (serialDebug) displayMessage("Log:", system_message[system_message_pointer]);
+    #endif
+
 }
 
 
@@ -74,9 +81,12 @@ void log_system_message(String smes) {
 //                         -header (html)
 // ----------------------------------------------------------------
 // HTML at the top of each web page
-//    additional style settings can be included and auto page refresh rate
+// @param   client    the http client
+// @param   adnlStyle additional style settings to included
+// @param   refresh   enable page auto refreshing
 
 void webheader(WiFiClient &client, char* adnlStyle = " ", int refresh = 0) {
+
 
   // start html page
     client.write("HTTP/1.1 200 OK\r\n");
@@ -90,12 +100,8 @@ void webheader(WiFiClient &client, char* adnlStyle = " ", int refresh = 0) {
   // page refresh
     if (refresh > 0) client.printf("  <meta http-equiv='refresh' content='%c'>\n", refresh);
 
+ 
   // HTML / CSS
-
-    // This is the below code compacted via https://www.textfixer.com/html/compress-html-compression.php
-    client.printf(R"=====( <title>%s</title> <style> body { color: black; background-color: #FFFF00; text-align: center; } ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);} li {float: left;} li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;} li a:hover { background-color: rgb(100, 0, 0);} %s </style> </head> <body> <ul> <li><a href='%s'>Home</a></li> <li><a href='/log'>Log</a></li> <li><a href='/bootlog'>BootLog</a></li> <li><a href='/stream'>Live Video</a></li> <li><a href='/images'>Stored Images</a></li> <li><a href='/live'>Capture Image</a></li> <li><a href='/imagedata'>Raw Data</a></li> <h1> <font color='#FF0000'>%s</h1></font> </ul>)=====", stitle, adnlStyle, HomeLink, stitle);
-
-  /*
     client.printf(R"=====(
         <title>%s</title>
         <style>
@@ -115,18 +121,15 @@ void webheader(WiFiClient &client, char* adnlStyle = " ", int refresh = 0) {
         <ul>
           <li><a href='%s'>Home</a></li>
           <li><a href='/log'>Log</a></li>
-          <li><a href='/bootlog'>BootLog</a></li>
-          <li><a href='/stream'>Live Video</a></li>
-          <li><a href='/images'>Stored Images</a></li>
-          <li><a href='/live'>Capture Image</a></li>
-          <li><a href='/imagedata'>Raw Data</a></li>
-          <h1> <font color='#FF0000'>%s</h1></font>
+          <h1> <font color='#FF0000'>%s</font></h1>
         </ul>
     )=====", stitle, adnlStyle, HomeLink, stitle);
+/*
+ // above compacted via https://www.textfixer.com/html/compress-html-compression.php
+client.printf(R"=====( <title>%s</title> <style> body { color: black; background-color: #FFFF00; text-align: center; } ul {list-style-type: none; margin: 0; padding: 0; overflow: hidden; background-color: rgb(128, 64, 0);} li {float: left;} li a {display: inline-block; color: white; text-align: center; padding: 30px 20px; text-decoration: none;} li a:hover { background-color: rgb(100, 0, 0);} %s </style> </head> <body> <ul> <li><a href='%s'>Home</a></li> <li><a href='/log'>Log</a></li> <li><a href='/bootlog'>BootLog</a></li> <li><a href='/stream'>Live Video</a></li> <li><a href='/images'>Stored Images</a></li> <li><a href='/live'>Capture Image</a></li> <li><a href='/imagedata'>Raw Data</a></li> <h1> <font color='#FF0000'>%s</h1></font> </ul>)=====", stitle, adnlStyle, HomeLink, stitle);
 */
 
 }
-
 
 
 // ----------------------------------------------------------------
@@ -158,15 +161,14 @@ void webfooter(WiFiClient &client) {
       else if (tstat == timeNeedsSync) client.print(" | NTP Sync failed");
       else if (tstat == timeNotSet) client.print(" | NTP Failed");
 
-     // free space on spiffs
-       client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() ) / 1024  );             // if using spiffs
+//      client.printf(" | Spiffs: %dK", ( SPIFFS.totalBytes() - SPIFFS.usedBytes() / 1024 ) );             // if using spiffs
 
-     // client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
+//      client.printf(" | MAC: %2x%2x%2x%2x%2x%2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);       // mac address
 
-     // free PSRAM
-       if (psramFound()) {
-         client.printf(" | PSram: %dK", heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024 );
-       }
+//     // free PSRAM
+//       if (psramFound()) {
+//         client.printf(" | PSram: %dK", heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024 );
+//       }
 
      client.printf("%s </small>\n", colEnd);
      client.write("</div>\n");
@@ -188,8 +190,7 @@ void handleLogpage() {
 
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    String clientIP = decodeIP(cip.toString());   // check for known IP addresses
     //log_system_message("Log page requested from: " + clientIP);
 
 
@@ -228,8 +229,7 @@ void handleNotFound() {
 
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
-    clientIP = decodeIP(clientIP);               // check for known IP addresses
+    String clientIP = decodeIP(cip.toString());   // check for known IP addresses
     log_system_message("Invalid URL requested from " + clientIP);
 
   String message = "File Not Found\n\n";
@@ -360,7 +360,7 @@ class Led {
 class Button {
 
   private:
-    int      _debounceDelay = 40;              // default debounce setting (ms)
+    uint32_t _debounceDelay = 40;              // default debounce setting (ms)
     uint32_t _timer;                           // timer used for debouncing
     bool     _rawState;                        // raw state of the button
     byte     _gpiopin;                         // gpio pin of the button

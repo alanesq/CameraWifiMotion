@@ -2,12 +2,9 @@
  *
  *                                    Send emails from ESP8266/ESP32
  *
- *
  *    using ESP_Mail_Client library  -  https://github.com/mobizt/ESP-Mail-Client
  *
- *
- *    include in main sketch with command     #include "email.h"
- *
+ *    part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *
  *
  *   This will fail if using Gmail unless your Google account has the following option set:
@@ -15,7 +12,7 @@
  *       Also requires POP access to be enabled.
  *   GMX.COM emails work very well with no additional setup other than enable POP access.
  *
- *                                              20Nov21
+ *                                              17May22
  *
  **************************************************************************************************
 
@@ -44,22 +41,19 @@
 
   const int MaxEmailAttempts = 5;                           // maximum email send attempts
 
-  const int maxMessageLength = 500;                         // maximum length of email message
-  const int maxSubjectLength = 150;                         // maximum length of email subject
 
- // #define _SenderName "blank"                        // name of sender (no spaces)
-
-  #define _UserDomain "gmail.com"                           // user domain to report in email
-
-
-// blank settings
-  char _emailReceiver[30] = "<email address>";              // address to send emails to
+// email settings
+  #define _emailReceiver "<email address>"                  // address to send emails to
   #define _smsReceiver "<email address>"                    // address to send text messages to
   #define _UserDomain "<domain to report from>"             // user domain to report in email
   #define _mailUser "<email address>"                       // address to send from
   #define _mailPassword "<email password>"                  // email password
   #define _SMTP "<smtp server>"                             // smtp server address
   #define _SMTP_Port 587                                    // port to use (gmail: Port for SSL: 465, Port for TLS/STARTTLS: 587)
+
+
+const int maxMessageLength = 500;                             // maximum length of email message
+const int maxSubjectLength = 150;                             // maximum length of email subject
 
 
 //  ----------------------------------------------------------------------------------------
@@ -124,7 +118,6 @@ void EMAILloop() {
 
 // Function send an email
 //   see full example: https://github.com/mobizt/ESP-Mail-Client/blob/master/examples/Send_Text/Send_Text.ino
-
 
 bool sendEmail(char* emailTo, char* emailSubject, char* emailBody) {
 

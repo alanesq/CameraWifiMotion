@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *      Wifi / NTP Connections using Autoconnect - 07Dec21
+ *      Wifi / NTP Connections using Autoconnect - 17May22
  *
  *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *
@@ -16,34 +16,28 @@
  *
  **************************************************************************************************/
 
+#include <Arduino.h>                      // required by PlatformIO
+
 
 // **************************************** S e t t i n g s ****************************************
 
 
-// Configuration Portal (Autoconnect)
-  const String AP_SSID = "ESPcam";
-  const String AP_PASS = "12345678";
-
-
-//     mDNS name
-//       const String mDNS_name = "esp32";
-//       const String mDNS_name = stitle;                                         // use sketch title
+// Settings for the configuration portal (Autoconnect)
+  const String AP_SSID = "ESPBWS";
+  const String AP_PASS = "password";
 
 
 
 // *************************************************************************************************
 
 
-#include <Arduino.h>            // required by PlatformIO
-
-
 // forward declarations
   void startWifiManager();
-  String currentTime();
+  String currentTime(bool);
   bool IsBST();
   void sendNTPpacket();
   time_t getNTPTime();
-  String requestWebPage(String, String, int, int, String, bool);
+  int requestWebPage(String*, String*, int);
 
 
 // ----------------------------------------------------------------
@@ -131,6 +125,9 @@ void startWifiManager() {
     delete ACserver;
   #endif
 
+// set wifi to auto re-connect if connection is lost
+  WiFi.setAutoReconnect(1);
+
 //  // Set up mDNS responder:
 //    if (serialDebug) Serial.println( MDNS.begin(mDNS_name.c_str()) ? "mDNS responder started ok" : "Error setting up mDNS responder" );
 
@@ -145,9 +142,9 @@ void startWifiManager() {
 // ----------------------------------------------------------------
 //          -Return current time and date as a string
 // ----------------------------------------------------------------
-// Note: in this format so it can be sorted by date order if stored on sd card etc.
+// Notes: two formats available, for British summer time
 
-String currentTime(){
+String currentTime(bool dFormat = 1){
 
    time_t t=now();     // get current time
    String ttime;
@@ -157,21 +154,39 @@ String currentTime(){
 
    if (IsBST()) t+=3600;     // add one hour if it is Summer Time
 
-   // date
-   ttime += String(year(t));
-   tstore = month(t);   if (tstore<10) ttime+="0";
-   ttime += String(tstore);
-   tstore = day(t);   if (tstore<10) ttime+="0";
-   ttime += String(tstore) + "_";
-
-   // time
-   tstore = hour(t);   if (tstore<10) ttime+="0";
-   ttime += String(tstore);
-   tstore = minute(t);   if (tstore<10) ttime+="0";
-   ttime += String(tstore);
-   tstore = second(t);   if (tstore<10) ttime+="0";
-   ttime += String(tstore);
-   ttime += "_" + DoW[weekday(t)-1];
+   if (dFormat == 0) {
+    // format suitable for file names
+        // date
+          ttime += String(year(t));
+          tstore = month(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore);
+          tstore = day(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore) + "_";
+        // time
+          tstore = hour(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore);
+          tstore = minute(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore);
+          tstore = second(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore);
+          ttime += "_" + DoW[weekday(t)-1];
+   } else {
+    // format easily read by humans
+        // date
+          ttime += DoW[weekday(t)-1] + " ";
+          tstore = day(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore) + "/";
+          tstore = month(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore) + "/";
+          ttime += String(year(t)) + " ";
+        // time
+          tstore = hour(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore) + ":";
+          tstore = minute(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore) + ":";
+          tstore = second(t);   if (tstore<10) ttime+="0";
+          ttime += String(tstore);
+   }
 
    return ttime;
 
@@ -325,99 +340,44 @@ time_t getNTPTime() {
 // ----------------------------------------------------------------
 //                        request a web page
 // ----------------------------------------------------------------
-//   @param    ip           ip address
 //   @param    page         web page to request
-//   @param    port         ip port to use (usually 80)
-//   @param    maxChars     maximum number of chars to receive
-//   @param    cuttoffText  ignore all in reply before this text
-//   @return   the reply as a string
-//   Example usage: requestWebPage("192.168.1.166", "/log", 80, 600, "");
+//   @param    received     String to store response in
+//   @param    maxWaitTime  maximum time to wait for reply (ms)
+//   @returns  http code
+/*
+      see:  https://randomnerdtutorials.com/esp32-http-get-post-arduino/#http-get-1
+      Example usage:
+                              String page = "http://192.168.1.166/ping";   // url to request
+                              String response;                             // reply will be stored here
+                              int httpCode = requestWebPage(&page, &response);
+                              // show results
+                                Serial.println("Web page requested: '" + page + "' - http code: " + String(httpCode));
+                                Serial.println(response);
+*/
 
-String requestWebPage(String ip, String page, int port, int maxChars, String cuttoffText = ""){
+int requestWebPage(String* page, String* received, int maxWaitTime=5000){
 
-  uint32_t maxWaitTime = 3000;            // max time to wait for reply (ms)
+  if (serialDebug) Serial.println("requesting web page: " + *page);
 
-  char received[maxChars + 1];            // temp store for incoming character data
-  int received_counter = 0;               // counter of number of characters which have been received
+  WiFiClient client;
+  HTTPClient http;     // see:  https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266HTTPClient
+  http.setTimeout(maxWaitTime);
+  http.begin(client, *page);      // for https requires (client, *page, thumbprint)  e.g.String thumbprint="08:3B:71:72:02:43:6E:CA:ED:42:86:93:BA:7E:DF:81:C4:BC:62:30";
+  int httpCode = http.GET();      // http codes: https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+  if (serialDebug) Serial.println("http code: " + String(httpCode));
 
-  if (!page.startsWith("/")) page = "/" + page;     // make sure page begins with "/"
-
-  if (serialDebug) {
-    Serial.print("requesting web page: ");
-    Serial.print(ip);
-    Serial.println(page);
+  if (httpCode > 0) {
+    *received = http.getString();
+  } else {
+    *received = "error:" + String(httpCode);
   }
+  if (serialDebug) Serial.println(*received);
 
-    WiFiClient client;
+  http.end();   //Close connection
+  if (serialDebug) Serial.println("Web connection closed");
 
-    // Connect to the site
-      if (!client.connect(ip.c_str() , port)) {
-        if (serialDebug) Serial.println("Web client connection failed");
-        return "web client connection failed";
-      }
-      if (serialDebug) Serial.println("Connected to host - sending request...");
-
-    // send request - A basic request looks something like: "GET /index.html HTTP/1.1\r\nHost: 192.168.0.4:8085\r\n\r\n"
-      client.println("GET " + page + " HTTP/1.1 ");
-      client.println("Host: " + ip );
-      client.println("User-Agent: arduino-ethernet");
-      client.println("Connection: close");
-      client.println();    // needed to end HTTP header
-
-      if (serialDebug) Serial.println("Request sent - waiting for reply...");
-
-    // Wait for a response
-      uint32_t ttimer = millis();
-      while ( client.connected() && !client.available() && (uint32_t)(millis() - ttimer) < maxWaitTime ) {
-        delay(10);
-      }
-      if ( ((uint32_t)(millis() - ttimer) > maxWaitTime ) && serialDebug) Serial.println("-Timed out");
-
-    // read the response
-      while ( client.connected() && client.available() && received_counter < maxChars ) {
-        delay(4);
-        received[received_counter] = char(client.read());     // read one character
-        received_counter+=1;
-      }
-      received[received_counter] = '\0';     // end of string marker
-
-    if (serialDebug) {
-      Serial.println("--------received web page-----------");
-      Serial.println(received);
-      Serial.println("------------------------------------");
-      Serial.flush();     // wait for serial data to finish sending
-    }
-
-    client.stop();    // close connection
-    if (serialDebug) Serial.println("Connection closed");
-
-    // if cuttoffText was supplied then only return the text following this
-      if (cuttoffText != "") {
-        char* locus = strstr(received,cuttoffText.c_str());    // locus = pointer to the found text
-        if (locus) {                                           // if text was found
-          if (serialDebug) Serial.println("The text '" + cuttoffText + "' was found in reply");
-          return locus;                                        // return the reply text following 'cuttoffText'
-        } else if (serialDebug) Serial.println("The text '" + cuttoffText + "' WAS NOT found in reply");
-      }
-
-  return received;        // return the full reply text
+  return httpCode;
 
 }  // requestWebPage
-
-
-/*
-    Idea for better code:
-
-                                char espBuffer[1024] = {0};
-                                int readCount = 0;
-                                long startTime = millis();
-
-                                while (millis() - startTime < 5000) { // Run for at least 5 seconds
-                                // Check to make sure we don't exceed espBuffer's boundaries
-                                    if (ESPserial.available() > readCount + sizeof espBuffer - 1) break;
-                                    readCount += ESPserial.readBytes(espBuffer + readCount, ESPserial.available());
-                                }
-
-*/
 
 // --------------------------- E N D -----------------------------
