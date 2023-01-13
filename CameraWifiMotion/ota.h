@@ -1,10 +1,12 @@
 /**************************************************************************************************
  *
- *      Over The Air updates (OTA) - 01Feb22
+ *      Over The Air updates (OTA) - 30Jan22
  *
  *      part of the BasicWebserver sketch - https://github.com/alanesq/BasicWebserver
  *
+ *
  *      If using an esp32cam module In Arduino IDE Select "ESP32 dev module" not "ESP32-cam" with PSRAM enabled
+ *
  *
  **************************************************************************************************
 
@@ -30,7 +32,8 @@
 // ----------------------------------------------------------------
 //     -enable OTA
 // ----------------------------------------------------------------
-// Enable OTA updates, called when correct password has been entered
+//
+//   Enable OTA updates, called when correct password has been entered
 
 void otaSetup() {
 
@@ -47,8 +50,10 @@ void otaSetup() {
         }, []() {
           HTTPUpload& upload = server.upload();
           if (upload.status == UPLOAD_FILE_START) {
-            if (serialDebug) Serial.setDebugOutput(true);
-            if (serialDebug) Serial.printf("Update: %s\n", upload.filename.c_str());
+            if (serialDebug) {
+              Serial.setDebugOutput(true);
+              Serial.printf("Update: %s\n", upload.filename.c_str());
+            }
             if (!Update.begin()) {        //start with max available size
               if (serialDebug) Update.printError(Serial);
             }
@@ -109,7 +114,8 @@ void otaSetup() {
 // ----------------------------------------------------------------
 //     -OTA web page requested     i.e. http://x.x.x.x/ota
 // ----------------------------------------------------------------
-// Request OTA password or implement OTA update if already entered
+//
+//   Request OTA password or implement OTA update
 
 void handleOTA(){
 
@@ -117,7 +123,8 @@ void handleOTA(){
 
   // log page request including clients IP address
     IPAddress cip = client.remoteIP();
-    String clientIP = decodeIP(cip.toString());   // check for known IP addresses
+    String clientIP = String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]);
+    clientIP = decodeIP(clientIP);               // check for known IP addresses
     log_system_message("OTA page requested from: " + clientIP);
 
   // check if valid password supplied
@@ -134,19 +141,17 @@ void handleOTA(){
 
     // OTA is not enabled so request password to enable it
 
-      webheader(client);      // add the standard html header
-      
-      
-      // This is the below javascript/html compacted to save flash memory via https://www.textfixer.com/html/compress-html-compression.php
-      client.print (R"=====(<form name='loginForm'> <table width='20%' bgcolor='A09F9F' align='center'> <tr> <td colspan=2> <center><font size=4><b>Enter OTA password</b></font></center><br> </td> <br> </tr><tr> <td>Password:</td> <td><input type='Password' size=25 name='pwd'><br></td><br><br> </tr><tr> <td><input type='submit' onclick='check(this.form)' value='Login'></td> </tr> </table> </form> <script> function check(form) { window.open('/ota?pwd=' + form.pwd.value , '_self') } </script>)=====");
-      /*
+      webheader(client);                            // add the standard html header
+
+/*
       client.print (R"=====(
          <form name='loginForm'>
             <table width='20%' bgcolor='A09F9F' align='center'>
                 <tr>
                     <td colspan=2>
                         <center><font size=4><b>Enter OTA password</b></font></center><br>
-                    </td><br>
+                    </td>
+                        <br>
                 </tr><tr>
                     <td>Password:</td>
                     <td><input type='Password' size=25 name='pwd'><br></td><br><br>
@@ -162,19 +167,21 @@ void handleOTA(){
             }
         </script>
       )=====");
-      */
-      
-      
+*/     
+// above compacted via https://www.textfixer.com/html/compress-html-compression.php
+client.print (R"=====( <form name='loginForm'> <table width='20%' bgcolor='A09F9F' align='center'> <tr> <td colspan=2> <center><font size=4><b>Enter OTA password</b></font></center><br> </td> <br> </tr><tr> <td>Password:</td> <td><input type='Password' size=25 name='pwd'><br></td><br><br> </tr><tr> <td><input type='submit' onclick='check(this.form)' value='Login'></td> </tr> </table> </form> <script> function check(form) { window.open('/ota?pwd=' + form.pwd.value , '_self') } </script>)=====");
+
       webfooter(client);                          // add the standard web page footer
 
   }
 
   // -----------------------------------------
 
-  
-  if (OTAEnabled == 1) {                // if OTA is enabled implement it
+  if (OTAEnabled == 1) {
 
-      webheader(client);                // add the standard html header
+    // OTA is enabled so implement it
+
+      webheader(client);                            // add the standard html header
 
       client.write("<br><H1>Update firmware</H1><br>\n");
       client.printf("Current version =  %s, %s \n\n", stitle, sversion);
@@ -186,7 +193,7 @@ void handleOTA(){
       client.write("<br><br>Device will reboot when upload complete");
       client.printf("%s <br>To disable OTA restart device<br> %s \n", colRed, colEnd);
 
-      webfooter(client);                // add the standard html footer
+      webfooter(client);                          // add the standard web page footer
   }
 
   // -----------------------------------------

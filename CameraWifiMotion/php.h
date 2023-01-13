@@ -1,10 +1,10 @@
 /**************************************************************************************************
  *
- *                           Send images via a PHP script - 31Dec21
+ *                            Send images via PHP - 02Jan22
  *
  *       based on code from: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
  *
- *                    see bottom of page for the PHP scripts to use
+ *                        see bottom of php.h for the scripts to use
  *
  **************************************************************************************************/
 
@@ -17,11 +17,12 @@
    //  ----------------------  s e t t i n g s --------------------------
 
 
-   const String PHPserverName = "domainYourPHPScriptIsOn.com";   // YOUR DOMAIN NAME
+    const String PHPserverName = "192.168.1.123";             // The domain to upload to - (bedroom laptop)
 
-   const String PHPserverPath = "/temp/receive.php";             // the php file location
+    const String PHPserverPath = "/pics/receive.php";         // the php script file location
 
-   const int PHPserverPort = 80;
+    const int PHPserverPort = 80;
+
 
 
    //  ------------------------------------------------------------------
@@ -33,7 +34,6 @@
    // pass image frame buffer pointer, length, file name to use
 
    String sendPHP(uint8_t* fbBuf, size_t fbLen, String fName = "cwm") {
-     log_system_message("Sending image via PHP");
      WiFiClient client = server.client();
      String getAll;
      String getBody;
@@ -80,20 +80,22 @@
          while (client.available()) {
            char c = client.read();
            if (c == '\n') {
-             if (getAll.length()==0) { state=true; }
+             if (getAll.length()==0) state=true;
              getAll = "";
+           } else if (c != '\r') {
+             getAll += String(c);
            }
-           else if (c != '\r') { getAll += String(c); }
-           if (state==true) { getBody += String(c); }
+           if (state==true) getBody += String(c);
            startTimer = millis();
          }
-         if (getBody.length()>0) { break; }
+         if (getBody.length()>0) break;
        }
-       if (serialDebug) Serial.println();
        client.stop();
-       if (serialDebug) Serial.println(getBody);
-     }
-     else {
+       if (serialDebug) {
+         Serial.println();
+         Serial.println(getBody);
+       }
+     } else {
        getBody = "PHP error-Connection to " + PHPserverName +  " failed";
        if (serialDebug) Serial.println(getBody);
      }
@@ -108,97 +110,99 @@
      return getBody;
    }
 
+
 /*
-
-------------------------------------------------------------
-
-
-   ----------------------------------------------------------------
-           HTML/PHP script to display all images in folder
-   ----------------------------------------------------------------
-
-<html>
- <head>
- <title>Images</title>
- </head>
- <body>
-        <center>
-        <H1>Images</H1>
-	<?php
-	  // show all images in folder
-      $images = glob("*.jpg");
-      foreach($images as $image) {
-        echo $image.' <br><img width="640" src="'.$image.'" /><br><br>\n';
-      }
-	?>
- </body>
- </html>
+--------------------------------------------------------------------------------------
+                        PHP scripts for use with php.h
+--------------------------------------------------------------------------------------
 
 
- ----------------------------------------------------------------
-           PHP script to receive images from ESP32Cam
- ----------------------------------------------------------------
-
-<?php
-// receive image files from esp32cam - dec21
-// from: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
-// results in file name format:   2021.12.30_21:43:05_esp32-cam.jpg
-
-$target_dir = "./";
-$datum = mktime(date('H')+0, date('i'), date('s'), date('m'), date('d'), date('y'));
-$target_file = $target_dir . date('Y.m.d_H:i:s_', $datum) . basename($_FILES["imageFile"]["name"]);
-$uploadOk = 1;
-$imageFileType = strtolower(pathinfo($target_file,PATHINFO_EXTENSION));
+HTML/PHP script to display all images in the folder:
 
 
-// Check if image file is a actual image or fake image
-if(isset($_POST["submit"])) {
-  $check = getimagesize($_FILES["imageFile"]["tmp_name"]);
-  if($check !== false) {
-    echo "File is an image - " . $check["mime"] . ".";
+   <html>
+    <head>
+     <title>ESP32Cam Images</title>
+    </head>
+    <body>
+           <center> <H1>Images</H1>
+   	<?php
+   	  // show all images in folder
+             $images = glob("*.jpg");
+             foreach($images as $image) {
+               // echo $image.' <br><img width="640" src="'.$image.'" /><br><br>\n';   // display image
+               echo "<br><a href='./" . $image  . "'>" . $image . "</a>\n";   // insert link to image
+             }
+   	?>
+    </body>
+   </html>
+
+
+--------------------------------------------------------------------------------------
+
+
+PHP script to receive images from the ESP32Cam:
+
+
+    <?php
+    // receive image files from esp32cam - dec21
+    // from: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
+    // results in file name format:   2021.12.30_21:43:05_esp32-cam.jpg
+
+    $target_dir = "./";
+    $datum = mktime(date('H')+0, date('i'), date('s'), date('m'), date('d'), date('y'));
+    $target_file = $target_dir . date('Y.m.d_H:i:s_', $datum) . basename($_FILES["imageFile"]["name"]);
     $uploadOk = 1;
-  }
-  else {
-    echo "File is not an image.";
-    $uploadOk = 0;
-  }
-}
-
-// Check if file already exists
-if (file_exists($target_file)) {
-  echo "Sorry, file already exists.";
-  $uploadOk = 0;
-}
-
-// Check file size
-if ($_FILES["imageFile"]["size"] > 500000) {
-  echo "Sorry, your file is too large.";
-  $uploadOk = 0;
-}
-
-// Allow certain file formats
-if($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg"
-&& $imageFileType != "gif" ) {
-  echo "Sorry, only JPG, JPEG, PNG & GIF files are allowed.";
-  $uploadOk = 0;
-}
-
-// Check if $uploadOk is set to 0 by an error
-if ($uploadOk == 0) {
-  echo "Sorry, your file was not uploaded.";
-// if everything is ok, try to upload file
-}
-else {
-  if (move_uploaded_file($_FILES["imageFile"]["tmp_name"], $target_file)) {
-    echo "The file ". basename( $_FILES["imageFile"]["name"]). " has been uploaded.";
-  }
-  else {
-    echo "Sorry, there was an error uploading your file.";
-  }
-}
-?>
+    $imageFileType = strtolower(pathinfo($target_file,PATHINFO_EXTENSION));
 
 
-----------------------------------------------------------------
-*/
-// end
+    // Check if image file is a actual image or fake image
+    if(isset($_POST["submit"])) {
+      $check = getimagesize($_FILES["imageFile"]["tmp_name"]);
+      if($check !== false) {
+        echo "File is an image - " . $check["mime"] . ".";
+        $uploadOk = 1;
+      }
+      else {
+        echo "File is not an image.";
+        $uploadOk = 0;
+      }
+    }
+
+    // Check if file already exists
+    if (file_exists($target_file)) {
+      echo "Sorry, file already exists.";
+      $uploadOk = 0;
+    }
+
+    // Check file size
+    if ($_FILES["imageFile"]["size"] > 500000) {
+      echo "Sorry, your file is too large.";
+      $uploadOk = 0;
+    }
+
+    // Allow certain file formats
+    if($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg"
+    && $imageFileType != "gif" ) {
+      echo "Sorry, only JPG, JPEG, PNG & GIF files are allowed.";
+      $uploadOk = 0;
+    }
+
+    // Check if $uploadOk is set to 0 by an error
+    if ($uploadOk == 0) {
+      echo "Sorry, your file was not uploaded.";
+    // if everything is ok, try to upload file
+    }
+    else {
+      if (move_uploaded_file($_FILES["imageFile"]["tmp_name"], $target_file)) {
+        echo "The file ". basename( $_FILES["imageFile"]["name"]). " has been uploaded.";
+      }
+      else {
+        echo "Sorry, there was an error uploading your file.";
+      }
+    }
+    ?>
+
+
+--------------------------------------------------------------------------------------
+                                     * end */

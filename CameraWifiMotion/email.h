@@ -12,7 +12,7 @@
  *       Also requires POP access to be enabled.
  *   GMX.COM emails work very well with no additional setup other than enable POP access.
  *
- *                                              17May22
+ *                                              20jan22
  *
  **************************************************************************************************
 
@@ -42,7 +42,7 @@
   const int MaxEmailAttempts = 5;                           // maximum email send attempts
 
 
-// email settings
+// blank settings
   #define _emailReceiver "<email address>"                  // address to send emails to
   #define _smsReceiver "<email address>"                    // address to send text messages to
   #define _UserDomain "<domain to report from>"             // user domain to report in email
