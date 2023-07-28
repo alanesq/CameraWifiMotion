@@ -27,7 +27,7 @@ better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going 
 from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option (I think 'M12 F1.4' is the type of thing we need)...
-You can remove the casing from the supplied camera leaving just the ccd (see pic) and then glue a lens case over the top of it.
+You can remove the casing from the supplied camera leaving just the ccd (see pic) and then glue a lens case over the top of it. If you have a 3d printer you can print an adaptor from https://www.thingiverse.com/thing:4663521, mine has a 20mm spacing on the holes though so I have created a modified version here: https://github.com/alanesq/CameraWifiMotion/blob/master/misc/esp32cam-lensAdaptor-20mm.step
 <table><tr>
   <td><img src="/Images/replacement-lens.jpg" width="200px" /</td>
   <td><img src="/Images/replacement-lens-2.jpg" width="200px" /></td>
