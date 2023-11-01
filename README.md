@@ -12,7 +12,6 @@ It also has the options to email or FTP the captured images or store them to sd 
   <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
-LATEST NEWS!!!
 There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
 It looks like the esp32cam suplied with them are not standard and have one of the GND pins modified to act as a reset pin?
@@ -28,7 +27,7 @@ better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going 
 from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option (I think 'M12 F1.4' is the type of thing we need)...
 You can remove the casing from the supplied camera leaving just the ccd (see pic) and then glue a lens case over the top of it. If you have a 3d printer you can print an adaptor from https://www.thingiverse.com/thing:4663521, mine has a 20mm spacing on the holes though so I have created a modified version here: https://github.com/alanesq/CameraWifiMotion/blob/master/misc/esp32cam-lensAdaptor-20mm.step
-<br>Latest news (Nov23): You can now buy cameras with replaceable, screw in lenses fitted on Aliexpress so no need to do the above
+<br>Latest news (Nov23): You can now buy ov5640 cameras with this type lense fitted on Aliexpress so no need to do the above
 <br><table><tr>
   <td><img src="/Images/replacement-lens.jpg" width="200px" /</td>
   <td><img src="/Images/replacement-lens-2.jpg" width="200px" /></td>
