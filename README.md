@@ -28,6 +28,7 @@ better lens.        see: https://www.youtube.com/watch?v=T0P37aEneto
 Removing the I.R. filter and fitting a suitable lens completely transforms these cameras in low light conditions, going 
 from completely useless to ok.  You need a lens with a large iris, I am still searching for the best option (I think 'M12 F1.4' is the type of thing we need)...
 You can remove the casing from the supplied camera leaving just the ccd (see pic) and then glue a lens case over the top of it. If you have a 3d printer you can print an adaptor from https://www.thingiverse.com/thing:4663521, mine has a 20mm spacing on the holes though so I have created a modified version here: https://github.com/alanesq/CameraWifiMotion/blob/master/misc/esp32cam-lensAdaptor-20mm.step
+Latest news (Nov23): You can now buy cameras with replaceable, screw in lenses fitted on Aliexpress so no need to do the above
 <table><tr>
   <td><img src="/Images/replacement-lens.jpg" width="200px" /</td>
   <td><img src="/Images/replacement-lens-2.jpg" width="200px" /></td>
@@ -71,7 +72,7 @@ order to enter your wifi details.
              otherwise you need to check the serial output or your router to discover what IP address it has been assigned.
 
 The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
-It works by repeatedly capturing a greyscale image (320x240 pixels).  This image is split up in to 20x20 
+It works by repeatedly capturing a grayscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
 number for each block between 0 and 255 (i.e. average of the block).
 These resulting 16x12 blocks are then compared to the previously captured one and if the value of any block has varied by
@@ -117,11 +118,11 @@ It also has the following URLs you can use:
                                 /imagedata - show raw block data
                                 /ota - update firmware (requires password entered first)
                                 /img - just display a plain jpg 
-                                       defaults to the live greyscale image or stored images selected with /img?pic=x
+                                       defaults to the live grayscale image or stored images selected with /img?pic=x
                                        for smaller pre capture images add 100 to x.
                                 /stream - Shows a live video stream 
                                         Thanks to Uwe Gerlach for sending me the code showing how to do this 
-                                /jpg - display the greyscale image the motion detecting is using
+                                /jpg - display the grayscale image the motion detecting is using
 
 -----------------
 
