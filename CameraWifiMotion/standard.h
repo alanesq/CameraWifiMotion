@@ -35,12 +35,8 @@
 
 String decodeIP(String IPadrs) {
 
-    if (IPadrs == "192.168.1.176") IPadrs = "HA server";
-    else if (IPadrs == "192.168.1.103") IPadrs = "Parlour laptop";
-    else if (IPadrs == "192.168.1.101") IPadrs = "Bedroom laptop";
-    else if (IPadrs == "192.168.1.169") IPadrs = "Linda's laptop";
-    else if (IPadrs == "192.168.1.170") IPadrs = "Shed 1 laptop";
-    else if (IPadrs == "192.168.1.143") IPadrs = "Shed 2 laptop";
+    if (IPadrs == "192.1.1.1") IPadrs = "main pc";
+    else if (IPadrs == "192.1.1.2") IPadrs = "backup pc";
 
     // log last IP client connected
       if (IPadrs != lastClient) {
