@@ -17,9 +17,9 @@
    //  ----------------------  s e t t i n g s --------------------------
 
 
-    const String PHPserverName = "192.168.1.123";             // The domain to upload to - (bedroom laptop)
+    const String PHPserverName = "192.168.1.1";               // The domain to upload to 
 
-    const String PHPserverPath = "/pics/receive.php";         // the php script file location
+    const String PHPserverPath = "/receive.php";              // the php script file location
 
     const int PHPserverPort = 80;
 

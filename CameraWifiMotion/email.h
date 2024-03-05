@@ -41,8 +41,7 @@
 
   const int MaxEmailAttempts = 5;                           // maximum email send attempts
 
-
-// blank settings
+// ettings
   #define _emailReceiver "<email address>"                  // address to send emails to
   #define _smsReceiver "<email address>"                    // address to send text messages to
   #define _UserDomain "<domain to report from>"             // user domain to report in email

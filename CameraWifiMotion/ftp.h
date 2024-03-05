@@ -15,9 +15,9 @@
 // **************************************** S e t t i n g s ****************************************
 
 // Enter your FTP account details here
-char ftp_server[] = "<ftp servers ip address>";
-char ftp_user[]   = "<ftp user name>";
-char ftp_pass[]   = "<ftp password>";
+  char ftp_server[] = "<ftp servers ip address>";
+  char ftp_user[]   = "<ftp user name>";
+  char ftp_pass[]   = "<ftp password>";
 
 
 // *************************************************************************************************

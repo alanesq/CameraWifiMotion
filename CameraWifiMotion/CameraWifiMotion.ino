@@ -1,15 +1,15 @@
 /*******************************************************************************************************************
  *
- *        CameraWifiMotion - v2.4
+ *     CameraWifiMotion
  *
- *        ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE
+ *     ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 2.x
  *
  *                                   https://github.com/alanesq/CameraWifiMotion
- *                      Tested with ESP32 board manager version 1.0.6, WifiManager v1.7.4
- *                              Use standrad development board with PSRAM enabled
- *                   If using Esp33cam with motherboard you may need to lower the upload speed
+ *                        Tested with ESP32 board manager version 2.0.14, WifiManager v2.0.16 
+ *           Select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "default 4mb with Spiffs"
  *
  *                             Included files: email.h, standard.h, ota.h, wifi.h
+ *
  *
  *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             GPIO12 can be used for io but must be low at boot
@@ -23,17 +23,18 @@
  *      Motion detection based on: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  *
  *      camera troubleshooting: https://randomnerdtutorials.com/esp32-cam-troubleshooting-guide/
+ *                              if camera fails to start make sure PSRAM is enabled
  *
  *      ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
- *
  *
  *      First time the ESP starts it will create an access point "ESPPortal" which you need to connect to in order to
  *      enter your wifi details.  default password = "12345678"   (change this in wifi.h)
  *      see: https://randomnerdtutorials.com/wifimanager-with-esp8266-autoconnect-custom-parameter-and-manage-your-ssid-and-password
  *
- *
  *            Distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
  *                    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ *                                                                                          https://alanesq.github.io/
  *
  ********************************************************************************************************************/
 
@@ -42,26 +43,27 @@
   #error This sketch is for esp32cam only
 #endif
 
-#include <Arduino.h>    // required by PlatformIO
+#include <Arduino.h>                  // required by PlatformIO
+#include <esp_task_wdt.h>             // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
+#define WDT_TIMEOUT 60                // timeout of watchdog timer (seconds)  
 
 
 // ---------------------------------------------------------------
 //                       - S E T T I N G S -
 // ---------------------------------------------------------------
 
-
   const char* stitle = "CameraWifiMotion";               // title of this sketch (CameraWifiMotion)
 
-  const char* sversion = "30Jan22";                      // version of this sketch
+  const char* sversion = "04Mar24";                      // version of this sketch
 
-  const bool serialDebug = 0;                            // provide debug info on serial port
+  const bool serialDebug = 1;                            // provide debug info on serial port
 
   bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
-  #define EMAIL_ENABLED 1                                // Enable E-mail support
+  #define EMAIL_ENABLED 0                                // Enable E-mail support
 
   #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
-  const String OTAPassword = "12345678";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
+  const String OTAPassword = "password";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
   #define FTP_ENABLED 0                                  // if ftp uploads are enabled
 
@@ -69,7 +71,7 @@
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
-  const byte LogNumber = 30;                             // number of entries in the system log
+  const byte LogNumber = 50;                             // number of entries in the system log
 
   const uint16_t ServerPort = 80;                        // ip port to serve web pages on
 
@@ -95,7 +97,7 @@
 
   const byte flashMode = 2;                              // 1=take picture using flash when dark, 2=use flash every time, 3=flash after capturing the image as display only
 
-  const byte gioPin = 13;                                // I/O pin (for external sensor input)
+  const byte gioPin = 13;                                // I/O pin (for external sensor input, 0=not used)
 
   bool ioRequiredHighToTrigger = 0;                      // If motion detection only triggers if IO input is also high
 
@@ -146,6 +148,7 @@
   void handleStream();
   void handleJPG();
   void handleTest();
+  bool checkCameraIsFree();
 
 
 // ---------------------------------------------------------------
@@ -216,11 +219,32 @@ Led statusLed1(onboardLED, LOW);             // set up onboard LED (LOW = on) - 
 
 
 // ---------------------------------------------------------------
+//                -check if camera is already in use
+// ---------------------------------------------------------------
+// try to avoid two processes capturing an image at the same time by using rudimentary flag
+bool checkCameraIsFree() {
+  int waitTimeout = 10;         // how long to wait if camera is in use
+  if (DetectionEnabled != 2) return 1;
+  log_system_message("Waiting to capture image as camera is already in use!");
+  for (int i = 0; i < waitTimeout; i++) {
+    delay(100);   if (DetectionEnabled != 2) return 1;
+  }
+  log_system_message("Waiting for camera to become free timed out");
+  return 0;
+}
+
+
+// ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
 // ---------------------------------------------------------------
 // setup section (runs once at startup)
 
 void setup() {
+  
+  // watchdog timer (esp32)
+    Serial.println("Configuring watchdog timer");
+    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+    esp_task_wdt_add(NULL); //add current thread to WDT watch    
 
   // status info. on serial port config
   if (serialDebug) {
@@ -239,6 +263,7 @@ void setup() {
       ESP.restart();                                // restart and try again
       delay(5000);
     } else {
+      //delay(500);
       if (serialDebug) {
         Serial.print(("SPIFFS mounted successfully: "));
         Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
@@ -270,8 +295,10 @@ void setup() {
   BlinkLed(1);           // flash the led once
 
   // configure the gpio pin (with pullup resistor)
-    pinMode(gioPin,  INPUT);
-    SensorStatus = 1;
+    if (gioPin > 0) {
+      pinMode(gioPin,  INPUT);
+      SensorStatus = 1;
+    }
 
   // configure ondoard indicator led
     pinMode(onboardLED, OUTPUT);
@@ -287,7 +314,9 @@ void setup() {
       if (serialDebug) Serial.print(("Camera initialised ok"));
     }
 
-  startWifiManager();                        // Connect to wifi (procedure is in wifi.h)
+  // Slect wifi connection typw - NOTE: Only enable one of these
+    startWifiManager();                          // Connect to wifi using WifiManager
+    //startWifi();                                 // Connect to wifi supplying hard coded credentials
 
 //  // MDNS config
 //  if (MDNS.begin(MDNStitle)) {
@@ -393,18 +422,20 @@ void loop(void){
     }
 
   // log when sensor i/o input pin status changes
-    bool tstatus = digitalRead(gioPin);
-    if (tstatus != SensorStatus) {
-      delay(20);
-      tstatus = digitalRead(gioPin);        // debounce input
+    if (gioPin > 0) {
+      bool tstatus = digitalRead(gioPin);
       if (tstatus != SensorStatus) {
-        // input pin status has changed
-        if (tstatus == 1) {
-          SensorStatus = 1;
-          ioDetected(1);                    // trigger io status has changed procedure
-        } else {
-          SensorStatus = 0;
-          ioDetected(0);                    // trigger io status has changed procedure
+        delay(20);
+        tstatus = digitalRead(gioPin);        // debounce input
+        if (tstatus != SensorStatus) {
+          // input pin status has changed
+          if (tstatus == 1) {
+            SensorStatus = 1;
+            ioDetected(1);                    // trigger io status has changed procedure
+          } else {
+            SensorStatus = 0;
+            ioDetected(0);                    // trigger io status has changed procedure
+          }
         }
       }
     }
@@ -412,6 +443,7 @@ void loop(void){
   // periodic system tasks
     if ((unsigned long)(millis() - MaintTiming) >= (MaintCheckRate * 1000) ) {
       if (DetectionEnabled && flashIndicatorLED) digitalWrite(onboardLED, !digitalRead(onboardLED));  // flash onboard indicator led
+      esp_task_wdt_reset();                               // reset watchdog timer 
       WIFIcheck();                                        // check if wifi connection is ok
       MaintTiming = millis();                             // reset system tasks timer
       time_t t=now();                                     // read current time to ensure NTP auto refresh keeps triggering (otherwise only triggers when time is required causing a delay in response)
@@ -754,11 +786,10 @@ void handleRoot() {
         client.println("<br><span id='uline5'></span>");
 
       // Javascript - to periodically update the above info lines from http://x.x.x.x/data
-
-      // This is the below code compacted via https://www.textfixer.com/html/compress-html-compression.php
-      client.printf(R"=====(<script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); document.getElementById('uline0').innerHTML = receivedArr[0]; document.getElementById('uline1').innerHTML = receivedArr[1]; document.getElementById('uline2').innerHTML = receivedArr[2]; document.getElementById('uline3').innerHTML = receivedArr[3]; document.getElementById('uline4').innerHTML = receivedArr[4]; document.getElementById('uline5').innerHTML = receivedArr[5]; } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
-
+      // This is the below javascript code compacted to save flash memory via https://www.textfixer.com/html/compress-html-compression.php
+         client.printf(R"=====(  <script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); for (let i = 0; i < receivedArr.length; i++) { document.getElementById('uline' + i).innerHTML = receivedArr[i]; } } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
 /*
+        // get a comma seperated list from http://x.x.x.x/data and populate the blank lines in html above
         client.printf(R"=====(
            <script>
               function getData() {
@@ -766,12 +797,9 @@ void handleRoot() {
                 xhttp.onreadystatechange = function() {
                 if (this.readyState == 4 && this.status == 200) {
                   var receivedArr = this.responseText.split(',');
-                  document.getElementById('uline0').innerHTML = receivedArr[0];
-                  document.getElementById('uline1').innerHTML = receivedArr[1];
-                  document.getElementById('uline2').innerHTML = receivedArr[2];
-                  document.getElementById('uline3').innerHTML = receivedArr[3];
-                  document.getElementById('uline4').innerHTML = receivedArr[4];
-                  document.getElementById('uline5').innerHTML = receivedArr[5];
+                  for (let i = 0; i < receivedArr.length; i++) {
+                    document.getElementById('uline' + i).innerHTML = receivedArr[i];
+                  }
                 }
               };
               xhttp.open('GET', 'data', true);
@@ -1164,6 +1192,7 @@ void rootButtons() {
     // if button "toggle illuminator LED" was pressed
       if (server.hasArg("illuminator")) {
         // button was pressed
+          checkCameraIsFree();                                // try to avoid using camera if already in use
           if (DetectionEnabled == 1) DetectionEnabled = 2;    // pause motion detecting to stop light triggering it (not required with single core esp32?)
           if (!ReqLEDStatus) {
             ReqLEDStatus = 1;
@@ -1256,7 +1285,7 @@ void handleData(){
 
    // line4 - sd card
      if (SD_Present) {
-       reply += "SD Crad: " + String(SDfreeSpace);
+       reply += "SD Card: " + String(SDusedSpace) + "MB used - " + String(SDfreeSpace) + "MB free";
      }
      reply += ",";
 
@@ -1670,7 +1699,8 @@ bool checkPhoto( fs::FS &fs, String IFileName ) {
 
 bool capturePhotoSaveSpiffs(bool Flash) {
 
-  if (DetectionEnabled == 1) DetectionEnabled = 2;      // pause motion detecting while photo is captured (not required with single core esp32?)
+  checkCameraIsFree();                                                // try to avoid using camera if already in use
+  if (DetectionEnabled == 1) DetectionEnabled = 2;                    // pause motion detecting while photo is captured (not required with single core esp32?)
 
   // increment image count
     SpiffsFileCounter++;
@@ -1750,11 +1780,11 @@ void RebootCamera(pixformat_t format) {
     log_system_message("ERROR: Problem with camera detected so resetting it");
     // turn camera off then back on
       digitalWrite(PWDN_GPIO_NUM, HIGH);
-      delay(300);
+      delay(200);
       digitalWrite(PWDN_GPIO_NUM, LOW);
-      delay(300);
+      delay(400);
     RestartCamera(PIXFORMAT_GRAYSCALE);    // restart camera in motion mode
-    delay(300);
+    delay(50);
     // try capturing a frame, if still problem reboot esp32
       if (!capture_still()) {
           UpdateBootlogSpiffs("Camera failed to reboot so rebooting esp32");    // store in bootlog
@@ -1992,6 +2022,7 @@ void saveGreyscaleFrame(String filesName) {
 
 void ioDetected(bool iostat) {
 
+  checkCameraIsFree();                                                   // try to avoid using camera if already in use
   if (DetectionEnabled == 1) DetectionEnabled = 2;                       // pause motion detecting (not required with single core esp32?)
 
     log_system_message("IO input has triggered - status = " + String(iostat));
@@ -2010,6 +2041,7 @@ void ioDetected(bool iostat) {
 
 void MotionDetected(uint16_t changes) {
 
+  checkCameraIsFree();                                                    // try to avoid using camera if already in use
   if (DetectionEnabled == 1) DetectionEnabled = 2;                        // pause motion detecting (not required with single core esp32?)
 
     log_system_message("Camera detected motion: " + String(changes));
@@ -2070,6 +2102,7 @@ void handleStream(){
   const int bdrLen = strlen(BOUNDARY);
   const int cntLen = strlen(CTNTTYPE);
 
+  checkCameraIsFree();                                           // try to avoid using camera if already in use
   if (DetectionEnabled == 1) DetectionEnabled = 2;               // pause motion detecting while streaming (not required with single core esp32?)
 
   // send html header
@@ -2112,8 +2145,8 @@ void handleStream(){
 // ----------------------------------------------------------------
 
 void handleJPG() {
-  
-  if (DetectionEnabled == 2) return;            // if detection is paused another process may be using camera
+
+  if (checkCameraIsFree() == 0) return;         // try to avoid using camera if already in use
 
   WiFiClient client = server.client();          // open link with client
   char buf[32];
@@ -2121,7 +2154,7 @@ void handleJPG() {
   size_t jpg_size = 0;
 
   // capture a frame (greyscale)
-    camera_fb_t *fb = esp_camera_fb_get();   // capture frame
+    camera_fb_t *fb = esp_camera_fb_get();      // capture frame
     if (!fb) {
       log_system_message("error: failed to capture image");
       //RebootCamera(PIXFORMAT_GRAYSCALE);
