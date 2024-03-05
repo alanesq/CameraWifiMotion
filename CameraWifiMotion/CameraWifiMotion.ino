@@ -8,7 +8,7 @@
  *                        Tested with ESP32 board manager version 2.0.14, WifiManager v2.0.16 
  *           Select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "default 4mb with Spiffs"
  *
- *                             Included files: email.h, standard.h, ota.h, wifi.h
+ *                             Included files: email.h, standard.h, ota.h, php.h & wifi.h
  *
  *
  *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
@@ -67,7 +67,7 @@
 
   #define FTP_ENABLED 0                                  // if ftp uploads are enabled
 
-  #define PHP_ENABLED 1                                  // if PHP uploads are enabled
+  #define PHP_ENABLED 0                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
