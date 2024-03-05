@@ -12,6 +12,8 @@ It also has the options to email or FTP the captured images or store them to sd 
   <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
+NOTE: It is important that if using Arduino IDE you select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "default 4mb with Spiffs.<br>
+
 There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
 It looks like the esp32cam suplied with them are not standard and have one of the GND pins modified to act as a reset pin?
