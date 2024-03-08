@@ -72,7 +72,7 @@ order to enter your wifi details.
              at the address:     http://ESPcam1.local     (if your browser / config supports it)
              otherwise you need to check the serial output or your router to discover what IP address it has been assigned.
 
-The motion detection is based on - https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
+The motion detection is based on some code posted by eloquentarduino, this has since been updated but info on the subject can be seen [HERE](https://eloquentarduino.com/posts/esp32-cam-motion-detection)<br>
 It works by repeatedly capturing a grayscale image (320x240 pixels).  This image is split up in to 20x20 
 pixel blocks (i.e. 16 x 12 blocks for the complete image).  All the pixel values in each block are averaged to give a single 
 number for each block between 0 and 255 (i.e. average of the block).
