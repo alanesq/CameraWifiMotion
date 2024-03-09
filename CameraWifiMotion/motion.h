@@ -136,7 +136,7 @@ bool setupCameraHardware() {
     // if no psram found reduce image resolution
       if(!psramFound()){
         config.frame_size = FRAMESIZE_SVGA;
-        #define FRAME_SIZE_PHOTO FRAMESIZE_SVGA
+        //#define FRAME_SIZE_PHOTO FRAMESIZE_SVGA
         config.jpeg_quality = 12;
         config.fb_count = 1;
       }
