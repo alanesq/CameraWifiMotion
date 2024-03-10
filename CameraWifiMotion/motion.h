@@ -139,6 +139,7 @@ bool setupCameraHardware() {
         //#define FRAME_SIZE_PHOTO FRAMESIZE_SVGA
         config.jpeg_quality = 12;
         config.fb_count = 1;
+        log_system_message("Error: No PSRam found");
       }
 
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
