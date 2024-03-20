@@ -392,6 +392,9 @@ time_t getNTPTime() {
     // subtract seventy years:
     unsigned long epoch = secsSince1900 - seventyYears;
 
+    // apply GMT time zone
+    epoch += timeZone * 60L*60L;
+
     // Reset the interval to get the time from NTP server in case we previously changed it
     setSyncInterval(_resyncSeconds);
 
