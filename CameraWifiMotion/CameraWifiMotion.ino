@@ -44,7 +44,10 @@
 #endif
 
 #include <Arduino.h>                  // required by PlatformIO
+
+// WATCHDOG TIMER IS NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
 #include <esp_task_wdt.h>             // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
+
 #define WDT_TIMEOUT 60                // timeout of watchdog timer (seconds)  
 
 
@@ -241,10 +244,10 @@ bool checkCameraIsFree() {
 
 void setup() {
   
-  // watchdog timer (esp32)
-    Serial.println("Configuring watchdog timer");
-    esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
-    esp_task_wdt_add(NULL); //add current thread to WDT watch    
+  // watchdog timer (esp32) - NOT WORKING WITH ESP32 3.0.0 - jun24
+  //  Serial.println("Configuring watchdog timer");
+  //  esp_task_wdt_init(WDT_TIMEOUT, true); //enable panic so ESP32 restarts
+  //  esp_task_wdt_add(NULL); //add current thread to WDT watch    
 
   // status info. on serial port config
   if (serialDebug) {
