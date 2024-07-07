@@ -7,6 +7,9 @@ It captures an image from the camera around 4 times a second, each time comparin
 any changes.  If significant change is detected it captures a higher res image and stores it in internal memory.  
 It also has the options to email or FTP the captured images or store them to sd card.
 
+NOTE: The latest ESP32 board manager (i.e. v3.x) seems to require a lot more memory resulting in this sketch not fitting in memory, also they seem to have made
+several changes resulting in it stopping things working.  I have a version which works with the newer one but I have to disable OTA and change the partition table so best to use v2 of the board manager for this sketch.<br>
+
 <table><tr>
   <td><img src="/Images/screen1.png" /></td>
   <td><img src="/Images/screen2.png" /></td>
