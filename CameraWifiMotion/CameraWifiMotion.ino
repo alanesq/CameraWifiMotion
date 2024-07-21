@@ -2,18 +2,19 @@
  *
  *     CameraWifiMotion
  *
- *     ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 2.x
+ *     ESP32-Cam based security camera with motion detection, email, ftp and web server -  using Arduino IDE 2.3.2
+ *     Note: Latest esp32 board manager makes using OTA impossible so disable and set partition to 2mb app, 2mb spiffs
  *
- *                                   https://github.com/alanesq/CameraWifiMotion
- *                        Tested with ESP32 board manager version 2.0.14, WifiManager v2.0.16 
- *           Select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "default 4mb with Spiffs"
+ *                                      https://github.com/alanesq/CameraWifiMotion
+ *                         Tested with ESP32 board manager version 3.0.3, WifiManager v2.0.16 
+ *                   Select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "custom"
  *
- *                             Included files: email.h, standard.h, ota.h, php.h & wifi.h
+ *                    Included files: email.h, standard.h, ota.h, php.h, ftp.h, motion.h & wifi.h
  *
  *
  *             GPIO13 is used as an input pin for external sensors etc. (just reports status change at the moment)
  *             GPIO12 can be used for io but must be low at boot
- *             GPIO1 / 03 Used for serial port
+ *             GPIO1 / 03 Serial port
  *
  *             IMPORTANT! - If you are getting weird problems (motion detection retriggering all the time, slow wifi
  *                          response times, random restarting - especially when using the LED) chances are there is a problem
@@ -44,11 +45,8 @@
 #endif
 
 #include <Arduino.h>                  // required by PlatformIO
-
-// WATCHDOG TIMER IS NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
 #include <esp_task_wdt.h>             // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
-
-#define WDT_TIMEOUT 60                // timeout of watchdog timer (seconds)  
+#define WDT_TIMEOUT 120               // timeout of watchdog timer (seconds)  
 
 
 // ---------------------------------------------------------------
@@ -57,24 +55,26 @@
 
   const char* stitle = "CameraWifiMotion";               // title of this sketch (CameraWifiMotion)
 
-  const char* sversion = "04Mar24";                      // version of this sketch
+  const char* sversion = "18Jul24";                      // version of this sketch
 
   const bool serialDebug = 1;                            // provide debug info on serial port
+  const int serialSpeed = 115200;                        // Serial data speed to use
 
   bool flashIndicatorLED = 1;                            // flash the onboard led when detection is enabled
 
-  #define EMAIL_ENABLED 0                                // Enable E-mail support
+  #define ENABLE_EMAIL 1                                 // Enable E-mail support
+  #define EMAIL_FROM_NAME "CameraWifiMotion"             // who sent emails report to be from
 
-  #define ENABLE_OTA 1                                   // Enable Over The Air updates (OTA)
+  #define ENABLE_OTA 0                                   // Enable Over The Air updates (OTA) - unlikely to work with esp32 board manager v3 as it requires more memory
   const String OTAPassword = "password";                 // Password to enable OTA service (supplied as - http://<ip address>?pwd=xxxx )
 
-  #define FTP_ENABLED 0                                  // if ftp uploads are enabled
+  #define FTP_ENABLED 0                                  // if FTP uploads are enabled
 
   #define PHP_ENABLED 0                                  // if PHP uploads are enabled
 
   const String HomeLink = "/";                           // Where home button on web pages links to (usually "/")
 
-  const byte LogNumber = 50;                             // number of entries in the system log
+  const byte LogNumber = 40;                             // number of entries in the system log
 
   const uint16_t ServerPort = 80;                        // ip port to serve web pages on
 
@@ -83,8 +83,6 @@
   const bool ledBlinkEnabled = 1;                        // enable blinking onboard status LED
   const uint16_t ledBlinkRate = 1500;                    // Speed to blink the status LED (milliseconds) - also perform some system tasks
 
-  const int serialSpeed = 115200;                        // Serial data speed to use
-
   const uint16_t MaintCheckRate = 5;                     // how often to carry out routine system checks (seconds)
 
 
@@ -92,7 +90,7 @@
 
   #define IMAGE_SETTINGS 1                               // Implement adjustment of camera sensor settings
 
-  const int8_t MaxSpiffsImages = 6;                      // number of images to store in camera (Spiffs)
+  const int8_t MaxSpiffsImages = 4;                      // number of images to store in camera (Spiffs)
 
   const uint32_t maxCamStreamTime = 60;                  // max camera stream can run for (seconds)
 
@@ -160,7 +158,8 @@
 // global variables / constants
   bool wifiok = 0;                           // Flag if wifi is connected ok
   uint16_t dataRefresh = 5;                  // How often the updating info. on root page refreshes (seconds)
-  bool cameraImageInvert = 0;                // flip image  (i.e. upside down)
+  bool cameraImageInvert = 0;                // Invert image  (i.e. upside down)
+  bool cameraImageFlip = 0;                  // flip image  (i.e. left to right)
   float cameraImageExposure = 0;             // Camera exposure (loaded from spiffs)
   float cameraImageGain = 0;                 // Image gain (loaded from spiffs)
   uint32_t TRIGGERtimer = 0;                 // used for limiting camera motion trigger rate
@@ -207,8 +206,10 @@ Led statusLed1(onboardLED, LOW);             // set up onboard LED (LOW = on) - 
   #include "ota.h"                           // Over The Air updates (OTA)
 #endif
 
-#if EMAIL_ENABLED
-    #define _SenderName "ESP"                // name of email sender (no spaces)
+bool emailSendingEnabled = 1;                // flag can be used to enable/disable the sending of emails 
+#if ENABLE_EMAIL
+    #define ENABLE_EMAIL_RECEIVE 0           // if email command receiving is used in this sketch (IMAP)
+    #define _SenderName "CameraWifiMotion"   // name of email sender (no spaces)
     #include "email.h"
 #endif
 
@@ -247,27 +248,26 @@ void setup() {
     // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
       #if defined ESP32
         esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
-        #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3  
+        #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
           // v3 board manager detected
-          // Create and initialize the watchdog timer(WDT) configuration structure
-            if (serialDebug) Serial.println("v3 esp32 board manager detected");
+            if (serialDebug) Serial.println("Watchdog timer: v3 esp32 board manager detected");
             esp_task_wdt_config_t wdt_config = {
                 .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
-                .idle_core_mask = 1 << 1,         // Monitor core 1 only
+                .idle_core_mask = 1 << 0,         // Which core to monitor
                 .trigger_panic = true             // Enable panic
             };
           // Initialize the WDT with the configuration structure
             esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
             esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
             esp_task_wdt_reset();                 // reset timer
-            if (serialDebug) Serial.println("Watchdog Timer initialized at WDT_TIMEOUT seconds");
+            if (serialDebug) Serial.println("Watchdog Timer initialized");
         #else
           // pre v3 board manager assumed
-            if (serialDebug) Serial.println("older esp32 board manager assumed");
+            if (serialDebug) Serial.println("Watchdog timer: Older esp32 board manager detected");
             esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
             esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
         #endif
-      #endif
+      #endif  
 
   // status info. on serial port config
   if (serialDebug) {
@@ -507,7 +507,7 @@ void AutoAdjustImage() {
             if (cameraImageExposure < 0) cameraImageExposure = 0;
             if (cameraImageExposure > 1200) cameraImageExposure = 1200;
             if (cameraImageGain < 0) cameraImageGain = 0;
-            if (cameraImageGain > 30) cameraImageGain = 30;
+            if (cameraImageGain > 31) cameraImageGain = 31;
           cameraImageSettings(FRAME_SIZE_MOTION);      // apply camera sensor settings
           capture_still();                             // update stored image with the changed image settings to prevent trigger
           update_frame();
@@ -637,7 +637,13 @@ void LoadSettingsSpiffs() {
       else if (tnum == 1) cameraImageInvert = 1;
       else log_system_message("Invalid cameraImageInvert in settings: " + line);
 
-    // line 17 - dataRefresh
+    // line 17 - cameraImageFlip
+      ReadLineSpiffs(&file, &line, &tnum);
+      if (tnum == 0) cameraImageFlip = 0;
+      else if (tnum == 1) cameraImageFlip = 1;
+      else log_system_message("Invalid cameraImageFlip in settings: " + line);      
+
+    // line 18 - dataRefresh
       ReadLineSpiffs(&file, &line, &tnum);
       if (tnum < 1 || tnum > 600) log_system_message("invalid dataRefresh in settings");
       else dataRefresh = tnum;
@@ -657,7 +663,6 @@ void LoadSettingsSpiffs() {
         }
       }
       if (gerr) log_system_message("invalid mask entry in settings");
-
     file.close();
 }
 
@@ -694,6 +699,7 @@ void SaveSettingsSpiffs() {
         file.println(String(ftpImages));
         file.println(String(PHPImages));
         file.println(String(cameraImageInvert));
+        file.println(String(cameraImageFlip));
         file.println(String(dataRefresh));
 
        // Detection mask grid
@@ -702,7 +708,6 @@ void SaveSettingsSpiffs() {
               file.println(String(mask_frame[x][y]));
             }
           }
-
     file.close();
 }
 
@@ -889,7 +894,7 @@ void handleRoot() {
 
     #if IMAGE_SETTINGS      // Implement adjustment of image settings
       client.write("<br>Set image exposure <input type='number' style='width: 50px' name='exp' min='0' max='1200' value=''>\n");
-      client.write(" gain <input type='number' style='width: 30px' name='gain' min='0' max='30' value=''>\n");
+      client.write(" gain <input type='number' style='width: 30px' name='gain' min='0' max='31' value=''>\n");
 
     // Target brightness brightness cuttoff point
       client.write("<BR>Auto image adjustment, target image brightness ");
@@ -908,7 +913,7 @@ void handleRoot() {
       client.write("<input type='number' style='width: 30px' name='consec' title='The number of changed images detected in a row required to trigger ");
       client.printf("motion detected' min='1' max='100' value='%d'>\n", tCounterTrigger);
 
-    #if EMAIL_ENABLED
+    #if ENABLE_EMAIL
     // minimum seconds between email sends
       if (emailWhenTriggered) {
         client.write("<BR>Minimum time between E-mails:");
@@ -931,6 +936,11 @@ void handleRoot() {
       if (cameraImageInvert) client.write("checked ");
       client.write(">\n");
 
+    // flip image check box
+      client.print(", Flip Image<input type='checkbox' name='flip' ");
+      if (cameraImageFlip) client.write("checked ");
+      client.write(">\n");      
+
     // input submit button
       client.write("&ensp; <input type='submit' name='submit'><BR>\n");
 
@@ -943,7 +953,7 @@ void handleRoot() {
     // Toggle motion detection
       client.write("<input style='height: 30px;' name='detection' title='Motion detection enable/disable' value='Detection' type='submit'> \n");
 
-    #if EMAIL_ENABLED
+    #if ENABLE_EMAIL
     // Toggle email when motion detection
       client.write("<input style='height: 30px;' name='email' value='Email' title='Send email when motion detected enable/disable' type='submit'> \n");
     #endif
@@ -1154,6 +1164,17 @@ void rootButtons() {
         }
       }
 
+    // if cameraImageFlip was changed
+      if (server.hasArg("submit")) {
+        bool tStore = 0;
+        if (server.hasArg("flip")) tStore = 1;
+        if (tStore != cameraImageFlip) {     // value has changed
+          cameraImageFlip = tStore;
+          SaveSettingsSpiffs();
+          log_system_message("Flip image changed to " + String(cameraImageInvert));
+        }
+      }      
+
     // if mask grid check box array was altered
       if (server.hasArg("submit")) {                           // if submit button was pressed
         mask_active = 0;
@@ -1333,7 +1354,7 @@ void handleData(){
        #endif
 
      // email status
-       #if EMAIL_ENABLED
+       #if ENABLE_EMAIL
            if (emailWhenTriggered) reply += " {<font color='#FF0000'>Email sending enabled</font>}&ensp;";
        #endif
 
@@ -1537,9 +1558,9 @@ void handleImagedata() {
 
     // difference between images table
     client.write("<BR><center>Difference<BR><table>\n");
-    for (int y = 0; y < H; y++) {
+    for (int y = 0; y < FH; y++) {
       client.write("<tr>");
-      for (int x = 0; x < W; x++) {
+      for (int x = 0; x < FW; x++) {
         uint16_t timg = abs(current_frame[y][x] - prev_frame[y][x]);
         bool mactive = block_active(x,y);    // is it active in the mask (0 or 1) - "block_active" is in motion.h
         client.write(generateTD(timg,mactive).c_str());
@@ -1550,9 +1571,9 @@ void handleImagedata() {
 
     // current image table
     client.write("<BR><BR>Current Frame<BR><table>\n");
-    for (int y = 0; y < H; y++) {
+    for (int y = 0; y < FH; y++) {
       client.write("<tr>");
-      for (int x = 0; x < W; x++) {
+      for (int x = 0; x < FW; x++) {
         bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
         client.write(generateTD(current_frame[y][x],mactive).c_str());
       }
@@ -1562,9 +1583,9 @@ void handleImagedata() {
 
     // previous image table
     client.write("<BR><BR>Previous Frame<BR><table>\n");
-    for (int y = 0; y < H; y++) {
+    for (int y = 0; y < FH; y++) {
       client.write("<tr>");
-      for (int x = 0; x < W; x++) {
+      for (int x = 0; x < FW; x++) {
         bool mactive = block_active(x,y);    // is it active in the mask (0 or 1)
         client.write(generateTD(prev_frame[y][x],mactive).c_str());
       }
@@ -1642,7 +1663,6 @@ void handleBootLog() {
           }
         }
         file.close();
-
       client.write("<BR><BR>");
 
     // close html page
@@ -1943,6 +1963,7 @@ void saveJpgFrame(String filesName) {
               } else {
                 log_system_message("Error: failed to save image to sd card");
               }
+              file.flush();
               file.close();
           }
       }
@@ -2021,6 +2042,7 @@ void saveGreyscaleFrame(String filesName) {
             log_system_message("Error: writing grey image to sd card");
           }
         }
+      file.flush();
       file.close();
     }
 
@@ -2072,7 +2094,7 @@ void MotionDetected(uint16_t changes) {
 
     int capres = capturePhotoSaveSpiffs(UseFlash);                                     // capture an image
 
-    #if EMAIL_ENABLED
+    #if ENABLE_EMAIL
       // send email if long enough since last motion detection (or if this is the first one)
       if (emailWhenTriggered) {       // add "&& cameraImageGain == 0" to only email during daylight hours (i.e. Chris's setting)
           unsigned long currentMillis = millis();        // get current time
@@ -2081,13 +2103,13 @@ void MotionDetected(uint16_t changes) {
             EMAILtimer = currentMillis;    // reset timer
 
             // send an email
-              _message[0]=0; _subject[0]=0;          // clear any existing text
+              _recepient[0]='\0'; _message[0]='\0'; _subject[0]='\0';      // clear any existing text
+              strcat(_recepient, _emailReceiver);                          // email address to send it to
               strcat(_subject,"ESPcamera");
               strcat(_message,"Camera triggered at ");
               String tt=currentTime(1);
               strcat(_message, tt.c_str());
-              if (!capres) strcat(_message, "\nNote: there was a problem detected when capturing an image");
-              sendEmail(_emailReceiver, _subject, _message);
+              emailToSend=1; lastEmailAttempt=0; emailAttemptCounter=0; sendSMSflag=0;   // set flags that there is an email to be sent
           }
           else log_system_message("Too soon to send another email");
       }
@@ -2247,13 +2269,15 @@ void handleTest(){
 //    requestWebPageGSM("alanesq.eu5.net", "/temp/q.txt", 80);
 
 
-#if EMAIL_ENABLED
-  client.write("<br>Sending test email<br>\n");
-  // send a test email
-    _message[0]=0; _subject[0]=0;          // clear any existing text
-    strcat(_subject, stitle);
-    strcat(_message, "test email");
-    sendEmail(_emailReceiver, _subject, _message);
+// demo of sending an email
+#if ENABLE_EMAIL
+      client.write("<br>Sending test email");
+      _recepient[0]='\0'; _message[0]='\0'; _subject[0]='\0';      // clear any existing text
+      strcat(_recepient, _emailReceiver);                          // email address to send it to
+      strcat(_subject,stitle);
+      strcat(_subject,"test");
+      strcat(_message,"test email");
+      emailToSend=1; lastEmailAttempt=0; emailAttemptCounter=0; sendSMSflag=0;   // set flags that there is an email to be sent
 #endif
 
 

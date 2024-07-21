@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *  Motion detection from camera image - 16Feb22
+ *  Motion detection from camera image - 08Jul24
  *
  *  original code from: https://eloquentarduino.github.io/2020/01/motion-detection-with-esp32-cam-only-arduino-version/
  *
@@ -60,13 +60,13 @@ const bool showFrames = 0;      // if set captured frames will be shown on seria
     uint16_t Image_thresholdH = 100;      // max changed blocks in image required to count as motion detected in percent
 
 // misc
-    #define WIDTH 320                 // motion sensing frame size
-    #define HEIGHT 240
-    #define W (WIDTH / BLOCK_SIZE_X)  // number of blocks in image
-    #define H (HEIGHT / BLOCK_SIZE_Y)
-    uint16_t tCounter = 0;            // count number of consecutive triggers (i.e. how many times in a row movement has been detected)
-    uint16_t tCounterTrigger = 2;     // number of consequitive triggers required to count as movement detected
-    uint16_t AveragePix = 0;          // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
+    #define FWIDTH 320                    // motion sensing frame size
+    #define FHEIGHT 240
+    #define FW (FWIDTH / BLOCK_SIZE_X)     // number of blocks in image
+    #define FH (FHEIGHT / BLOCK_SIZE_Y)
+    uint16_t tCounter = 0;                // count number of consecutive triggers (i.e. how many times in a row movement has been detected)
+    uint16_t tCounterTrigger = 2;         // number of consequitive triggers required to count as movement detected
+    uint16_t AveragePix = 0;              // average pixel reading from captured image (used for nighttime compensation) - bright day = around 120
     const uint16_t blocksPerMaskUnit = 16;    // number of blocks in each of the 12 detection mask units
     // expected variables:  cameraImageBrightness, cameraImageInvert, cameraImageContrast, thresholdGainAdjust
 
@@ -74,16 +74,16 @@ const bool showFrames = 0;      // if set captured frames will be shown on seria
     uint16_t latestChanges = 0;
 
 // frame stores (blocks)
-    uint16_t prev_frame[H][W] = { 0 };      // previously captured frame
-    uint16_t current_frame[H][W] = { 0 };   // current frame
+    uint16_t prev_frame[FH][FW] = { 0 };      // previously captured frame
+    uint16_t current_frame[FH][FW] = { 0 };   // current frame
 
 // Image detection mask (i.e. if area of image is enabled for use when motion sensing, 1=active)
 //   4 x 3 grid results in mask areas of 16 blocks (4x4) - image = 320x240 pixels, blocks = 20x20 pixels
     const uint8_t mask_columns = 4;         // columns in detection mask
     const uint8_t mask_rows = 3;            // rows in detection mask
     uint16_t mask_active = 12;              // number of mask sections active
-    const uint16_t maskBlockWidth = W / 4;  // number of blocks in each mask area
-    const uint16_t maskBlockHeight = H / 3;
+    const uint16_t maskBlockWidth = FW / 4;  // number of blocks in each mask area
+    const uint16_t maskBlockHeight = FH / 3;
     bool mask_frame[mask_columns][mask_rows] = { {1,1,1},
                                                  {1,1,1},
                                                  {1,1,1},
@@ -94,7 +94,7 @@ const bool showFrames = 0;      // if set captured frames will be shown on seria
     bool capture_still();
     float motion_detect();
     void update_frame();
-    void print_frame(uint16_t frame[H][W]);
+    void print_frame(uint16_t frame[FH][FW]);
     bool block_active(uint16_t x,uint16_t y);
     bool cameraImageSettings(framesize_t);
 
@@ -123,8 +123,14 @@ bool setupCameraHardware() {
     config.pin_pclk = PCLK_GPIO_NUM;
     config.pin_vsync = VSYNC_GPIO_NUM;
     config.pin_href = HREF_GPIO_NUM;
-    config.pin_sscb_sda = SIOD_GPIO_NUM;
-    config.pin_sscb_scl = SIOC_GPIO_NUM;
+    // variations in version of esp32 board manager (v3 changed the names for some reason)
+      #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3  
+          config.pin_sccb_sda = SIOD_GPIO_NUM;    // v3.x
+          config.pin_sccb_scl = SIOC_GPIO_NUM;     
+      #else
+          config.pin_sscb_sda = SIOD_GPIO_NUM;    // pre v3
+          config.pin_sscb_scl = SIOC_GPIO_NUM;
+      #endif
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
@@ -134,7 +140,7 @@ bool setupCameraHardware() {
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 
     // if no psram found reduce image resolution
-      if(!psramFound()){
+      if(!psramFound()) {
         config.frame_size = FRAMESIZE_SVGA;
         //#define FRAME_SIZE_PHOTO FRAMESIZE_SVGA
         config.jpeg_quality = 12;
@@ -176,7 +182,7 @@ bool cameraImageSettings(framesize_t fsize) {
       // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
       s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
       s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
-      s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+      s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 31)
       s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
       s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
       s->set_quality(s, 10);                        // (0 - 63)
@@ -186,7 +192,7 @@ bool cameraImageSettings(framesize_t fsize) {
       s->set_saturation(s, 0);                      // (-2 to 2)
       s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
       s->set_sharpness(s, 0);                       // (-2 to 2)
-      s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+      s->set_hmirror(s, cameraImageFlip);           // (0 or 1) flip horizontally
       s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
       s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
 //       s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
@@ -224,7 +230,7 @@ bool capture_still() {
     Serial.flush();                                           // wait for serial data to be sent first as I suspect this can cause problems capturing an image
                                                               //      although I have read that this command has changed and no longer performs this function?
 
-    uint32_t temp_frame[H][W] = { 0 };
+    uint32_t temp_frame[FH][FW] = { 0 };
 
     // capture image from camera
     cameraImageSettings(FRAME_SIZE_MOTION);                   // apply camera sensor settings
@@ -235,9 +241,9 @@ bool capture_still() {
     }
 
     // down-sample image in to blocks
-    for (uint32_t i = 0; i < (WIDTH * HEIGHT); i++) {         // step through all pixels in image
-      const uint16_t x = i % WIDTH;                           // calculate x and y location of this pixel in the image
-      const uint16_t y = floor(i / WIDTH);
+    for (uint32_t i = 0; i < (FWIDTH * FHEIGHT); i++) {         // step through all pixels in image
+      const uint16_t x = i % FWIDTH;                           // calculate x and y location of this pixel in the image
+      const uint16_t y = floor(i / FWIDTH);
       const uint8_t block_x = floor(x / BLOCK_SIZE_X);        // calculate which block this pixel is in
       const uint8_t block_y = floor(y / BLOCK_SIZE_Y);
       const uint8_t pixel = frame_buffer->buf[i];             // get the pixels brightness (0 to 255)
@@ -249,8 +255,8 @@ bool capture_still() {
     // average the values for all pixels in each block
       bool frameChanged = 0;                                  // flag if any change at all since last frame (used to detect problem)
       uint16_t TempAveragePix = 0;                            // average pixel reading (used for calculating image brightness)
-      for (int y = 0; y < H; y++) {
-        for (int x = 0; x < W; x++) {
+      for (int y = 0; y < FH; y++) {
+        for (int x = 0; x < FW; x++) {
             uint16_t currentBlock = temp_frame[y][x] / (BLOCK_SIZE_X * BLOCK_SIZE_Y);    // average pixel brightness in the block
             if (current_frame[y][x] != currentBlock) frameChanged = 1;
             current_frame[y][x] = currentBlock;
@@ -258,7 +264,7 @@ bool capture_still() {
         }
       }
     if (!frameChanged) log_system_message("Suspect camera problem as no change at all since previous image was captured");
-    AveragePix = TempAveragePix / (H * W);                    // calculate the average pixel brightness in whole image
+    AveragePix = TempAveragePix / (FH * FW);                    // calculate the average pixel brightness in whole image
     if (serialDebug && showFrames) print_frame(current_frame);// show captured frame on serial port for debugging
 
     return true;
@@ -272,14 +278,14 @@ bool capture_still() {
 
 float motion_detect() {
     uint16_t changes = 0;
-    //const uint16_t blocks = (WIDTH * HEIGHT) / (BLOCK_SIZE_X * BLOCK_SIZE_Y);     // total number of blocks in image
+    //const uint16_t blocks = (FWIDTH * FHEIGHT) / (BLOCK_SIZE_X * BLOCK_SIZE_Y);     // total number of blocks in image
 
     // adjust block_threshold for gain setting (to compensate for noise introduced with gain)
     uint16_t tThreshold = Block_threshold + (float)(cameraImageGain * thresholdGainCompensation);
 
     // go through all blocks in current frame and check for changes since previous frame
-    for (int y = 0; y < H; y++) {
-        for (int x = 0; x < W; x++) {
+    for (int y = 0; y < FH; y++) {
+        for (int x = 0; x < FW; x++) {
             uint16_t current = current_frame[y][x];
             uint16_t prev = prev_frame[y][x];
             uint16_t pChange = abs(current - prev);          // modified code Feb20 - gives blocks average pixels variation in range 0 to 255
@@ -344,11 +350,11 @@ void update_frame() {
 // ---------------------------------------------------------------
 // For serial debugging
 
-void print_frame(uint16_t frame[H][W]) {
+void print_frame(uint16_t frame[FH][FW]) {
     if (!serialDebug) return;
     Serial.println("--- Current frame ----");
-    for (int y = 0; y < H; y++) {
-        for (int x = 0; x < W; x++) {
+    for (int y = 0; y < FH; y++) {
+        for (int x = 0; x < FW; x++) {
             Serial.print(frame[y][x]);
             Serial.print('\t');
         }

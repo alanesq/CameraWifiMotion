@@ -1,6 +1,6 @@
 /**************************************************************************************************
  *
- *                        FTP images to server - 02Jan22
+ *                        FTP images to server - 10Jul24
  *
  *                        library used: https://github.com/ldab/ESP32_FTPClient
  *
@@ -14,10 +14,13 @@
 
 // **************************************** S e t t i n g s ****************************************
 
+// directory to store files on FTP server
+  String FTPdirectory = "/";
+
 // Enter your FTP account details here
-  char ftp_server[] = "<ftp servers ip address>";
-  char ftp_user[]   = "<ftp user name>";
-  char ftp_pass[]   = "<ftp password>";
+char ftp_server[] = "<ftp servers ip address>";
+char ftp_user[]   = "<ftp user name>";
+char ftp_pass[]   = "<ftp password>";
 
 
 // *************************************************************************************************
@@ -45,7 +48,7 @@ void uploadImageByFTP(uint8_t* buf, size_t len, String fName) {
   //  ftp.MakeDir("my_new_dir");
 
   //Create a file and write the image data to it;
-    ftp.ChangeWorkDir("/");
+    ftp.ChangeWorkDir(FTPdirectory.c_str());
     ftp.InitFile("Type I");
     fName += ".jpg";
     ftp.NewFile( fName.c_str() );
@@ -54,7 +57,7 @@ void uploadImageByFTP(uint8_t* buf, size_t len, String fName) {
 
   ftp.CloseConnection();
 
-  // log_system_message("FTP");
+  log_system_message("FTP image uploaded");
 }
 
 
