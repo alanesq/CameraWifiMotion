@@ -9,12 +9,12 @@ It also has the options to email or FTP the captured images or store them to sd 
 NOTE: I have now updated it to work with the latest ESP32 board manager (v3), it may no longer work with older versions?
 You need to set the partition table to CUSTOM and if you want to include image attachments the ESP_Mail.FS.h file in the 
 library needs to be modified:
-              delete block of lines around 73-92 and replace with
-                  #if defined(ESP32)
-                  #include <SPIFFS.h>
-                  #endif
-                  #define ESP_MAIL_DEFAULT_FLASH_FS SPIFFS       
-              see: https://github.com/mobizt/ESP-Mail-Client/blob/master/src/ESP_Mail_FS.h 
+              delete block of lines around 73-92 and replace with<br>
+                  #if defined(ESP32)<br>
+                  #include <SPIFFS.h><br>
+                  #endif<br>
+                  #define ESP_MAIL_DEFAULT_FLASH_FS SPIFFS      <br> 
+              see: https://github.com/mobizt/ESP-Mail-Client/blob/master/src/ESP_Mail_FS.h <br><br>
 
 <table><tr>
   <td><img src="/Images/screen1.png" /></td>
