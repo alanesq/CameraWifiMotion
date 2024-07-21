@@ -1,21 +1,27 @@
 <p align="center"><img src="/Images/CameraWifiMotion.jpg" width="90%"/></p>
            
-This is a Arduino IDE or PlatformIO sketch to use one of the cheap (5ukp from eBay) ESP32 camera modules as a motion detecting security 
+This is a Arduino IDE sketch to use one of the cheap (7ukp from eBay) ESP32 camera modules as a motion detecting security 
 camera.
-Note - if using Arduino IDE rename to main.cpp "CameraWifiMotion.ino"
 It captures an image from the camera around 4 times a second, each time comparing this with the previous image looking for 
 any changes.  If significant change is detected it captures a higher res image and stores it in internal memory.  
 It also has the options to email or FTP the captured images or store them to sd card.
 
-NOTE: The latest ESP32 board manager (i.e. v3.x) seems to require a lot more memory resulting in this sketch not fitting in memory, also they seem to have made
-several changes resulting in it stopping things working.  I have a version which works with the newer one but I have to disable OTA and change the partition table so best to use v2 of the board manager for this sketch.<br>
+NOTE: I have now updated it to work with the latest ESP32 board manager (v3), it may no longer work with older versions?
+You need to set the partition table to CUSTOM and if you want to include image attachments the ESP_Mail.FS.h file in the 
+library needs to be modified:
+              delete block of lines around 73-92 and replace with
+                  #if defined(ESP32)
+                  #include <SPIFFS.h>
+                  #endif
+                  #define ESP_MAIL_DEFAULT_FLASH_FS SPIFFS       
+              see: https://github.com/mobizt/ESP-Mail-Client/blob/master/src/ESP_Mail_FS.h 
 
 <table><tr>
   <td><img src="/Images/screen1.png" /></td>
   <td><img src="/Images/screen2.png" /></td>
 </tr></table>   
 
-NOTE: It is important that if using Arduino IDE you select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "default 4mb with Spiffs.<br>
+NOTE: It is important that if using Arduino IDE you select board "ESP32 Dev Module" with PSRAM enabled, Partition scheme "CUSTOM".<br>
 
 There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
@@ -47,7 +53,7 @@ capacitor fitting as both the LED and wifi can cause a lot of spikes/voltage dro
 The sketch can use OTA (Over the air updates) to update the software, this can be enabled/disabled in the main settings of 
 the sketch.
 If you use OTA do not select the "ESP32-cam" board in the Arduino IDE, use "ESP32 Dev Module" and make sure PSRAM is 
-enabled otherwise OTA will not work.
+enabled and partition table "custom" selected, otherwise OTA will not work.
 In an attempt to give some form of security to OTA I have set up the sketch so that when OTA is enabled you can not access 
 it until you have first entered a password, accessed via "http://x.x.x.x/ota"
 You can change this password in the main settings (OTAPassword).
